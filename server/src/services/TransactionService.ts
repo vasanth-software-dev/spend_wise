@@ -1,0 +1,288 @@
+import { transactionRepository, TransactionFilterParams } from '../repositories/TransactionRepository.js';
+import { categoryRepository } from '../repositories/CategoryRepository.js';
+import { duplicateDetectionService } from './DuplicateDetectionService.js';
+import { ITransaction, TransactionType, PaymentMethod, TransactionSource } from '../types/index.js';
+import { roundTo2Decimals } from '../utils/currency.js';
+import { Types } from 'mongoose';
+
+export interface CreateTransactionDTO {
+  type: TransactionType;
+  amount: number;
+  currency?: string;
+  categoryId?: string | null;
+  merchant: string;
+  description?: string;
+  paymentMethod: PaymentMethod;
+  source?: TransactionSource;
+  sourceAccountId?: string | null;
+  externalTransactionId?: string;
+  transactionDate?: Date | string;
+  notes?: string;
+  isRecurring?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export class TransactionService {
+  async createTransaction(userId: string, data: CreateTransactionDTO): Promise<ITransaction> {
+    const amount = roundTo2Decimals(Number(data.amount));
+    if (isNaN(amount) || amount <= 0) {
+      throw new Error('Amount must be a positive number');
+    }
+
+    const txDate = data.transactionDate ? new Date(data.transactionDate) : new Date();
+
+    // Check duplicate
+    const dupCheck = await duplicateDetectionService.checkDuplicate(userId, {
+      amount,
+      currency: data.currency || 'INR',
+      type: data.type === 'income' ? 'income' : 'expense',
+      merchant: data.merchant,
+      transactionDate: txDate,
+      upiReference: data.externalTransactionId,
+      paymentMethod: data.paymentMethod,
+      confidenceScore: 100,
+    });
+
+    if (dupCheck.isDuplicate) {
+      console.warn(`Duplicate transaction noticed: ${dupCheck.reason}`);
+    }
+
+    const transaction = await transactionRepository.create({
+      userId: new Types.ObjectId(userId),
+      type: data.type,
+      amount,
+      currency: data.currency || 'INR',
+      categoryId: data.categoryId ? new Types.ObjectId(data.categoryId) : null,
+      merchant: data.merchant.trim(),
+      description: data.description?.trim(),
+      paymentMethod: data.paymentMethod,
+      source: data.source || 'manual',
+      sourceAccountId: data.sourceAccountId ? new Types.ObjectId(data.sourceAccountId) : null,
+      externalTransactionId: data.externalTransactionId?.trim() || undefined,
+      transactionDate: txDate,
+      notes: data.notes?.trim(),
+      status: 'confirmed',
+      isRecurring: !!data.isRecurring,
+      metadata: data.metadata || {},
+    });
+
+    return transaction;
+  }
+
+  async getTransactionById(id: string, userId: string): Promise<ITransaction | null> {
+    return transactionRepository.findById(id, userId);
+  }
+
+  async getTransactions(params: TransactionFilterParams) {
+    return transactionRepository.findWithFilters(params);
+  }
+
+  async updateTransaction(id: string, userId: string, updateData: Partial<CreateTransactionDTO>): Promise<ITransaction | null> {
+    const payload: Partial<ITransaction> = {};
+
+    if (updateData.amount !== undefined) payload.amount = roundTo2Decimals(Number(updateData.amount));
+    if (updateData.type) payload.type = updateData.type;
+    if (updateData.merchant) payload.merchant = updateData.merchant.trim();
+    if (updateData.description !== undefined) payload.description = updateData.description?.trim();
+    if (updateData.notes !== undefined) payload.notes = updateData.notes?.trim();
+    if (updateData.paymentMethod) payload.paymentMethod = updateData.paymentMethod;
+    if (updateData.transactionDate) payload.transactionDate = new Date(updateData.transactionDate);
+    if (updateData.categoryId !== undefined) {
+      payload.categoryId = updateData.categoryId ? new Types.ObjectId(updateData.categoryId) : null;
+    }
+
+    return transactionRepository.update(id, userId, payload);
+  }
+
+  async deleteTransaction(id: string, userId: string): Promise<boolean> {
+    return transactionRepository.delete(id, userId);
+  }
+
+  async bulkDelete(ids: string[], userId: string): Promise<number> {
+    return transactionRepository.deleteMany(ids, userId);
+  }
+
+  async bulkCategorize(ids: string[], userId: string, categoryId: string): Promise<number> {
+    return transactionRepository.updateMany(ids, userId, {
+      categoryId: new Types.ObjectId(categoryId),
+    });
+  }
+
+  async getDashboardData(userId: string, timeRange: '7d' | '30d' | '3m' | '6m' | '1y' = '30d') {
+    const now = new Date();
+    let startDate = new Date();
+    let groupBy: 'day' | 'month' = 'day';
+
+    switch (timeRange) {
+      case '7d':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case '30d':
+        startDate.setDate(now.getDate() - 30);
+        break;
+      case '3m':
+        startDate.setMonth(now.getMonth() - 3);
+        groupBy = 'month';
+        break;
+      case '6m':
+        startDate.setMonth(now.getMonth() - 6);
+        groupBy = 'month';
+        break;
+      case '1y':
+        startDate.setFullYear(now.getFullYear() - 1);
+        groupBy = 'month';
+        break;
+      default:
+        startDate.setDate(now.getDate() - 30);
+    }
+
+    // Start of the current calendar month for summary stats
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const [summary, spendingTrend, categoryBreakdown, topMerchants, paymentDistribution, recent] =
+      await Promise.all([
+        transactionRepository.getDashboardSummary(userId, startOfMonth, endOfMonth),
+        transactionRepository.getSpendingTrend(userId, startDate, now, groupBy),
+        transactionRepository.getCategoryBreakdown(userId, startDate, now, 'expense'),
+        transactionRepository.getTopMerchants(userId, startDate, now, 6),
+        transactionRepository.getPaymentMethodDistribution(userId, startDate, now),
+        transactionRepository.findWithFilters({ userId, page: 1, limit: 5 }),
+      ]);
+
+    return {
+      summary,
+      spendingTrend,
+      categoryBreakdown,
+      topMerchants,
+      paymentDistribution,
+      recentTransactions: recent.transactions,
+      timeRange,
+    };
+  }
+
+  // Import transactions from parsed CSV rows
+  async importTransactions(
+    userId: string,
+    rows: Array<{
+      date: string;
+      amount: number | string;
+      type?: string;
+      category?: string;
+      merchant: string;
+      payment_method?: string;
+      notes?: string;
+    }>
+  ) {
+    const created: ITransaction[] = [];
+    const skipped: Array<{ row: unknown; reason: string }> = [];
+
+    // Cache categories for user
+    const categories = await categoryRepository.findByUserId(userId);
+    const catMap = new Map<string, string>();
+    for (const c of categories) {
+      catMap.set(c.name.toLowerCase(), String(c._id));
+    }
+
+    for (const row of rows) {
+      try {
+        const amount = roundTo2Decimals(Number(row.amount));
+        if (isNaN(amount) || amount <= 0) {
+          skipped.push({ row, reason: 'Invalid or missing amount' });
+          continue;
+        }
+
+        const date = new Date(row.date);
+        if (isNaN(date.getTime())) {
+          skipped.push({ row, reason: 'Invalid date format' });
+          continue;
+        }
+
+        const merchant = (row.merchant || 'Unknown').trim();
+        const typeStr = (row.type || 'expense').toLowerCase();
+        const type: TransactionType = typeStr === 'income' ? 'income' : typeStr === 'transfer' ? 'transfer' : 'expense';
+
+        const paymentMethodStr = (row.payment_method || 'upi').toLowerCase();
+        const validMethods: PaymentMethod[] = ['upi', 'bank', 'cash', 'card', 'wallet', 'other'];
+        const paymentMethod: PaymentMethod = validMethods.includes(paymentMethodStr as PaymentMethod)
+          ? (paymentMethodStr as PaymentMethod)
+          : 'upi';
+
+        // Check duplicate
+        const dup = await duplicateDetectionService.checkDuplicate(userId, {
+          amount,
+          currency: 'INR',
+          type: type === 'income' ? 'income' : 'expense',
+          merchant,
+          transactionDate: date,
+          paymentMethod,
+          confidenceScore: 100,
+        });
+
+        if (dup.isDuplicate) {
+          skipped.push({ row, reason: `Duplicate detected: ${dup.reason}` });
+          continue;
+        }
+
+        let categoryId: string | null = null;
+        if (row.category && catMap.has(row.category.toLowerCase())) {
+          categoryId = catMap.get(row.category.toLowerCase()) || null;
+        }
+
+        const tx = await transactionRepository.create({
+          userId: new Types.ObjectId(userId),
+          type,
+          amount,
+          currency: 'INR',
+          categoryId: categoryId ? new Types.ObjectId(categoryId) : null,
+          merchant,
+          paymentMethod,
+          source: 'import',
+          transactionDate: date,
+          notes: row.notes?.trim(),
+          status: 'confirmed',
+        });
+
+        created.push(tx);
+      } catch (err) {
+        skipped.push({ row, reason: (err as Error).message });
+      }
+    }
+
+    return {
+      importedCount: created.length,
+      skippedCount: skipped.length,
+      created,
+      skipped,
+    };
+  }
+
+  // Export transactions to CSV format
+  async exportTransactionsToCSV(params: TransactionFilterParams): Promise<string> {
+    const result = await transactionRepository.findWithFilters({ ...params, limit: 10000 });
+    const headers = ['Date', 'Type', 'Amount', 'Currency', 'Category', 'Merchant', 'Payment Method', 'Source', 'Reference ID', 'Notes'];
+
+    const lines = [headers.join(',')];
+
+    for (const tx of result.transactions) {
+      const cat = (tx.categoryId as unknown as { name?: string })?.name || '';
+      const line = [
+        new Date(tx.transactionDate).toISOString().split('T')[0],
+        tx.type,
+        tx.amount,
+        tx.currency || 'INR',
+        `"${cat.replace(/"/g, '""')}"`,
+        `"${tx.merchant.replace(/"/g, '""')}"`,
+        tx.paymentMethod,
+        tx.source,
+        `"${(tx.externalTransactionId || '').replace(/"/g, '""')}"`,
+        `"${(tx.notes || '').replace(/"/g, '""')}"`,
+      ];
+      lines.push(line.join(','));
+    }
+
+    return lines.join('\n');
+  }
+}
+
+export const transactionService = new TransactionService();

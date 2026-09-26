@@ -1,0 +1,403 @@
+import mongoose, { Types } from 'mongoose';
+import { connectDatabase, disconnectDatabase } from './config/database.js';
+import { UserModel } from './models/User.js';
+import { CategoryModel } from './models/Category.js';
+import { TransactionModel } from './models/Transaction.js';
+import { BudgetModel } from './models/Budget.js';
+import { RecurringTransactionModel } from './models/RecurringTransaction.js';
+import { EmailAccountModel } from './models/EmailAccount.js';
+import { DetectedTransactionModel } from './models/DetectedTransaction.js';
+import { NotificationModel } from './models/Notification.js';
+import { hashPassword } from './utils/hash.js';
+import { categoryRepository, DEFAULT_SYSTEM_CATEGORIES } from './repositories/CategoryRepository.js';
+
+async function seed() {
+  console.log('🌱 Starting SpendWise Enterprise Data Seeder...');
+  await connectDatabase();
+
+  // Clear existing collections
+  console.log('🧹 Cleaning old data...');
+  await Promise.all([
+    UserModel.deleteMany({}),
+    CategoryModel.deleteMany({}),
+    TransactionModel.deleteMany({}),
+    BudgetModel.deleteMany({}),
+    RecurringTransactionModel.deleteMany({}),
+    EmailAccountModel.deleteMany({}),
+    DetectedTransactionModel.deleteMany({}),
+    NotificationModel.deleteMany({}),
+  ]);
+
+  // Ensure Default Categories
+  console.log('📁 Populating default categories...');
+  await categoryRepository.ensureDefaultCategories();
+  const categories = await CategoryModel.find({ userId: null });
+  const catMap = new Map<string, Types.ObjectId>();
+  categories.forEach((c) => catMap.set(c.name, c._id as Types.ObjectId));
+
+  // Seed 10 Realistic Users
+  console.log('👤 Seeding 10 users...');
+  const defaultPasswordHash = await hashPassword('SpendWise@123');
+
+  const usersData = [
+    { name: 'Vasanth Kumar', email: 'vasanth@spendwise.dev' },
+    { name: 'Priya Sharma', email: 'priya@spendwise.dev' },
+    { name: 'Rahul Verma', email: 'rahul@spendwise.dev' },
+    { name: 'Ananya Iyer', email: 'ananya@spendwise.dev' },
+    { name: 'Rohan Gupta', email: 'rohan@spendwise.dev' },
+    { name: 'Sneha Patel', email: 'sneha@spendwise.dev' },
+    { name: 'Vikram Malhotra', email: 'vikram@spendwise.dev' },
+    { name: 'Divya Nair', email: 'divya@spendwise.dev' },
+    { name: 'Aditya Rao', email: 'aditya@spendwise.dev' },
+    { name: 'Meera Deshmukh', email: 'meera@spendwise.dev' },
+  ];
+
+  const createdUsers = [];
+  for (const u of usersData) {
+    const user = await UserModel.create({
+      name: u.name,
+      email: u.email,
+      passwordHash: defaultPasswordHash,
+      currency: 'INR',
+      timezone: 'Asia/Kolkata',
+      isEmailVerified: true,
+    });
+    createdUsers.push(user);
+  }
+
+  const primaryUser = createdUsers[0];
+  console.log(`✨ Primary Demo User: ${primaryUser.email} (Password: SpendWise@123)`);
+
+  // Seed Email Accounts for Primary User (Requirement 3: Multiple email accounts per user)
+  console.log('📧 Setting up Email Accounts...');
+  const primaryGmail = await EmailAccountModel.create({
+    userId: primaryUser._id,
+    provider: 'gmail',
+    email: 'vasanth.personal@gmail.com',
+    status: 'active',
+    lastSyncAt: new Date(Date.now() - 15 * 60 * 1000),
+    detectedCount: 14,
+    syncFrequencyMinutes: 30,
+  });
+
+  const workGmail = await EmailAccountModel.create({
+    userId: primaryUser._id,
+    provider: 'mock',
+    email: 'vasanth.work@company.com',
+    status: 'active',
+    lastSyncAt: new Date(Date.now() - 45 * 60 * 1000),
+    detectedCount: 6,
+    syncFrequencyMinutes: 60,
+  });
+
+  const secondaryGmail = await EmailAccountModel.create({
+    userId: primaryUser._id,
+    provider: 'mock',
+    email: 'vasanth.finance@gmail.com',
+    status: 'paused',
+    lastSyncAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    detectedCount: 4,
+    syncFrequencyMinutes: 120,
+  });
+
+  // Seed Budgets for Primary User
+  console.log('🎯 Seeding Budgets...');
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+  await BudgetModel.create([
+    {
+      userId: primaryUser._id,
+      name: 'Food & Dining Budget',
+      amount: 12000,
+      categoryId: catMap.get('Food & Dining'),
+      period: 'monthly',
+      startDate: startOfMonth,
+      endDate: endOfMonth,
+      notificationThreshold: 80,
+    },
+    {
+      userId: primaryUser._id,
+      name: 'Monthly Groceries',
+      amount: 8000,
+      categoryId: catMap.get('Groceries'),
+      period: 'monthly',
+      startDate: startOfMonth,
+      endDate: endOfMonth,
+      notificationThreshold: 85,
+    },
+    {
+      userId: primaryUser._id,
+      name: 'Shopping & Leisure',
+      amount: 15000,
+      categoryId: catMap.get('Shopping'),
+      period: 'monthly',
+      startDate: startOfMonth,
+      endDate: endOfMonth,
+      notificationThreshold: 80,
+    },
+    {
+      userId: primaryUser._id,
+      name: 'Fuel & Commute',
+      amount: 5000,
+      categoryId: catMap.get('Fuel'),
+      period: 'monthly',
+      startDate: startOfMonth,
+      endDate: endOfMonth,
+      notificationThreshold: 75,
+    },
+  ]);
+
+  // Seed Recurring Transactions (Requirement 29)
+  console.log('🔄 Seeding Recurring Transactions...');
+  await RecurringTransactionModel.create([
+    {
+      userId: primaryUser._id,
+      name: 'Apartment Rent',
+      amount: 22000,
+      type: 'expense',
+      categoryId: catMap.get('Rent'),
+      merchant: 'Landlord Sharma',
+      paymentMethod: 'bank',
+      frequency: 'monthly',
+      startDate: new Date('2026-01-01'),
+      nextDueDate: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+      isActive: true,
+    },
+    {
+      userId: primaryUser._id,
+      name: 'Netflix Premium 4K',
+      amount: 649,
+      type: 'expense',
+      categoryId: catMap.get('Subscriptions'),
+      merchant: 'Netflix',
+      paymentMethod: 'upi',
+      frequency: 'monthly',
+      startDate: new Date('2026-01-15'),
+      nextDueDate: new Date(now.getTime() + 24 * 60 * 60 * 1000), // Tomorrow!
+      isActive: true,
+    },
+    {
+      userId: primaryUser._id,
+      name: 'Nifty 50 Index Fund SIP',
+      amount: 15000,
+      type: 'expense',
+      categoryId: catMap.get('Investments'),
+      merchant: 'Zerodha Coin',
+      paymentMethod: 'upi',
+      frequency: 'monthly',
+      startDate: new Date('2026-01-10'),
+      nextDueDate: new Date(now.getFullYear(), now.getMonth(), 10),
+      isActive: true,
+    },
+    {
+      userId: primaryUser._id,
+      name: 'Monthly Salary',
+      amount: 125000,
+      type: 'income',
+      categoryId: catMap.get('Salary'),
+      merchant: 'Tech Innovations Pvt Ltd',
+      paymentMethod: 'bank',
+      frequency: 'monthly',
+      startDate: new Date('2026-01-01'),
+      nextDueDate: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+      isActive: true,
+    },
+  ]);
+
+  // Seed 100+ Transactions across multiple months
+  console.log('💳 Seeding 120+ realistic transactions across 3 months...');
+  const txTemplates = [
+    { merchant: 'Swiggy', cat: 'Food & Dining', min: 250, max: 850, method: 'upi', notes: 'Dinner order' },
+    { merchant: 'Zomato', cat: 'Food & Dining', min: 300, max: 950, method: 'upi', notes: 'Lunch with colleagues' },
+    { merchant: 'Starbucks Coffee', cat: 'Food & Dining', min: 350, max: 750, method: 'card', notes: 'Cold brew & pastry' },
+    { merchant: 'Blinkit', cat: 'Groceries', min: 250, max: 1200, method: 'upi', notes: 'Daily essentials' },
+    { merchant: 'Zepto', cat: 'Groceries', min: 180, max: 800, method: 'upi', notes: 'Quick snacks & fruits' },
+    { merchant: 'BigBasket', cat: 'Groceries', min: 1200, max: 3500, method: 'upi', notes: 'Weekly grocery basket' },
+    { merchant: 'Amazon India', cat: 'Shopping', min: 599, max: 4999, method: 'upi', notes: 'Electronics & household' },
+    { merchant: 'Flipkart', cat: 'Shopping', min: 499, max: 2999, method: 'upi', notes: 'Clothing purchase' },
+    { merchant: 'Uber India', cat: 'Transport', min: 120, max: 480, method: 'upi', notes: 'Office cab ride' },
+    { merchant: 'Ola Cabs', cat: 'Transport', min: 110, max: 420, method: 'upi', notes: 'Auto ride' },
+    { merchant: 'HPCL Petrol Pump', cat: 'Fuel', min: 500, max: 2200, method: 'card', notes: 'Fuel top-up' },
+    { merchant: 'Indian Oil Bunk', cat: 'Fuel', min: 600, max: 2000, method: 'upi', notes: 'Petrol full tank' },
+    { merchant: 'TNEB Electricity Bill', cat: 'Bills & Utilities', min: 1400, max: 2800, method: 'upi', notes: 'Monthly power bill' },
+    { merchant: 'Airtel Broadband', cat: 'Bills & Utilities', min: 999, max: 1199, method: 'upi', notes: 'Fiber internet bill' },
+    { merchant: 'Jio Mobile Recharge', cat: 'Bills & Utilities', min: 349, max: 749, method: 'upi', notes: 'Prepaid recharge' },
+    { merchant: 'PVR Cinemas', cat: 'Entertainment', min: 600, max: 1800, method: 'card', notes: 'Movie tickets & popcorn' },
+    { merchant: 'Apollo Pharmacy', cat: 'Health & Medical', min: 250, max: 1600, method: 'upi', notes: 'Vitamins and medicine' },
+    { merchant: 'Cult.fit Gym', cat: 'Health & Medical', min: 1500, max: 2500, method: 'upi', notes: 'Cultpass monthly' },
+  ];
+
+  const transactionsToInsert = [];
+
+  // Monthly Salaries for past 3 months
+  for (let m = 2; m >= 0; m--) {
+    const salaryDate = new Date(now.getFullYear(), now.getMonth() - m, 1, 9, 30);
+    transactionsToInsert.push({
+      userId: primaryUser._id,
+      type: 'income',
+      amount: 125000,
+      currency: 'INR',
+      categoryId: catMap.get('Salary'),
+      merchant: 'Tech Innovations Pvt Ltd',
+      description: 'Monthly Salary Credit',
+      paymentMethod: 'bank',
+      source: 'manual',
+      transactionDate: salaryDate,
+      notes: 'Monthly salary credited directly to bank',
+      status: 'confirmed',
+    });
+
+    // Apartment rent for past 3 months
+    const rentDate = new Date(now.getFullYear(), now.getMonth() - m, 2, 11, 0);
+    transactionsToInsert.push({
+      userId: primaryUser._id,
+      type: 'expense',
+      amount: 22000,
+      currency: 'INR',
+      categoryId: catMap.get('Rent'),
+      merchant: 'Landlord Sharma',
+      description: 'House rent for month',
+      paymentMethod: 'bank',
+      source: 'manual',
+      transactionDate: rentDate,
+      notes: 'Flat 402 Rent',
+      status: 'confirmed',
+    });
+  }
+
+  // Generate 110 diverse expenses across the last 75 days
+  let refCounter = 426810000000;
+  for (let i = 0; i < 115; i++) {
+    const tpl = txTemplates[Math.floor(Math.random() * txTemplates.length)];
+    const daysAgo = Math.floor(Math.random() * 75);
+    const date = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000 - Math.random() * 86400000);
+    const amount = Math.floor(Math.random() * (tpl.max - tpl.min) + tpl.min);
+    refCounter++;
+
+    const isEmailSource = Math.random() > 0.45;
+
+    transactionsToInsert.push({
+      userId: primaryUser._id,
+      type: 'expense',
+      amount,
+      currency: 'INR',
+      categoryId: catMap.get(tpl.cat),
+      merchant: tpl.merchant,
+      description: `Payment to ${tpl.merchant}`,
+      paymentMethod: tpl.method,
+      source: isEmailSource ? 'email' : 'manual',
+      sourceAccountId: isEmailSource ? primaryGmail._id : null,
+      externalTransactionId: tpl.method === 'upi' ? `UPI/${refCounter}` : undefined,
+      transactionDate: date,
+      notes: tpl.notes,
+      status: 'confirmed',
+    });
+  }
+
+  await TransactionModel.insertMany(transactionsToInsert);
+  console.log(`✅ Inserted ${transactionsToInsert.length} transactions.`);
+
+  // Seed Detected Transactions for Review Center (Requirement 14, 18, 27)
+  console.log('📥 Seeding Detected Transactions for Review Center...');
+  await DetectedTransactionModel.create([
+    {
+      userId: primaryUser._id,
+      emailAccountId: primaryGmail._id,
+      emailMessageId: 'gmail_msg_982138129',
+      amount: 1299,
+      currency: 'INR',
+      merchant: 'Amazon India',
+      transactionDate: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2 hrs ago
+      transactionType: 'expense',
+      upiReference: '426899120847',
+      sender: 'payments-noreply@google.com',
+      subject: 'You paid ₹1,299 to Amazon India using Google Pay',
+      confidenceScore: 96,
+      status: 'detected',
+      rawMetadata: { item: 'Wireless Keyboard & Mouse' },
+    },
+    {
+      userId: primaryUser._id,
+      emailAccountId: primaryGmail._id,
+      emailMessageId: 'gmail_msg_982138130',
+      amount: 450,
+      currency: 'INR',
+      merchant: 'Swiggy',
+      transactionDate: new Date(now.getTime() - 5 * 60 * 60 * 1000), // 5 hrs ago
+      transactionType: 'expense',
+      upiReference: '426899120848',
+      sender: 'noreply@phonepe.com',
+      subject: 'Transaction Successful! Paid ₹450 to Swiggy',
+      confidenceScore: 94,
+      status: 'detected',
+      rawMetadata: { item: 'Biryani bowl' },
+    },
+    {
+      userId: primaryUser._id,
+      emailAccountId: workGmail._id,
+      emailMessageId: 'work_msg_10928301',
+      amount: 230,
+      currency: 'INR',
+      merchant: 'Uber India',
+      transactionDate: new Date(now.getTime() - 12 * 60 * 60 * 1000),
+      transactionType: 'expense',
+      upiReference: '426899120849',
+      sender: 'no-reply@paytm.com',
+      subject: 'Paid ₹230 to Uber using Paytm UPI',
+      confidenceScore: 88,
+      status: 'detected',
+      rawMetadata: { rideId: 'CRN982103' },
+    },
+    {
+      userId: primaryUser._id,
+      emailAccountId: primaryGmail._id,
+      emailMessageId: 'gmail_msg_10928302',
+      amount: 1850,
+      currency: 'INR',
+      merchant: 'Electricity Board',
+      transactionDate: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      transactionType: 'expense',
+      upiReference: '426899120850',
+      sender: 'alerts@hdfcbank.net',
+      subject: 'Alert: Your HDFC Bank A/C has been debited by INR 1,850.00',
+      confidenceScore: 92,
+      status: 'detected',
+    },
+  ]);
+
+  // Seed Notifications (Requirement 33)
+  console.log('🔔 Seeding Notifications...');
+  await NotificationModel.create([
+    {
+      userId: primaryUser._id,
+      title: 'New Transactions Detected',
+      message: '4 new UPI transactions detected from your linked Gmail accounts. Ready for your review.',
+      type: 'detected_transaction',
+      isRead: false,
+    },
+    {
+      userId: primaryUser._id,
+      title: 'Food & Dining Budget Alert',
+      message: 'You have used 82% of your Food & Dining budget this month. ₹2,150 remaining.',
+      type: 'budget_warning',
+      isRead: false,
+    },
+    {
+      userId: primaryUser._id,
+      title: 'Upcoming Bill Payment',
+      message: 'Netflix Premium (₹649) is due tomorrow.',
+      type: 'system',
+      isRead: false,
+    },
+  ]);
+
+  console.log('🎉 SpendWise enterprise seeding complete!');
+  await disconnectDatabase();
+}
+
+seed().catch((err) => {
+  console.error('Seeding failed:', err);
+  process.exit(1);
+});

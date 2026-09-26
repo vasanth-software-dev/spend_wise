@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: spendwise_mongodb
+    restart: unless-stopped
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    environment:
+      MONGO_INITDB_DATABASE: spendwise
+    volumes:
+      - spendwise_mongo_data:/data/db
+    networks:
+      - spendwise_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: spendwise_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - spendwise_redis_data:/data
+    networks:
+      - spendwise_network
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: spendwise_mongo_express
+    restart: unless-stopped
+    ports:
+      - "${MONGO_EXPRESS_PORT:-8081}:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_PORT: 27017
+      ME_CONFIG_BASICAUTH: "false"
+    depends_on:
+      - mongodb
+    networks:
+      - spendwise_network
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: spendwise_redis_commander
+    restart: unless-stopped
+    ports:
+      - "${REDIS_COMMANDER_PORT:-8082}:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - spendwise_network
+
+volumes:
+  spendwise_mongo_data:
+  spendwise_redis_data:
+
+networks:
+  spendwise_network:
+    driver: bridge
