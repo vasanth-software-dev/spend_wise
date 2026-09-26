@@ -49,8 +49,12 @@ let redisClient: CacheClient;
 
 export function initRedis(): CacheClient {
   try {
-    const isTls = env.REDIS_URL.startsWith('rediss://');
-    const redis = new Redis(env.REDIS_URL, {
+    let redisUrl = env.REDIS_URL;
+    if (redisUrl.includes('upstash.io') && redisUrl.startsWith('redis://')) {
+      redisUrl = redisUrl.replace('redis://', 'rediss://');
+    }
+    const isTls = redisUrl.startsWith('rediss://');
+    const redis = new Redis(redisUrl, {
       maxRetriesPerRequest: 1,
       retryStrategy: (times) => {
         if (times > 3) {
