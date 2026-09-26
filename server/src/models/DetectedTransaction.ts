@@ -17,6 +17,8 @@ const detectedTransactionSchema = new Schema<IDetectedTransaction>(
     subject: { type: String, required: true, trim: true },
     rawMetadata: { type: Schema.Types.Mixed, default: {} },
     confidenceScore: { type: Number, required: true, min: 0, max: 100 },
+    suggestedCategory: { type: String, trim: true, default: null },
+    categoryId: { type: Schema.Types.ObjectId, ref: 'Category', default: null },
     status: {
       type: String,
       enum: ['detected', 'confirmed', 'rejected', 'duplicate'],

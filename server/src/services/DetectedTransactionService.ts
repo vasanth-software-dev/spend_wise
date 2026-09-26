@@ -3,6 +3,7 @@ import { transactionRepository } from '../repositories/TransactionRepository.js'
 import { categoryRepository } from '../repositories/CategoryRepository.js';
 import { IDetectedTransaction, ITransaction } from '../types/index.js';
 import { Types } from 'mongoose';
+import { predictCategoryName, findMatchingCategoryId } from '../utils/categoryPredictor.js';
 
 export interface ConfirmDetectedDTO {
   categoryId?: string;
@@ -36,36 +37,13 @@ export class DetectedTransactionService {
     }
 
     // Auto-match category based on merchant if not provided
-    let categoryId = overrides?.categoryId;
+    let categoryId = overrides?.categoryId || (detected.categoryId ? String(detected.categoryId) : undefined);
     if (!categoryId) {
-      const merchantLower = (overrides?.merchant || detected.merchant).toLowerCase();
       const categories = await categoryRepository.findByUserId(userId);
-
-      if (/swiggy|zomato|eats|starbucks|mcdonalds|kfc|burger|restaurant|food/i.test(merchantLower)) {
-        const found = categories.find((c) => /food/i.test(c.name));
-        if (found) categoryId = String(found._id);
-      } else if (/groceries|blinkit|zepto|bigbasket|instamart|dmart/i.test(merchantLower)) {
-        const found = categories.find((c) => /grocer/i.test(c.name));
-        if (found) categoryId = String(found._id);
-      } else if (/amazon|flipkart|myntra|ajio|meesho|shopping|zara/i.test(merchantLower)) {
-        const found = categories.find((c) => /shop/i.test(c.name));
-        if (found) categoryId = String(found._id);
-      } else if (/uber|ola|rapido|metro|irctc|redbus/i.test(merchantLower)) {
-        const found = categories.find((c) => /transport/i.test(c.name));
-        if (found) categoryId = String(found._id);
-      } else if (/fuel|petrol|hpcl|bpcl|iocl|shell/i.test(merchantLower)) {
-        const found = categories.find((c) => /fuel/i.test(c.name));
-        if (found) categoryId = String(found._id);
-      } else if (/electric|tneb|bescom|airtel|jio|vi|broadband|water|gas|utility|bill/i.test(merchantLower)) {
-        const found = categories.find((c) => /bill/i.test(c.name));
-        if (found) categoryId = String(found._id);
-      } else if (/netflix|spotify|prime|hotstar|apple|youtube/i.test(merchantLower)) {
-        const found = categories.find((c) => /subscri/i.test(c.name));
-        if (found) categoryId = String(found._id);
-      } else if (/salary/i.test(merchantLower) || detected.transactionType === 'income') {
-        const found = categories.find((c) => /salary|income/i.test(c.name));
-        if (found) categoryId = String(found._id);
-      }
+      const targetText = `${overrides?.merchant || detected.merchant} ${detected.subject || ''}`;
+      const predicted = detected.suggestedCategory || predictCategoryName(targetText);
+      const matched = findMatchingCategoryId(categories, predicted);
+      if (matched) categoryId = matched;
     }
 
     // Create confirmed transaction in financial ledger

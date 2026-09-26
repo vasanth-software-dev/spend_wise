@@ -63,6 +63,8 @@ export interface DetectedTransaction {
   subject: string;
   rawMetadata?: Record<string, unknown>;
   confidenceScore: number;
+  suggestedCategory?: string;
+  categoryId?: string;
   status: 'detected' | 'confirmed' | 'rejected' | 'duplicate';
   createdAt: string;
 }

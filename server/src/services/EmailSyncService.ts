@@ -2,8 +2,10 @@ import { emailAccountRepository } from '../repositories/EmailAccountRepository.j
 import { detectedTransactionRepository } from '../repositories/DetectedTransactionRepository.js';
 import { notificationRepository } from '../repositories/NotificationRepository.js';
 import { auditLogRepository } from '../repositories/AuditLogRepository.js';
+import { categoryRepository } from '../repositories/CategoryRepository.js';
 import { duplicateDetectionService } from './DuplicateDetectionService.js';
 import { emailParserRegistry } from '../providers/parsers/EmailParserRegistry.js';
+import { predictCategoryName, findMatchingCategoryId } from '../utils/categoryPredictor.js';
 import { GmailProvider } from '../providers/gmail/GmailProvider.js';
 import { MockEmailProvider } from '../providers/email/MockEmailProvider.js';
 import { encrypt } from '../utils/encryption.js';
@@ -217,6 +219,14 @@ export class EmailSyncService {
           continue;
         }
 
+        const suggestedCategory = parsed.categoryHint || predictCategoryName(`${parsed.merchant} ${msg.subject}`);
+        let categoryId: Types.ObjectId | null = null;
+        try {
+          const userCategories = await categoryRepository.findByUserId(userId);
+          const matchedId = findMatchingCategoryId(userCategories, suggestedCategory);
+          if (matchedId) categoryId = new Types.ObjectId(matchedId);
+        } catch (_) {}
+
         // New transaction detected!
         await detectedTransactionRepository.create({
           userId: new Types.ObjectId(userId),
@@ -231,6 +241,8 @@ export class EmailSyncService {
           bankReference: parsed.bankReference,
           sender: parsed.sender || msg.sender,
           subject: msg.subject,
+          suggestedCategory,
+          categoryId,
           rawMetadata: parsed.rawDetails,
           confidenceScore: parsed.confidenceScore,
           status: 'detected',
@@ -477,6 +489,14 @@ export class EmailSyncService {
       };
     }
 
+    const suggestedCategory = parsed.categoryHint || predictCategoryName(`${parsed.merchant} ${unwrapped.subject}`);
+    let categoryId: Types.ObjectId | null = null;
+    try {
+      const userCategories = await categoryRepository.findByUserId(userId);
+      const matchedId = findMatchingCategoryId(userCategories, suggestedCategory);
+      if (matchedId) categoryId = new Types.ObjectId(matchedId);
+    } catch (_) {}
+
     // 7. Save new detected transaction
     const newDetected = await detectedTransactionRepository.create({
       userId: new Types.ObjectId(userId),
@@ -491,6 +511,8 @@ export class EmailSyncService {
       bankReference: parsed.bankReference,
       sender: parsed.sender || unwrapped.sender,
       subject: unwrapped.subject,
+      suggestedCategory,
+      categoryId,
       rawMetadata: { ...parsed.rawDetails, isForwarded, forwardedBy: fromField },
       confidenceScore: parsed.confidenceScore,
       status: 'detected',

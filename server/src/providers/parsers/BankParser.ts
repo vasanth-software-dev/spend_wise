@@ -1,4 +1,19 @@
 import { EmailMessage, ParsedTransaction, TransactionEmailParser, PaymentMethod } from '../../types/index.js';
+import { predictCategoryName } from '../../utils/categoryPredictor.js';
+
+function formatMerchantName(raw: string): string {
+  const cleaned = raw
+    .replace(/^(UPI\/|POS\/|NEFT\/|IMPS\/|VPA\s+)/i, '')
+    .replace(/[._-]+/g, ' ')
+    .trim();
+
+  if (!cleaned) return 'Bank Transaction';
+
+  return cleaned
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
 
 export class BankParser implements TransactionEmailParser {
   public name = 'BankParser';
@@ -40,11 +55,23 @@ export class BankParser implements TransactionEmailParser {
 
     // Extract merchant or info
     let merchant = 'Bank Transaction';
-    const infoMatch = content.match(/(?:Info[:\s]+|towards\s+|at\s+|to\s+)([A-Za-z0-9\s&'./-]{2,30}?)(?:\s+(?:on|via|ref|bal|\.|\n))/i);
-    if (infoMatch && infoMatch[1]) {
-      merchant = infoMatch[1].replace(/^(UPI\/|POS\/|NEFT\/|IMPS\/)/i, '').trim();
-    } else if (type === 'income' && /salary/i.test(content)) {
-      merchant = 'Salary Credit';
+
+    // Priority 1: Check VPA with parenthesized merchant name, e.g., "towards VPA xyz@ybl (APOLLO PHARMACY)"
+    const vpaParenMatch = content.match(/(?:towards|to)\s+VPA\s+([^\s(]+)(?:\s*\(([^)]+)\))?/i);
+    if (vpaParenMatch) {
+      if (vpaParenMatch[2] && vpaParenMatch[2].trim().length > 1) {
+        merchant = formatMerchantName(vpaParenMatch[2]);
+      } else if (vpaParenMatch[1]) {
+        merchant = formatMerchantName(vpaParenMatch[1].split('@')[0]);
+      }
+    } else {
+      // Priority 2: General info/towards/at pattern
+      const infoMatch = content.match(/(?:Info[:\s]+|towards\s+|at\s+|to\s+)([A-Za-z0-9\s&'./-]{2,40}?)(?:\s+(?:on|via|ref|bal|\.|\n))/i);
+      if (infoMatch && infoMatch[1]) {
+        merchant = formatMerchantName(infoMatch[1]);
+      } else if (type === 'income' && /salary/i.test(content)) {
+        merchant = 'Salary Credit';
+      }
     }
 
     // Reference number extraction
@@ -57,7 +84,7 @@ export class BankParser implements TransactionEmailParser {
       upiReference = upiSlashMatch[1].trim();
       paymentMethod = 'upi';
     } else {
-      const refMatch = content.match(/(?:UPI Ref(?:\s*No)?|Ref No\.?|UTR|Txn No)[:\s]+([A-Za-z0-9]{8,22})/i);
+      const refMatch = content.match(/(?:UPI(?:\s+transaction)?\s+ref(?:erence)?(?:\s*no\.?)?|Ref(?:\s*No\.?)?|UTR|Txn\s*No\.?)[:\s]+([A-Za-z0-9]{8,22})/i);
       if (refMatch && refMatch[1]) {
         if (paymentMethod === 'upi') {
           upiReference = refMatch[1].trim();
@@ -67,23 +94,42 @@ export class BankParser implements TransactionEmailParser {
       }
     }
 
-    let confidenceScore = 90;
-    if (upiReference || bankReference) confidenceScore += 6;
+    // Date extraction: e.g. "on 23-09-26" or "on 23/09/2026"
+    let transactionDate: Date = email.date || new Date();
+    const dateMatch = content.match(/\bon\s+(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})\b/i);
+    if (dateMatch) {
+      let [_, dStr, mStr, yStr] = dateMatch;
+      let year = parseInt(yStr, 10);
+      if (year < 100) year += 2000;
+      const month = parseInt(mStr, 10) - 1;
+      const day = parseInt(dStr, 10);
+      const parsedDate = new Date(year, month, day, 12, 0, 0);
+      if (!isNaN(parsedDate.getTime())) {
+        transactionDate = parsedDate;
+      }
+    }
+
+    let confidenceScore = 92;
+    if (upiReference || bankReference) confidenceScore += 5;
+    if (merchant !== 'Bank Transaction') confidenceScore += 2;
     confidenceScore = Math.min(99, confidenceScore);
+
+    const categoryHint = predictCategoryName(`${merchant} ${content}`);
 
     return {
       amount,
       currency: 'INR',
       type,
       merchant,
-      transactionDate: email.date || new Date(),
+      transactionDate,
       upiReference,
       bankReference,
       paymentMethod,
       confidenceScore,
       notes: `Bank Alert: ${email.subject}`,
       sender: email.sender,
-      rawDetails: { subject: email.subject, messageId: email.id },
+      categoryHint,
+      rawDetails: { subject: email.subject, messageId: email.id, categoryHint },
     };
   }
 }

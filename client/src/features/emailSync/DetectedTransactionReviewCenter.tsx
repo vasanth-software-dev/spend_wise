@@ -31,11 +31,22 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
     setEditAmount(String(item.amount));
     setEditNotes('');
 
-    // Pre-select category
-    const cat = categories.find((c) =>
-      c.name.toLowerCase().includes(item.merchant.toLowerCase())
-    );
-    setEditCategory(cat ? cat._id : '');
+    // Pre-select category using suggestedCategory or categoryId
+    let selectedCat = item.categoryId || '';
+    if (!selectedCat && item.suggestedCategory) {
+      const match = categories.find((c) =>
+        c.name.toLowerCase() === item.suggestedCategory?.toLowerCase() ||
+        c.name.toLowerCase().includes(item.suggestedCategory?.toLowerCase() || '')
+      );
+      if (match) selectedCat = match._id;
+    }
+    if (!selectedCat) {
+      const match = categories.find((c) =>
+        c.name.toLowerCase().includes(item.merchant.toLowerCase())
+      );
+      if (match) selectedCat = match._id;
+    }
+    setEditCategory(selectedCat);
   };
 
   const handleConfirmEdit = async () => {
@@ -102,6 +113,11 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                       {tx.merchant}
                     </p>
+                    {tx.suggestedCategory && (
+                      <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60">
+                        🏷️ {tx.suggestedCategory}
+                      </span>
+                    )}
                   </div>
                   <span
                     className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${confidence.color}`}

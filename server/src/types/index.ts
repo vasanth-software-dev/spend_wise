@@ -113,6 +113,8 @@ export interface IDetectedTransaction {
   subject: string;
   rawMetadata?: Record<string, unknown>;
   confidenceScore: number;
+  suggestedCategory?: string;
+  categoryId?: Types.ObjectId | string | null;
   status: DetectedTransactionStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -223,6 +225,7 @@ export interface ParsedTransaction {
   confidenceScore: number; // 0 to 100
   notes?: string;
   sender?: string;
+  categoryHint?: string;
   rawDetails?: Record<string, unknown>;
 }
 
