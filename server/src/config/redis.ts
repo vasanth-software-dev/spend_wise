@@ -49,6 +49,7 @@ let redisClient: CacheClient;
 
 export function initRedis(): CacheClient {
   try {
+    const isTls = env.REDIS_URL.startsWith('rediss://');
     const redis = new Redis(env.REDIS_URL, {
       maxRetriesPerRequest: 1,
       retryStrategy: (times) => {
@@ -57,6 +58,7 @@ export function initRedis(): CacheClient {
         }
         return Math.min(times * 100, 500);
       },
+      tls: isTls ? { rejectUnauthorized: false } : undefined,
       lazyConnect: true,
       enableOfflineQueue: false,
     });
