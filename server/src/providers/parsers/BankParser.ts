@@ -19,11 +19,15 @@ export class BankParser implements TransactionEmailParser {
   public name = 'BankParser';
 
   canParse(email: EmailMessage): boolean {
-    const text = `${email.sender} ${email.subject} ${email.snippet || ''}`.toLowerCase();
+    const text = `${email.sender} ${email.subject} ${email.snippet || ''} ${email.bodyText || ''}`.toLowerCase();
     const bankKeywords = [
-      'hdfc', 'icici', 'sbi', 'axis', 'kotak', 'punjab national',
+      'hdfc', 'icici', 'sbi', 'axis', 'kotak', 'punjab national', 'pnb',
+      'idfc', 'indusind', 'canara', 'baroda', 'federal', 'yes bank', 'rbl',
       'alerts@hdfcbank.net', 'alerts@icicibank.com', 'sbialerts', 'axisbank.com',
-      'debited', 'credited', 'account has been debited', 'account has been credited',
+      'debited', 'credited', 'spent', 'paid', 'transferred', 'withdrawn',
+      'account has been debited', 'account has been credited',
+      'account ending', 'card ending', 'a/c ending', 'acct ending',
+      'bank alert', 'transaction alert', 'txn alert', 'statement',
     ];
     return bankKeywords.some((kw) => text.includes(kw));
   }
@@ -39,15 +43,24 @@ export class BankParser implements TransactionEmailParser {
     const amount = parseFloat(amountMatch[1].replace(/,/g, ''));
     if (isNaN(amount) || amount <= 0) return null;
 
+    // Ensure the email expresses an actual financial debit or credit transaction event
+    const isActualTxn = /(?:debited|credited|deposited|refunded|spent|paid|withdrawn|transferred)\b/i.test(content);
+    if (!isActualTxn) return null;
+
+    // Reject credit card sales/approval advertisements, loan marketing, and gift promotions
+    if (/(?:credit card is ready|apply for|pre-approved|loan offer|birthday gift|gift voucher|internship|booking confirmation)/i.test(content)) {
+      return null;
+    }
+
     // Detect debited vs credited
-    const isIncome = /(?:credited|deposited|refunded)\b/i.test(content) && !/(?:debited)\b/i.test(email.subject);
+    const isIncome = /(?:credited|deposited|refunded)\b/i.test(content) && !/(?:debited|spent|paid)\b/i.test(email.subject);
     const type: 'expense' | 'income' = isIncome ? 'income' : 'expense';
 
     // Payment method detection
     let paymentMethod: PaymentMethod = 'bank';
     if (/upi|vpa|google pay|phonepe|paytm/i.test(content)) {
       paymentMethod = 'upi';
-    } else if (/debit card|pos|atm/i.test(content)) {
+    } else if (/debit card|credit card|pos|atm/i.test(content)) {
       paymentMethod = 'card';
     } else if (/net banking|neft|rtgs|imps/i.test(content)) {
       paymentMethod = 'bank';
@@ -55,22 +68,34 @@ export class BankParser implements TransactionEmailParser {
 
     // Extract merchant or info
     let merchant = 'Bank Transaction';
+    let extractedVpa: string | undefined;
+    const senderMatch = content.match(/\bSender\s*:\s*([^\n(]{2,80}?)(?:\s*\(\s*VPA\s*:|\s*\n|$)/i);
+    const vpaMatch = content.match(/\bVPA\s*:\s*([A-Za-z0-9._-]+@[A-Za-z0-9._-]+)/i);
 
-    // Priority 1: Check VPA with parenthesized merchant name, e.g., "towards VPA xyz@ybl (APOLLO PHARMACY)"
-    const vpaParenMatch = content.match(/(?:towards|to)\s+VPA\s+([^\s(]+)(?:\s*\(([^)]+)\))?/i);
-    if (vpaParenMatch) {
-      if (vpaParenMatch[2] && vpaParenMatch[2].trim().length > 1) {
-        merchant = formatMerchantName(vpaParenMatch[2]);
-      } else if (vpaParenMatch[1]) {
-        merchant = formatMerchantName(vpaParenMatch[1].split('@')[0]);
-      }
+    // HDFC UPI credit alert: "Sender: NAME (VPA: name@bank)".
+    // Check this before generic "to ..." matching, which would otherwise pick up
+    // "credited to your HDFC Bank account" as the merchant.
+    if (senderMatch) {
+      merchant = formatMerchantName(senderMatch[1]);
+      if (vpaMatch) extractedVpa = vpaMatch[1];
     } else {
-      // Priority 2: General info/towards/at pattern
-      const infoMatch = content.match(/(?:Info[:\s]+|towards\s+|at\s+|to\s+)([A-Za-z0-9\s&'./-]{2,40}?)(?:\s+(?:on|via|ref|bal|\.|\n))/i);
-      if (infoMatch && infoMatch[1]) {
-        merchant = formatMerchantName(infoMatch[1]);
-      } else if (type === 'income' && /salary/i.test(content)) {
-        merchant = 'Salary Credit';
+      // Priority 1: Check VPA with parenthesized merchant name, e.g., "towards VPA xyz@ybl (APOLLO PHARMACY)"
+      const vpaParenMatch = content.match(/(?:towards|to)\s+VPA\s+([^\s(]+)(?:\s*\(([^)]+)\))?/i);
+      if (vpaParenMatch) {
+        extractedVpa = vpaParenMatch[1];
+        if (vpaParenMatch[2] && vpaParenMatch[2].trim().length > 1) {
+          merchant = formatMerchantName(vpaParenMatch[2]);
+        } else if (vpaParenMatch[1]) {
+          merchant = formatMerchantName(vpaParenMatch[1].split('@')[0]);
+        }
+      } else {
+        // Priority 2: General info/towards/at pattern
+        const infoMatch = content.match(/(?:Info[:\s]+|towards\s+|at\s+|to\s+|paid to\s+|for\s+)([A-Za-z0-9\s&'./-]{2,40}?)(?:\s+(?:on|via|ref|bal|\.|\n))/i);
+        if (infoMatch && infoMatch[1]) {
+          merchant = formatMerchantName(infoMatch[1]);
+        } else if (type === 'income' && /salary/i.test(content)) {
+          merchant = 'Salary Credit';
+        }
       }
     }
 
@@ -94,18 +119,44 @@ export class BankParser implements TransactionEmailParser {
       }
     }
 
-    // Date extraction: e.g. "on 23-09-26" or "on 23/09/2026"
+    // Date extraction: e.g. "on 23-09-26", "Date: 23-09-26", or "on 23/09/2026"
+    // along with optional time, e.g. "at 10:30:00", "at 10:30 AM", "10:30:00 hrs"
     let transactionDate: Date = email.date || new Date();
-    const dateMatch = content.match(/\bon\s+(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})\b/i);
+
+    const timeMatch = content.match(/(?:\bat\s+|time\s*:\s*|,\s*|\s+)(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm|hrs)?\b/i);
+    const dateMatch = content.match(/(?:\bon\s+|\bDate\s*:\s*)(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})\b/i);
+
     if (dateMatch) {
       let [_, dStr, mStr, yStr] = dateMatch;
       let year = parseInt(yStr, 10);
       if (year < 100) year += 2000;
       const month = parseInt(mStr, 10) - 1;
       const day = parseInt(dStr, 10);
-      const parsedDate = new Date(year, month, day, 12, 0, 0);
-      if (!isNaN(parsedDate.getTime())) {
-        transactionDate = parsedDate;
+
+      const baseTime = email.date && !isNaN(email.date.getTime()) ? email.date : new Date();
+
+      if (timeMatch) {
+        let h = parseInt(timeMatch[1], 10);
+        const m = parseInt(timeMatch[2], 10);
+        const s = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+        const meridian = timeMatch[4]?.toLowerCase();
+
+        if (meridian === 'pm' && h < 12) h += 12;
+        if (meridian === 'am' && h === 12) h = 0;
+
+        if (h >= 0 && h < 24 && m >= 0 && m < 60) {
+          const parsed = new Date(year, month, day, h, m, s);
+          if (!isNaN(parsed.getTime())) {
+            transactionDate = parsed;
+          }
+        }
+      } else {
+        // No explicit time in text: preserve the exact time of day from the email header
+        const parsed = new Date(baseTime.getTime());
+        parsed.setFullYear(year, month, day);
+        if (!isNaN(parsed.getTime())) {
+          transactionDate = parsed;
+        }
       }
     }
 
@@ -114,7 +165,7 @@ export class BankParser implements TransactionEmailParser {
     if (merchant !== 'Bank Transaction') confidenceScore += 2;
     confidenceScore = Math.min(99, confidenceScore);
 
-    const categoryHint = predictCategoryName(`${merchant} ${content}`);
+    const categoryHint = predictCategoryName(content, { merchant, vpa: extractedVpa });
 
     return {
       amount,
@@ -129,7 +180,7 @@ export class BankParser implements TransactionEmailParser {
       notes: `Bank Alert: ${email.subject}`,
       sender: email.sender,
       categoryHint,
-      rawDetails: { subject: email.subject, messageId: email.id, categoryHint },
+      rawDetails: { subject: email.subject, messageId: email.id, categoryHint, vpa: extractedVpa },
     };
   }
 }

@@ -99,7 +99,14 @@ export class EmailAccountController {
     try {
       const userId = req.user!.userId;
       const { id } = req.params;
-      const result = await emailSyncService.syncAccount(userId, id);
+      const month = req.body?.month || req.query?.month;
+      const year = req.body?.year || req.query?.year;
+      const options = (month && year) ? {
+        month: parseInt(String(month), 10),
+        year: parseInt(String(year), 10),
+      } : undefined;
+
+      const result = await emailSyncService.syncAccount(userId, id, options);
       sendSuccess(res, result, 'Email sync completed');
     } catch (err) {
       next(err);

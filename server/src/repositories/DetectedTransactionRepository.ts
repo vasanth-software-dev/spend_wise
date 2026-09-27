@@ -16,7 +16,7 @@ export class DetectedTransactionRepository {
     return DetectedTransactionModel.findOne({ userId, emailMessageId }).lean();
   }
 
-  async findPendingByUserId(userId: string, limit = 50): Promise<IDetectedTransaction[]> {
+  async findPendingByUserId(userId: string, limit = 500): Promise<IDetectedTransaction[]> {
     return DetectedTransactionModel.find({
       userId: new Types.ObjectId(userId),
       status: 'detected',
@@ -42,6 +42,18 @@ export class DetectedTransactionRepository {
     return DetectedTransactionModel.findOneAndUpdate(
       { _id: id, userId },
       { $set: { status } },
+      { new: true }
+    ).lean();
+  }
+
+  async update(
+    id: string,
+    userId: string,
+    data: Partial<IDetectedTransaction>
+  ): Promise<IDetectedTransaction | null> {
+    return DetectedTransactionModel.findOneAndUpdate(
+      { _id: id, userId: new Types.ObjectId(userId) },
+      { $set: data },
       { new: true }
     ).lean();
   }

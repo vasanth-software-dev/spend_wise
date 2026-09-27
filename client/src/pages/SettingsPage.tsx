@@ -130,7 +130,7 @@ export const SettingsPage: React.FC = () => {
   const iconOptions = [
     'Tag', 'Utensils', 'ShoppingBag', 'ShoppingCart', 'Car', 'Fuel', 'Zap',
     'Home', 'Film', 'HeartPulse', 'GraduationCap', 'Plane', 'CreditCard',
-    'Briefcase', 'TrendingUp', 'Coffee'
+    'Briefcase', 'TrendingUp', 'Coffee', 'Users'
   ];
 
   return (

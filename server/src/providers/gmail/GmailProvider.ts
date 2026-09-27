@@ -1,7 +1,39 @@
 import { google } from 'googleapis';
 import { env } from '../../config/env.js';
 import { decrypt } from '../../utils/encryption.js';
-import { EmailMessage, EmailProvider } from '../../types/index.js';
+import { EmailMessage, EmailProvider, SyncOptions } from '../../types/index.js';
+
+function decodeBody(data: string): string {
+  return Buffer.from(data, 'base64url').toString('utf8');
+}
+
+function htmlToText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p\s*>/gi, '\n')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s*\n\s*/g, '\n')
+    .trim();
+}
+
+function findBodyPart(parts: any[] | undefined, mimeType: string): string | undefined {
+  if (!parts) return undefined;
+
+  for (const part of parts) {
+    if (part.mimeType === mimeType && part.body?.data) {
+      return decodeBody(part.body.data);
+    }
+
+    const nested = findBodyPart(part.parts, mimeType);
+    if (nested) return nested;
+  }
+}
 
 export class GmailProvider implements EmailProvider {
   public name = 'GmailProvider';
@@ -83,66 +115,136 @@ export class GmailProvider implements EmailProvider {
     return true;
   }
 
-  async getMessages(query?: string, maxResults = 20): Promise<EmailMessage[]> {
+  async getMessages(query?: string, maxResults = 500): Promise<EmailMessage[]> {
     const gmail = google.gmail({ version: 'v1', auth: this.oauth2Client });
 
-    // Targeted query for Indian financial emails to reduce API calls
-    const defaultQuery = 'subject:(UPI OR debited OR credited OR payment OR "Google Pay" OR PhonePe OR Paytm OR "Bank Alert")';
+    // Broad search query matching UPI, cards, net banking, and alerts across major banks while excluding marketing, jobs, and travel ticket confirmations
+    const defaultQuery = '{UPI VPA debited credited debit credit payment paid spent sent received transfer txn transaction "Bank Alert" alert "Google Pay" PhonePe Paytm "Amazon Pay" Cred BHIM HDFC ICICI SBI Axis Kotak "State Bank"} -category:promotions -category:spam -from:indeed.com -from:naukri.com -from:linkedin.com -from:irctc.co.in -from:mailers.hdfcbank.bank.in';
     const searchQuery = query || defaultQuery;
 
-    const listRes = await gmail.users.messages.list({
-      userId: 'me',
-      q: searchQuery,
-      maxResults,
-    });
+    // Paginate to retrieve up to maxResults message summaries
+    const messageSummaries: Array<{ id?: string | null; threadId?: string | null }> = [];
+    let pageToken: string | undefined = undefined;
 
-    const messages = listRes.data.messages || [];
+    while (messageSummaries.length < maxResults) {
+      const pageSize = Math.min(100, maxResults - messageSummaries.length);
+      const listRes: any = await gmail.users.messages.list({
+        userId: 'me',
+        q: searchQuery,
+        maxResults: pageSize,
+        pageToken,
+      });
+
+      const pageMessages = listRes.data.messages || [];
+      messageSummaries.push(...pageMessages);
+
+      if (!listRes.data.nextPageToken || pageMessages.length === 0) {
+        break;
+      }
+      pageToken = listRes.data.nextPageToken;
+    }
+
     const parsedMessages: EmailMessage[] = [];
+    const batchSize = 20;
 
-    for (const msg of messages) {
-      if (!msg.id) continue;
-      try {
-        const msgDetail = await gmail.users.messages.get({
-          userId: 'me',
-          id: msg.id,
-          format: 'full',
-        });
+    // Fetch message details in concurrent chunks of 20 to avoid sequential network delays
+    for (let i = 0; i < messageSummaries.length; i += batchSize) {
+      const batch = messageSummaries.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(async (msg) => {
+          if (!msg.id) return null;
+          try {
+            const msgDetail = await gmail.users.messages.get({
+              userId: 'me',
+              id: msg.id,
+              format: 'full',
+            });
 
-        const headers = msgDetail.data.payload?.headers || [];
-        const subject = headers.find((h) => h.name?.toLowerCase() === 'subject')?.value || 'No Subject';
-        const sender = headers.find((h) => h.name?.toLowerCase() === 'from')?.value || 'Unknown';
-        const dateHeader = headers.find((h) => h.name?.toLowerCase() === 'date')?.value;
-        const date = dateHeader ? new Date(dateHeader) : new Date();
+            const headers = msgDetail.data.payload?.headers || [];
+            const subject = headers.find((h) => h.name?.toLowerCase() === 'subject')?.value || 'No Subject';
+            const sender = headers.find((h) => h.name?.toLowerCase() === 'from')?.value || 'Unknown';
+            const dateHeader = headers.find((h) => h.name?.toLowerCase() === 'date')?.value;
+            const date = dateHeader ? new Date(dateHeader) : new Date();
 
-        let bodyText = msgDetail.data.snippet || '';
-        // Extract body plain text if present
-        const parts = msgDetail.data.payload?.parts;
-        if (parts && parts.length) {
-          const textPart = parts.find((p) => p.mimeType === 'text/plain');
-          if (textPart?.body?.data) {
-            bodyText = Buffer.from(textPart.body.data, 'base64').toString('utf8');
+            let bodyText = msgDetail.data.snippet || '';
+            const payload = msgDetail.data.payload;
+            const textBody = payload?.mimeType === 'text/plain' && payload.body?.data
+              ? decodeBody(payload.body.data)
+              : findBodyPart(payload?.parts, 'text/plain');
+            const htmlBody = payload?.mimeType === 'text/html' && payload.body?.data
+              ? decodeBody(payload.body.data)
+              : findBodyPart(payload?.parts, 'text/html');
+
+            bodyText = textBody || (htmlBody ? htmlToText(htmlBody) : bodyText);
+
+            return {
+              id: msg.id,
+              threadId: msg.threadId || undefined,
+              sender,
+              subject,
+              date,
+              snippet: msgDetail.data.snippet || '',
+              bodyText,
+            };
+          } catch (err) {
+            console.warn(`Error fetching message ${msg.id}:`, err);
+            return null;
           }
-        }
+        })
+      );
 
-        parsedMessages.push({
-          id: msg.id,
-          threadId: msg.threadId || undefined,
-          sender,
-          subject,
-          date,
-          snippet: msgDetail.data.snippet || '',
-          bodyText,
-        });
-      } catch (err) {
-        console.warn(`Error fetching message ${msg.id}:`, err);
+      for (const res of batchResults) {
+        if (res) parsedMessages.push(res);
       }
     }
 
     return parsedMessages;
   }
 
-  async sync(cursor?: string): Promise<{ messages: EmailMessage[]; newCursor?: string }> {
-    const messages = await this.getMessages(undefined, 25);
+  async sync(cursor?: string, options?: SyncOptions): Promise<{ messages: EmailMessage[]; newCursor?: string }> {
+    const defaultQuery = '{UPI VPA debited credited debit credit payment paid spent sent received transfer txn transaction "Bank Alert" alert "Google Pay" PhonePe Paytm "Amazon Pay" Cred BHIM HDFC ICICI SBI Axis Kotak "State Bank"} -category:promotions -category:spam -from:indeed.com -from:naukri.com -from:linkedin.com -from:irctc.co.in -from:mailers.hdfcbank.bank.in';
+
+    let searchQuery = defaultQuery;
+
+    if (options?.month && options?.year) {
+      const month = options.month; // 1 to 12
+      const year = options.year;
+      // Start of selected month: year/month/01
+      const startOfMonth = new Date(year, month - 1, 1, 0, 0, 0);
+      // Start of next month:
+      const startOfNextMonth = new Date(year, month, 1, 0, 0, 0);
+
+      // Add 1-day safety buffer for timezones
+      const afterDate = new Date(startOfMonth.getTime() - 86400 * 1000);
+      const beforeDate = new Date(startOfNextMonth.getTime() + 86400 * 1000);
+
+      const afterStr = `${afterDate.getFullYear()}/${String(afterDate.getMonth() + 1).padStart(2, '0')}/${String(afterDate.getDate()).padStart(2, '0')}`;
+      const beforeStr = `${beforeDate.getFullYear()}/${String(beforeDate.getMonth() + 1).padStart(2, '0')}/${String(beforeDate.getDate()).padStart(2, '0')}`;
+
+      searchQuery = `${defaultQuery} after:${afterStr} before:${beforeStr}`;
+    } else {
+      // Default: 1st of current month (00:00:00) or at least 30 days back, whichever is earlier
+      const now = new Date();
+      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const minTargetDate = startOfCurrentMonth < thirtyDaysAgo ? startOfCurrentMonth : thirtyDaysAgo;
+
+      let effectiveDate = minTargetDate;
+      if (cursor) {
+        const cursorDate = new Date(cursor);
+        if (!isNaN(cursorDate.getTime()) && cursorDate.getTime() < minTargetDate.getTime()) {
+          effectiveDate = cursorDate;
+        }
+      }
+
+      const afterDate = new Date(effectiveDate.getTime() - 86400 * 1000);
+      const afterStr = `${afterDate.getFullYear()}/${String(afterDate.getMonth() + 1).padStart(2, '0')}/${String(afterDate.getDate()).padStart(2, '0')}`;
+      searchQuery = `${defaultQuery} after:${afterStr}`;
+    }
+
+    // Fetch messages in the specified date range, up to 500 messages
+    const messages = await this.getMessages(searchQuery, 500);
+
     return {
       messages,
       newCursor: new Date().toISOString(),

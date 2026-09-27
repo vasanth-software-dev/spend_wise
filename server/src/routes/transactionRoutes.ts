@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { transactionController } from '../controllers/TransactionController.js';
+import { personController } from '../controllers/PersonController.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
 import { validate } from '../middleware/validationMiddleware.js';
 import { createTransactionSchema, updateTransactionSchema } from '../validators/transactionValidators.js';
@@ -16,6 +17,7 @@ router.post('/bulk-categorize', (req, res, next) => transactionController.bulkCa
 
 router.get('/', (req, res, next) => transactionController.getAll(req, res, next));
 router.post('/', validate(createTransactionSchema), (req, res, next) => transactionController.create(req, res, next));
+router.patch('/:id/person', (req, res, next) => personController.assignTransaction(req, res, next));
 
 router.get('/:id', (req, res, next) => transactionController.getById(req, res, next));
 router.patch('/:id', validate(updateTransactionSchema), (req, res, next) => transactionController.update(req, res, next));

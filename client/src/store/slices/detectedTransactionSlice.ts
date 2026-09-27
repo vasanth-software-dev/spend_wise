@@ -77,6 +77,21 @@ export const markDuplicateDetectedThunk = createAsyncThunk(
   }
 );
 
+export const updateDetectedThunk = createAsyncThunk(
+  'detected/update',
+  async (
+    { id, updates }: { id: string; updates: { categoryId?: string | null; suggestedCategory?: string; merchant?: string; amount?: number; notes?: string } },
+    { rejectWithValue }
+  ) => {
+    try {
+      const res = await api.patch(`/detected-transactions/${id}`, updates);
+      return res.data.data.detectedTransaction;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to update transaction');
+    }
+  }
+);
+
 const detectedTransactionSlice = createSlice({
   name: 'detectedTransactions',
   initialState,
@@ -102,6 +117,16 @@ const detectedTransactionSlice = createSlice({
     });
     builder.addCase(confirmDetectedThunk.rejected, (state, action) => {
       state.actionLoading[action.meta.arg.id] = false;
+    });
+
+    builder.addCase(updateDetectedThunk.fulfilled, (state, action) => {
+      const idx = state.pendingTransactions.findIndex((t) => t._id === action.payload._id);
+      if (idx !== -1) {
+        state.pendingTransactions[idx] = {
+          ...state.pendingTransactions[idx],
+          ...action.payload,
+        };
+      }
     });
   },
 });

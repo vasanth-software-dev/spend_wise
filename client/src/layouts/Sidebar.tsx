@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Receipt,
+  Users,
   PiggyBank,
   Repeat,
   MailCheck,
@@ -30,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
   const navItems = [
     { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
     { label: 'Transactions', to: '/transactions', icon: Receipt },
+    { label: 'People', to: '/people', icon: Users },
     { label: 'Budgets', to: '/budgets', icon: PiggyBank },
     { label: 'Recurring Bills', to: '/recurring', icon: Repeat },
     {

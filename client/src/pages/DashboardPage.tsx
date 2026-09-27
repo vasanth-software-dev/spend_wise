@@ -10,7 +10,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
-import { fetchDashboardThunk, setTimeRange } from '../store/slices/dashboardSlice.js';
+import { DashboardTimeRange, fetchDashboardThunk, setTimeRange } from '../store/slices/dashboardSlice.js';
 import { fetchPendingDetectedThunk } from '../store/slices/detectedTransactionSlice.js';
 import { fetchUpcomingThunk } from '../store/slices/recurringSlice.js';
 import { fetchCategoriesThunk } from '../store/slices/categorySlice.js';
@@ -45,6 +45,7 @@ export const DashboardPage: React.FC = () => {
   const upcomingBills = useAppSelector((state) => state.recurring.upcomingList);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   useEffect(() => {
@@ -54,7 +55,7 @@ export const DashboardPage: React.FC = () => {
     dispatch(fetchCategoriesThunk());
   }, [dispatch, timeRange]);
 
-  const handleRangeChange = (range: '7d' | '30d' | '3m' | '6m' | '1y') => {
+  const handleRangeChange = (range: DashboardTimeRange) => {
     dispatch(setTimeRange(range));
     dispatch(fetchDashboardThunk(range));
   };
@@ -164,17 +165,17 @@ export const DashboardPage: React.FC = () => {
 
             {/* Time Range Filter Pills */}
             <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl self-start sm:self-auto">
-              {(['7d', '30d', '3m', '6m', '1y'] as const).map((r) => (
+              {(['today', '7d', '30d', '3m', '6m', '1y'] as const).map((r) => (
                 <button
                   key={r}
                   onClick={() => handleRangeChange(r)}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors ${
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
                     timeRange === r
                       ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  {r === '7d' ? '7D' : r === '30d' ? '30D' : r === '3m' ? '3M' : r === '6m' ? '6M' : '1Y'}
+                  {r === 'today' ? 'Today' : r === '7d' ? '7D' : r === '30d' ? '30D' : r === '3m' ? '3M' : r === '6m' ? '6M' : '1Y'}
                 </button>
               ))}
             </div>
@@ -365,7 +366,23 @@ export const DashboardPage: React.FC = () => {
         transaction={selectedTx}
         isOpen={!!selectedTx}
         onClose={() => setSelectedTx(null)}
+        onEdit={(tx) => {
+          setSelectedTx(null);
+          setEditingTx(tx);
+        }}
       />
+
+      {/* Edit Transaction Modal */}
+      {editingTx && (
+        <TransactionModal
+          isOpen={true}
+          transaction={editingTx}
+          onClose={() => setEditingTx(null)}
+          onSuccess={() => {
+            dispatch(fetchDashboardThunk(timeRange));
+          }}
+        />
+      )}
     </div>
   );
 };

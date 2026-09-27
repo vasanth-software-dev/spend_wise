@@ -19,6 +19,8 @@ export interface CreateTransactionDTO {
   transactionDate?: Date | string;
   notes?: string;
   isRecurring?: boolean;
+  personId?: string | null;
+  vpa?: string | null;
   metadata?: Record<string, unknown>;
 }
 
@@ -63,6 +65,8 @@ export class TransactionService {
       notes: data.notes?.trim(),
       status: 'confirmed',
       isRecurring: !!data.isRecurring,
+      personId: data.personId ? new Types.ObjectId(data.personId) : null,
+      vpa: data.vpa ? data.vpa.trim().toLowerCase() : null,
       metadata: data.metadata || {},
     });
 
@@ -90,6 +94,12 @@ export class TransactionService {
     if (updateData.categoryId !== undefined) {
       payload.categoryId = updateData.categoryId ? new Types.ObjectId(updateData.categoryId) : null;
     }
+    if (updateData.personId !== undefined) {
+      payload.personId = updateData.personId ? new Types.ObjectId(updateData.personId) : null;
+    }
+    if (updateData.vpa !== undefined) {
+      payload.vpa = updateData.vpa ? updateData.vpa.trim().toLowerCase() : null;
+    }
 
     return transactionRepository.update(id, userId, payload);
   }
@@ -108,12 +118,15 @@ export class TransactionService {
     });
   }
 
-  async getDashboardData(userId: string, timeRange: '7d' | '30d' | '3m' | '6m' | '1y' = '30d') {
+  async getDashboardData(userId: string, timeRange: 'today' | '7d' | '30d' | '3m' | '6m' | '1y' = '30d') {
     const now = new Date();
     let startDate = new Date();
     let groupBy: 'day' | 'month' = 'day';
 
     switch (timeRange) {
+      case 'today':
+        startDate.setHours(0, 0, 0, 0);
+        break;
       case '7d':
         startDate.setDate(now.getDate() - 7);
         break;

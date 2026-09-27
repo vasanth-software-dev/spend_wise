@@ -74,11 +74,22 @@ export const simulateInboundThunk = createAsyncThunk(
   }
 );
 
+export interface SyncAccountPayload {
+  accountId: string;
+  month?: number;
+  year?: number;
+}
+
 export const syncAccountThunk = createAsyncThunk(
   'emailAccounts/sync',
-  async (accountId: string, { dispatch, rejectWithValue }) => {
+  async (arg: string | SyncAccountPayload, { dispatch, rejectWithValue }) => {
     try {
-      const res = await api.post(`/email-accounts/${accountId}/sync`);
+      const accountId = typeof arg === 'string' ? arg : arg.accountId;
+      const body = typeof arg === 'object' && arg.month && arg.year ? {
+        month: arg.month,
+        year: arg.year,
+      } : {};
+      const res = await api.post(`/email-accounts/${accountId}/sync`, body);
       dispatch(fetchAccountsThunk());
       dispatch(fetchPendingDetectedThunk());
       dispatch(fetchNotificationsThunk());
@@ -146,13 +157,16 @@ const emailAccountSlice = createSlice({
     });
 
     builder.addCase(syncAccountThunk.pending, (state, action) => {
-      state.isSyncing[action.meta.arg] = true;
+      const accountId = typeof action.meta.arg === 'string' ? action.meta.arg : action.meta.arg.accountId;
+      state.isSyncing[accountId] = true;
     });
     builder.addCase(syncAccountThunk.fulfilled, (state, action) => {
-      state.isSyncing[action.meta.arg] = false;
+      const accountId = typeof action.meta.arg === 'string' ? action.meta.arg : action.meta.arg.accountId;
+      state.isSyncing[accountId] = false;
     });
     builder.addCase(syncAccountThunk.rejected, (state, action) => {
-      state.isSyncing[action.meta.arg] = false;
+      const accountId = typeof action.meta.arg === 'string' ? action.meta.arg : action.meta.arg.accountId;
+      state.isSyncing[accountId] = false;
     });
   },
 });

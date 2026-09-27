@@ -43,8 +43,35 @@ export interface Transaction {
   notes?: string;
   status: TransactionStatus;
   isRecurring: boolean;
+  personId?: Person | string | null;
+  person_id?: Person | string | null;
+  vpa?: string | null;
   metadata?: Record<string, unknown>;
   createdAt: string;
+}
+
+export interface Person {
+  _id: string;
+  name: string;
+  normalizedName?: string;
+  vpa?: string | null;
+  email?: string | null;
+  transactionCount?: number;
+  totalAmount?: number;
+  totalSent?: number;
+  totalReceived?: number;
+  lastTransactionDate?: string | null;
+  recentTransactions?: {
+    _id: string;
+    amount: number;
+    type: TransactionType;
+    merchant: string;
+    transactionDate: string;
+    paymentMethod?: string;
+    notes?: string;
+  }[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface DetectedTransaction {

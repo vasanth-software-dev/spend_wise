@@ -10,7 +10,13 @@ export class GenericUPIParser implements TransactionEmailParser {
       text.includes('vpa') ||
       text.includes('bhim') ||
       text.includes('amazon pay') ||
-      text.includes('cred')
+      text.includes('cred') ||
+      text.includes('gpay') ||
+      text.includes('google pay') ||
+      text.includes('phonepe') ||
+      text.includes('paytm') ||
+      text.includes('bharatpe') ||
+      text.includes('mobikwik')
     );
   }
 
@@ -25,6 +31,23 @@ export class GenericUPIParser implements TransactionEmailParser {
     const amount = parseFloat(amountMatch[1].replace(/,/g, ''));
     if (isNaN(amount) || amount <= 0) return null;
 
+    let upiReference: string | undefined;
+    const refMatch = content.match(/(?:UPI Ref|UTR|Ref No|Txn ID)[:\s]+([A-Za-z0-9]{8,22})/i);
+    if (refMatch && refMatch[1]) {
+      upiReference = refMatch[1].trim();
+    }
+
+    // Ensure this is an actual transaction statement, not promotional text
+    const isActualTxn = /(?:paid|debited|credited|received|transferred|withdrawn|successful\s+payment|payment\s+of|payment\s+successful|txn\s+id|upi\s+ref|utr)/i.test(content);
+    if (!isActualTxn && !upiReference) {
+      return null;
+    }
+
+    // Reject promotional amount matches like "Up to ₹2 Lakh", "₹1,000 Off"
+    if (/(?:up to|upto|flat|save|off\*?|discount)\s*(?:₹|Rs\.?|INR)/i.test(email.subject) && !upiReference) {
+      return null;
+    }
+
     const isIncome = /(?:received|credited|cashback|refund)\b/i.test(content);
     const type: 'expense' | 'income' = isIncome ? 'income' : 'expense';
 
@@ -32,12 +55,6 @@ export class GenericUPIParser implements TransactionEmailParser {
     const payeeMatch = content.match(/(?:to|towards|at|for|paid to)\s+([A-Za-z0-9\s&'.-]{2,30}?)(?:\s+(?:on|via|using|with|\.|\n))/i);
     if (payeeMatch && payeeMatch[1]) {
       merchant = payeeMatch[1].trim();
-    }
-
-    let upiReference: string | undefined;
-    const refMatch = content.match(/(?:UPI Ref|UTR|Ref No|Txn ID)[:\s]+([A-Za-z0-9]{8,22})/i);
-    if (refMatch && refMatch[1]) {
-      upiReference = refMatch[1].trim();
     }
 
     const confidenceScore = upiReference ? 75 : 60;

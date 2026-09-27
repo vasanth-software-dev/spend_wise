@@ -151,7 +151,7 @@ export class TransactionController {
   async getDashboard(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.userId;
-      const timeRange = (req.query.timeRange as '7d' | '30d' | '3m' | '6m' | '1y') || '30d';
+      const timeRange = (req.query.timeRange as 'today' | '7d' | '30d' | '3m' | '6m' | '1y') || '30d';
       const data = await transactionService.getDashboardData(userId, timeRange);
       sendSuccess(res, data);
     } catch (err) {

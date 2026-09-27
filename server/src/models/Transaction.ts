@@ -37,12 +37,21 @@ const transactionSchema = new Schema<ITransaction>(
     },
     isRecurring: { type: Boolean, default: false },
     recurringTransactionId: { type: Schema.Types.ObjectId, ref: 'RecurringTransaction', default: null },
+    personId: { type: Schema.Types.ObjectId, ref: 'Person', default: null, index: true },
+    vpa: { type: String, trim: true, default: null },
     metadata: { type: Schema.Types.Mixed, default: {} },
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Virtual alias for person_id
+transactionSchema.virtual('person_id').get(function () {
+  return this.personId;
+});
 
 // Indexed queries
 transactionSchema.index({ userId: 1, transactionDate: -1 });
@@ -50,6 +59,7 @@ transactionSchema.index({ userId: 1, categoryId: 1 });
 transactionSchema.index({ userId: 1, source: 1 });
 transactionSchema.index({ userId: 1, status: 1 });
 transactionSchema.index({ userId: 1, externalTransactionId: 1 });
+transactionSchema.index({ userId: 1, personId: 1, transactionDate: -1 });
 transactionSchema.index({ userId: 1, merchant: 'text', description: 'text', notes: 'text' });
 
 export const TransactionModel = model<ITransaction>('Transaction', transactionSchema);

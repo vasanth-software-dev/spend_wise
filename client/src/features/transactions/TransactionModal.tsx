@@ -1,26 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/index.js';
-import { createTransactionThunk } from '../../store/slices/transactionSlice.js';
+import { createTransactionThunk, updateTransactionThunk } from '../../store/slices/transactionSlice.js';
 import { fetchDashboardThunk } from '../../store/slices/dashboardSlice.js';
 import { Modal } from '../../components/ui/Modal.js';
 import { Button } from '../../components/ui/Button.js';
 import { Input } from '../../components/ui/Input.js';
 import { CategoryIcon } from '../../components/ui/CategoryIcon.js';
-import { TransactionType, PaymentMethod } from '../../types/index.js';
+import { TransactionType, PaymentMethod, Transaction } from '../../types/index.js';
+import { toast } from '../..//components/ui/Toast.js';
 
 interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultType?: TransactionType;
+  transaction?: Transaction | null;
+  onSuccess?: (updated: Transaction) => void;
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({
   isOpen,
   onClose,
   defaultType = 'expense',
+  transaction,
+  onSuccess,
 }) => {
   const dispatch = useAppDispatch();
   const categories = useAppSelector((state) => state.categories.categories);
+
+  const isEditing = !!transaction;
 
   const [type, setType] = useState<TransactionType>(defaultType);
   const [amount, setAmount] = useState('');
@@ -34,18 +41,37 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setType(defaultType);
-      setAmount('');
-      setMerchant('');
-      setNotes('');
-      setError(null);
-      setDate(new Date().toISOString().split('T')[0]);
+      if (transaction) {
+        setType(transaction.type);
+        setAmount(String(transaction.amount));
+        setMerchant(transaction.merchant || '');
+        const catId =
+          typeof transaction.categoryId === 'object' && transaction.categoryId !== null
+            ? transaction.categoryId._id
+            : (transaction.categoryId as string) || '';
+        setCategoryId(catId);
+        setPaymentMethod(transaction.paymentMethod || 'upi');
+        setDate(
+          transaction.transactionDate
+            ? new Date(transaction.transactionDate).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0]
+        );
+        setNotes(transaction.notes || '');
+        setError(null);
+      } else {
+        setType(defaultType);
+        setAmount('');
+        setMerchant('');
+        setNotes('');
+        setError(null);
+        setDate(new Date().toISOString().split('T')[0]);
 
-      // Pick default category for type
-      const defaultCat = categories.find((c) => c.type === defaultType || c.type === 'both');
-      if (defaultCat) setCategoryId(defaultCat._id);
+        // Pick default category for type
+        const defaultCat = categories.find((c) => c.type === defaultType || c.type === 'both');
+        if (defaultCat) setCategoryId(defaultCat._id);
+      }
     }
-  }, [isOpen, defaultType, categories]);
+  }, [isOpen, transaction, defaultType, categories]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,24 +89,49 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     setError(null);
 
     try {
-      await dispatch(
-        createTransactionThunk({
-          type,
-          amount: numAmount,
-          currency: 'INR',
-          categoryId: categoryId || undefined,
-          merchant: merchant.trim(),
-          paymentMethod,
-          transactionDate: new Date(date),
-          notes: notes.trim() || undefined,
-          source: 'manual',
-        })
-      ).unwrap();
+      if (isEditing && transaction) {
+        const res = await dispatch(
+          updateTransactionThunk({
+            id: transaction._id,
+            data: {
+              type,
+              amount: numAmount,
+              currency: 'INR',
+              categoryId: categoryId || null,
+              merchant: merchant.trim(),
+              paymentMethod,
+              transactionDate: new Date(date),
+              notes: notes.trim() || undefined,
+            },
+          })
+        ).unwrap();
 
-      dispatch(fetchDashboardThunk('30d'));
-      onClose();
+        toast.success('Transaction updated successfully');
+        dispatch(fetchDashboardThunk('30d'));
+        if (onSuccess) onSuccess(res);
+        onClose();
+      } else {
+        await dispatch(
+          createTransactionThunk({
+            type,
+            amount: numAmount,
+            currency: 'INR',
+            categoryId: categoryId || undefined,
+            merchant: merchant.trim(),
+            paymentMethod,
+            transactionDate: new Date(date),
+            notes: notes.trim() || undefined,
+            source: 'manual',
+          })
+        ).unwrap();
+
+        toast.success('Transaction created successfully');
+        dispatch(fetchDashboardThunk('30d'));
+        onClose();
+      }
     } catch (err: any) {
       setError(err || 'Failed to save transaction');
+      toast.error(err || 'Failed to save transaction');
     } finally {
       setIsSubmitting(false);
     }
@@ -103,8 +154,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Add Transaction"
-      description="Record a manual financial activity in your ledger."
+      title={isEditing ? 'Edit Transaction' : 'Add Transaction'}
+      description={
+        isEditing
+          ? 'Update transaction details in your financial ledger.'
+          : 'Record a manual financial activity in your ledger.'
+      }
       maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -257,7 +312,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             Cancel
           </Button>
           <Button type="submit" variant="primary" size="md" isLoading={isSubmitting}>
-            Save Transaction
+            {isEditing ? 'Update Transaction' : 'Save Transaction'}
           </Button>
         </div>
       </form>

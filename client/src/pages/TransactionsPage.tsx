@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Receipt,
   Mail,
+  UserRound,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import {
@@ -42,6 +43,7 @@ export const TransactionsPage: React.FC = () => {
   const categories = useAppSelector((state) => state.categories.categories);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isCategorizeModalOpen, setIsCategorizeModalOpen] = useState(false);
@@ -345,10 +347,23 @@ export const TransactionsPage: React.FC = () => {
                             <CategoryIcon name={cat?.icon || 'Tag'} className="w-4 h-4" />
                           </div>
                           <div className="min-w-0">
-                            <span className="font-bold text-slate-800 dark:text-slate-200 block truncate">
-                              {tx.merchant}
-                            </span>
-                            {tx.notes && (
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-800 dark:text-slate-200 block truncate">
+                                {tx.merchant}
+                              </span>
+                              {tx.personId && typeof tx.personId === 'object' && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/60 px-1.5 py-0.5 rounded">
+                                  <UserRound className="w-2.5 h-2.5" />
+                                  {tx.personId.name}
+                                </span>
+                              )}
+                            </div>
+                            {tx.vpa && (
+                              <span className="text-[11px] font-mono text-slate-400 truncate block">
+                                VPA: {tx.vpa}
+                              </span>
+                            )}
+                            {tx.notes && !tx.vpa && (
                               <span className="text-[11px] text-slate-400 truncate block">
                                 {tx.notes}
                               </span>
@@ -486,7 +501,23 @@ export const TransactionsPage: React.FC = () => {
         isOpen={!!selectedTx}
         onClose={() => setSelectedTx(null)}
         onDelete={handleDeleteSingle}
+        onEdit={(tx) => {
+          setSelectedTx(null);
+          setEditingTx(tx);
+        }}
       />
+
+      {/* Edit Transaction Modal */}
+      {editingTx && (
+        <TransactionModal
+          isOpen={true}
+          transaction={editingTx}
+          onClose={() => setEditingTx(null)}
+          onSuccess={() => {
+            dispatch(fetchTransactionsThunk(undefined));
+          }}
+        />
+      )}
     </div>
   );
 };

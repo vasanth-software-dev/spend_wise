@@ -31,3 +31,119 @@
 .card-hover {
   @apply transition-all duration-200 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700;
 }
+
+/* =========================================================================
+   SpendWise Custom Toast Styling (react-toastify tailored to site theme)
+   ========================================================================= */
+
+:root {
+  --toastify-color-light: #ffffff;
+  --toastify-color-dark: #0f172a;
+  --toastify-color-info: #0284c7;
+  --toastify-color-success: #059669;
+  --toastify-color-warning: #d97706;
+  --toastify-color-error: #e11d48;
+  --toastify-color-transparent: rgba(255, 255, 255, 0.7);
+
+  --toastify-icon-color-info: #38bdf8;
+  --toastify-icon-color-success: #6ee7b7;
+  --toastify-icon-color-warning: #fde68a;
+  --toastify-icon-color-error: #fecdd3;
+
+  --toastify-toast-width: 380px;
+  --toastify-toast-min-height: 56px;
+  --toastify-toast-max-height: 800px;
+  --toastify-toast-bd-radius: 16px;
+  --toastify-font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+.Toastify__toast-container {
+  padding: 16px !important;
+  width: min(420px, 92vw) !important;
+  z-index: 99999 !important;
+}
+
+.Toastify__toast {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  line-height: 1.45 !important;
+  border-radius: 16px !important;
+  padding: 13px 18px !important;
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.22), 0 4px 12px -2px rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  letter-spacing: -0.01em !important;
+  margin-bottom: 12px !important;
+}
+
+/* Colored Theme - Elegant Fintech Gradients matching SpendWise */
+.Toastify__toast-theme--colored.Toastify__toast--success {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(52, 211, 153, 0.3) !important;
+  box-shadow: 0 14px 28px -4px rgba(5, 150, 105, 0.35), 0 6px 12px -2px rgba(5, 150, 105, 0.2) !important;
+}
+
+.Toastify__toast-theme--colored.Toastify__toast--error {
+  background: linear-gradient(135deg, #e11d48 0%, #be123c 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(251, 113, 133, 0.3) !important;
+  box-shadow: 0 14px 28px -4px rgba(225, 29, 72, 0.35), 0 6px 12px -2px rgba(225, 29, 72, 0.2) !important;
+}
+
+.Toastify__toast-theme--colored.Toastify__toast--info {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(56, 189, 248, 0.3) !important;
+  box-shadow: 0 14px 28px -4px rgba(2, 132, 199, 0.35), 0 6px 12px -2px rgba(2, 132, 199, 0.2) !important;
+}
+
+.Toastify__toast-theme--colored.Toastify__toast--warning {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(251, 191, 36, 0.3) !important;
+  box-shadow: 0 14px 28px -4px rgba(217, 119, 6, 0.35), 0 6px 12px -2px rgba(217, 119, 6, 0.2) !important;
+}
+
+/* Light / Default Toast Surface */
+.Toastify__toast-theme--light {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(226, 232, 240, 0.9) !important;
+}
+
+/* Dark Mode Toast Surface */
+.dark .Toastify__toast-theme--light,
+.Toastify__toast-theme--dark {
+  background: rgba(15, 23, 42, 0.96) !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.5), 0 6px 16px -2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Progress bar refinement */
+.Toastify__progress-bar {
+  height: 3px !important;
+  border-radius: 0 0 16px 16px !important;
+}
+
+.Toastify__progress-bar--colored.Toastify__progress-bar--success,
+.Toastify__progress-bar--colored.Toastify__progress-bar--error,
+.Toastify__progress-bar--colored.Toastify__progress-bar--info,
+.Toastify__progress-bar--colored.Toastify__progress-bar--warning {
+  background: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Close Button */
+.Toastify__close-button {
+  color: rgba(255, 255, 255, 0.8) !important;
+  opacity: 0.8 !important;
+  transition: opacity 0.15s ease, transform 0.15s ease !important;
+  align-self: center !important;
+}
+.Toastify__close-button:hover {
+  opacity: 1 !important;
+  transform: scale(1.1) !important;
+}
+

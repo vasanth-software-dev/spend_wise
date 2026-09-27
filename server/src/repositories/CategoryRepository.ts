@@ -20,6 +20,7 @@ export const DEFAULT_SYSTEM_CATEGORIES: Array<{
   { name: 'Education', type: 'expense', icon: 'GraduationCap', color: '#6366f1' },
   { name: 'Travel', type: 'expense', icon: 'Plane', color: '#06b6d4' },
   { name: 'Subscriptions', type: 'expense', icon: 'CreditCard', color: '#f43f5e' },
+  { name: 'Friends & Family', type: 'both', icon: 'Users', color: '#8b5cf6' },
   { name: 'Salary', type: 'income', icon: 'Briefcase', color: '#22c55e' },
   { name: 'Investments', type: 'income', icon: 'TrendingUp', color: '#0284c7' },
   { name: 'Other', type: 'both', icon: 'MoreHorizontal', color: '#64748b' },

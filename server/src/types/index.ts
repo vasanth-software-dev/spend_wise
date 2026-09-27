@@ -92,7 +92,22 @@ export interface ITransaction {
   status: TransactionStatus;
   isRecurring: boolean;
   recurringTransactionId?: Types.ObjectId | string | null;
+  personId?: Types.ObjectId | string | null;
+  person_id?: Types.ObjectId | string | null;
+  vpa?: string | null;
   metadata?: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IPerson {
+  _id: Types.ObjectId | string;
+  userId: Types.ObjectId | string;
+  name: string;
+  normalizedName: string;
+  vpa?: string | null;
+  email?: string | null;
+  isDeleted?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -235,11 +250,16 @@ export interface TransactionEmailParser {
   parse(email: EmailMessage): ParsedTransaction | null;
 }
 
+export interface SyncOptions {
+  month?: number; // 1 - 12
+  year?: number;  // e.g. 2026
+}
+
 export interface EmailProvider {
   name: string;
   connect(authData?: unknown): Promise<boolean>;
   disconnect(): Promise<boolean>;
-  sync(cursor?: string): Promise<{ messages: EmailMessage[]; newCursor?: string }>;
+  sync(cursor?: string, options?: SyncOptions): Promise<{ messages: EmailMessage[]; newCursor?: string }>;
   getMessages(query?: string, maxResults?: number): Promise<EmailMessage[]>;
 }
 

@@ -15,6 +15,8 @@ import { SettingsPage } from '../pages/SettingsPage.js';
 import { LoginPage } from '../pages/LoginPage.js';
 import { RegisterPage } from '../pages/RegisterPage.js';
 import { AuthCallbackPage } from '../pages/AuthCallbackPage.js';
+import { PeoplePage } from '../pages/PeoplePage.js';
+import { ToastContainer } from '../components/ui/Toast.js';
 
 export const App: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -25,7 +27,9 @@ export const App: React.FC = () => {
   }, [dispatch]);
 
   return (
-    <Routes>
+    <>
+      <ToastContainer />
+      <Routes>
       {/* Public Auth Routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
@@ -36,6 +40,8 @@ export const App: React.FC = () => {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="transactions" element={<TransactionsPage />} />
+        <Route path="people" element={<PeoplePage />} />
+        <Route path="people/:id" element={<PeoplePage />} />
         <Route path="budgets" element={<BudgetsPage />} />
         <Route path="recurring" element={<RecurringPage />} />
         <Route path="email-sync" element={<EmailSyncPage />} />
@@ -46,5 +52,6 @@ export const App: React.FC = () => {
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+    </>
   );
 };

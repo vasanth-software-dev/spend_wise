@@ -20,6 +20,7 @@ import emailAccountRoutes from './routes/emailAccountRoutes.js';
 import detectedTransactionRoutes from './routes/detectedTransactionRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import personRoutes from './routes/personRoutes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -71,6 +72,7 @@ export function createApp(): Express {
   app.use('/api/v1/detected-transactions', detectedTransactionRoutes);
   app.use('/api/v1/reports', reportRoutes);
   app.use('/api/v1/notifications', notificationRoutes);
+  app.use('/api/v1/people', personRoutes);
 
   // In production, serve the built Vite SPA frontend if available
   const clientDistPaths = [

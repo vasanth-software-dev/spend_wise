@@ -15,6 +15,7 @@ import {
   Copy,
   Check,
   Send,
+  Calendar,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import {
@@ -28,6 +29,7 @@ import {
   removeAccountThunk,
 } from '../store/slices/emailAccountSlice.js';
 import { fetchPendingDetectedThunk } from '../store/slices/detectedTransactionSlice.js';
+import { fetchCategoriesThunk } from '../store/slices/categorySlice.js';
 import { Card } from '../components/ui/Card.js';
 import { Button } from '../components/ui/Button.js';
 import { Modal } from '../components/ui/Modal.js';
@@ -39,11 +41,38 @@ import { DetectedTransactionReviewCenter } from '../features/emailSync/DetectedT
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../services/api.js';
 
+const MONTH_OPTIONS = [
+  { value: 1, label: 'January' },
+  { value: 2, label: 'February' },
+  { value: 3, label: 'March' },
+  { value: 4, label: 'April' },
+  { value: 5, label: 'May' },
+  { value: 6, label: 'June' },
+  { value: 7, label: 'July' },
+  { value: 8, label: 'August' },
+  { value: 9, label: 'September' },
+  { value: 10, label: 'October' },
+  { value: 11, label: 'November' },
+  { value: 12, label: 'December' },
+];
+
+const YEAR_OPTIONS = [2024, 2025, 2026, 2027];
+
 export const EmailSyncPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const [searchParams] = useSearchParams();
   const { accounts, isSyncing } = useAppSelector((state) => state.emailAccounts);
   const { user } = useAppSelector((state) => state.auth);
+
+  const currentDate = new Date();
+  const [selectedMonths, setSelectedMonths] = useState<Record<string, number>>({});
+  const [selectedYears, setSelectedYears] = useState<Record<string, number>>({});
+
+  const handleSyncMonth = (accountId: string) => {
+    const month = selectedMonths[accountId] ?? (currentDate.getMonth() + 1);
+    const year = selectedYears[accountId] ?? currentDate.getFullYear();
+    dispatch(syncAccountThunk({ accountId, month, year }));
+  };
 
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [connectTab, setConnectTab] = useState<'forwarding' | 'mock' | 'gmail'>('forwarding');
@@ -66,6 +95,7 @@ export const EmailSyncPage: React.FC = () => {
   useEffect(() => {
     dispatch(fetchAccountsThunk());
     dispatch(fetchPendingDetectedThunk());
+    dispatch(fetchCategoriesThunk());
 
     if (urlConnected === 'gmail_success') {
       setBannerNotice({
@@ -380,8 +410,55 @@ export const EmailSyncPage: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Month & Year Selection for Email Sync */}
+                  {acc.provider !== 'forwarding' && (
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
+                          Sync Month & Year:
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-normal">Only that data syncs</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          value={selectedMonths[acc._id] ?? (currentDate.getMonth() + 1)}
+                          onChange={(e) =>
+                            setSelectedMonths((prev) => ({
+                              ...prev,
+                              [acc._id]: parseInt(e.target.value, 10),
+                            }))
+                          }
+                          className="w-full py-1.5 px-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                          {MONTH_OPTIONS.map((m) => (
+                            <option key={m.value} value={m.value}>
+                              {m.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={selectedYears[acc._id] ?? currentDate.getFullYear()}
+                          onChange={(e) =>
+                            setSelectedYears((prev) => ({
+                              ...prev,
+                              [acc._id]: parseInt(e.target.value, 10),
+                            }))
+                          }
+                          className="w-full py-1.5 px-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                          {YEAR_OPTIONS.map((y) => (
+                            <option key={y} value={y}>
+                              {y}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Actions */}
-                  <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                     {acc.provider === 'forwarding' ? (
                       <Button
                         size="sm"
@@ -395,12 +472,12 @@ export const EmailSyncPage: React.FC = () => {
                     ) : (
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="primary"
                         isLoading={syncing}
                         leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />}
-                        onClick={() => dispatch(syncAccountThunk(acc._id))}
+                        onClick={() => handleSyncMonth(acc._id)}
                       >
-                        Sync Now
+                        Sync {MONTH_OPTIONS.find((m) => m.value === (selectedMonths[acc._id] ?? (currentDate.getMonth() + 1)))?.label?.slice(0, 3)} {selectedYears[acc._id] ?? currentDate.getFullYear()}
                       </Button>
                     )}
 

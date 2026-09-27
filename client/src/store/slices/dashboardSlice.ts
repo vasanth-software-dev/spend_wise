@@ -9,6 +9,8 @@ import {
   Transaction,
 } from '../../types/index.js';
 
+export type DashboardTimeRange = 'today' | '7d' | '30d' | '3m' | '6m' | '1y';
+
 interface DashboardState {
   summary: DashboardSummary | null;
   spendingTrend: SpendingTrendPoint[];
@@ -16,7 +18,7 @@ interface DashboardState {
   topMerchants: TopMerchantItem[];
   paymentDistribution: PaymentDistributionItem[];
   recentTransactions: Transaction[];
-  timeRange: '7d' | '30d' | '3m' | '6m' | '1y';
+  timeRange: DashboardTimeRange;
   loading: boolean;
   error: string | null;
 }
@@ -35,7 +37,7 @@ const initialState: DashboardState = {
 
 export const fetchDashboardThunk = createAsyncThunk(
   'dashboard/fetchData',
-  async (timeRange: '7d' | '30d' | '3m' | '6m' | '1y' = '30d', { rejectWithValue }) => {
+  async (timeRange: DashboardTimeRange = '30d', { rejectWithValue }) => {
     try {
       const res = await api.get(`/transactions/dashboard?timeRange=${timeRange}`);
       return res.data.data;

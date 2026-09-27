@@ -14,6 +14,8 @@ export const createTransactionSchema = z.object({
     transactionDate: z.string().or(z.date()).optional(),
     notes: z.string().optional(),
     isRecurring: z.boolean().optional(),
+    personId: z.string().nullable().optional(),
+    vpa: z.string().nullable().optional(),
   }),
 });
 
@@ -27,5 +29,7 @@ export const updateTransactionSchema = z.object({
     paymentMethod: z.enum(['upi', 'bank', 'cash', 'card', 'wallet', 'other']).optional(),
     transactionDate: z.string().or(z.date()).optional(),
     notes: z.string().optional(),
+    personId: z.string().nullable().optional(),
+    vpa: z.string().nullable().optional(),
   }),
 });

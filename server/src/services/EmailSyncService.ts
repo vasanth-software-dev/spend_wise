@@ -9,7 +9,7 @@ import { predictCategoryName, findMatchingCategoryId } from '../utils/categoryPr
 import { GmailProvider } from '../providers/gmail/GmailProvider.js';
 import { MockEmailProvider } from '../providers/email/MockEmailProvider.js';
 import { encrypt } from '../utils/encryption.js';
-import { EmailProvider, IEmailAccount, IDetectedTransaction, EmailMessage } from '../types/index.js';
+import { EmailProvider, IEmailAccount, IDetectedTransaction, EmailMessage, SyncOptions } from '../types/index.js';
 import { Types } from 'mongoose';
 import { randomBytes } from 'crypto';
 import { env } from '../config/env.js';
@@ -144,7 +144,8 @@ export class EmailSyncService {
    */
   async syncAccount(
     userId: string,
-    emailAccountId: string
+    emailAccountId: string,
+    options?: SyncOptions
   ): Promise<{ scanned: number; detected: number; duplicates: number }> {
     const account = await emailAccountRepository.findById(emailAccountId, userId);
     if (!account) {
@@ -158,7 +159,7 @@ export class EmailSyncService {
     await auditLogRepository.log({
       userId,
       action: 'SYNC_STARTED',
-      metadata: { emailAccountId, email: account.email },
+      metadata: { emailAccountId, email: account.email, options },
     });
 
     if (account.provider === 'forwarding') {
@@ -181,11 +182,22 @@ export class EmailSyncService {
     }
 
     try {
-      const { messages, newCursor } = await provider.sync(account.syncCursor);
+      const { messages, newCursor } = await provider.sync(account.syncCursor, options);
       let detectedCount = 0;
       let duplicateCount = 0;
 
       for (const msg of messages) {
+        // Enforce month and year filter if specified
+        if (options?.month && options?.year) {
+          const msgDate = new Date(msg.date);
+          if (
+            msgDate.getMonth() + 1 !== options.month ||
+            msgDate.getFullYear() !== options.year
+          ) {
+            continue;
+          }
+        }
+
         // Parse email using registered parsers
         const parsed = emailParserRegistry.parse(msg);
         if (!parsed) continue;

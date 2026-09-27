@@ -8,8 +8,10 @@ import { RecurringTransactionModel } from './models/RecurringTransaction.js';
 import { EmailAccountModel } from './models/EmailAccount.js';
 import { DetectedTransactionModel } from './models/DetectedTransaction.js';
 import { NotificationModel } from './models/Notification.js';
+import { PersonModel } from './models/Person.js';
 import { hashPassword } from './utils/hash.js';
 import { categoryRepository, DEFAULT_SYSTEM_CATEGORIES } from './repositories/CategoryRepository.js';
+import { normalizePersonName } from './services/PersonService.js';
 
 async function seed() {
   console.log('🌱 Starting SpendWise Enterprise Data Seeder...');
@@ -26,7 +28,12 @@ async function seed() {
     EmailAccountModel.deleteMany({}),
     DetectedTransactionModel.deleteMany({}),
     NotificationModel.deleteMany({}),
+    PersonModel.deleteMany({}),
   ]);
+
+  try {
+    await PersonModel.syncIndexes();
+  } catch (_) {}
 
   // Ensure Default Categories
   console.log('📁 Populating default categories...');
@@ -231,6 +238,125 @@ async function seed() {
 
   const transactionsToInsert = [];
 
+  // Seed People for Primary User
+  console.log('👥 Seeding People & Payees...');
+  const abiramiPerson = await PersonModel.create({
+    userId: primaryUser._id,
+    name: 'ABIRAMI P',
+    normalizedName: normalizePersonName('ABIRAMI P'),
+    vpa: '8489906290@yapl',
+  });
+
+  const priyaPerson = await PersonModel.create({
+    userId: primaryUser._id,
+    name: 'Priya Sharma',
+    normalizedName: normalizePersonName('Priya Sharma'),
+    vpa: 'priya.sharma@oksbi',
+    email: 'priya@spendwise.dev',
+  });
+
+  const landlordPerson = await PersonModel.create({
+    userId: primaryUser._id,
+    name: 'Landlord Sharma',
+    normalizedName: normalizePersonName('Landlord Sharma'),
+  });
+
+  const rahulPerson = await PersonModel.create({
+    userId: primaryUser._id,
+    name: 'Rahul Verma',
+    normalizedName: normalizePersonName('Rahul Verma'),
+    vpa: 'rahul98@okaxis',
+    email: 'rahul@spendwise.dev',
+  });
+
+  // Seed exact 12 transactions for ABIRAMI P totaling ₹8,450 (Matches user example)
+  const abiramiAmounts = [1, 500, 1200, 450, 1800, 750, 350, 950, 600, 850, 500, 499];
+  const abiramiDates = [
+    new Date('2026-09-26T14:30:00.000Z'), // Exactly 26 Sep 2026
+    new Date('2026-09-24T18:15:00.000Z'),
+    new Date('2026-09-20T12:00:00.000Z'),
+    new Date('2026-09-17T09:45:00.000Z'),
+    new Date('2026-09-12T16:20:00.000Z'),
+    new Date('2026-09-08T11:10:00.000Z'),
+    new Date('2026-09-02T15:30:00.000Z'),
+    new Date('2026-08-28T20:00:00.000Z'),
+    new Date('2026-08-21T13:40:00.000Z'),
+    new Date('2026-08-15T10:25:00.000Z'),
+    new Date('2026-08-08T17:50:00.000Z'),
+    new Date('2026-08-01T14:00:00.000Z'),
+  ];
+  const friendsCat = catMap.get('Friends & Family') || catMap.get('Other') || null;
+
+  for (let i = 0; i < abiramiAmounts.length; i++) {
+    const isExampleEmail = i === 0;
+    transactionsToInsert.push({
+      userId: primaryUser._id,
+      type: 'expense',
+      amount: abiramiAmounts[i],
+      currency: 'INR',
+      categoryId: friendsCat,
+      merchant: 'ABIRAMI P',
+      description: isExampleEmail
+        ? 'Rs.1.00 is debited from your account ending 7079 towards VPA 8489906290@yapl (ABIRAMI P)'
+        : 'Payment to ABIRAMI P',
+      paymentMethod: 'upi',
+      source: 'email',
+      sourceAccountId: primaryGmail._id,
+      personId: abiramiPerson._id,
+      vpa: '8489906290@yapl',
+      externalTransactionId: isExampleEmail ? '130279331928' : `UPI/${426899130000 + i}`,
+      transactionDate: abiramiDates[i],
+      notes: isExampleEmail
+        ? 'towards VPA 8489906290@yapl (ABIRAMI P)'
+        : 'UPI Transfer',
+      status: 'confirmed',
+      metadata: {
+        vpa: '8489906290@yapl',
+        personName: 'ABIRAMI P',
+      },
+    });
+  }
+
+  // Transactions with Priya Sharma (Sent + Received)
+  transactionsToInsert.push(
+    {
+      userId: primaryUser._id,
+      type: 'expense',
+      amount: 1200,
+      currency: 'INR',
+      categoryId: friendsCat,
+      merchant: 'Priya Sharma',
+      description: 'Dinner split transfer to Priya Sharma',
+      paymentMethod: 'upi',
+      source: 'email',
+      sourceAccountId: primaryGmail._id,
+      personId: priyaPerson._id,
+      vpa: 'priya.sharma@oksbi',
+      externalTransactionId: 'UPI/426899140001',
+      transactionDate: new Date('2026-09-22T21:00:00.000Z'),
+      notes: 'Weekend dinner split',
+      status: 'confirmed',
+    },
+    {
+      userId: primaryUser._id,
+      type: 'income',
+      amount: 1500,
+      currency: 'INR',
+      categoryId: friendsCat,
+      merchant: 'Priya Sharma',
+      description: 'Trip reimbursement received from Priya Sharma',
+      paymentMethod: 'upi',
+      source: 'email',
+      sourceAccountId: primaryGmail._id,
+      personId: priyaPerson._id,
+      vpa: 'priya.sharma@oksbi',
+      externalTransactionId: 'UPI/426899140002',
+      transactionDate: new Date('2026-09-18T16:30:00.000Z'),
+      notes: 'Cab & movie reimbursement',
+      status: 'confirmed',
+    }
+  );
+
   // Monthly Salaries for past 3 months
   for (let m = 2; m >= 0; m--) {
     const salaryDate = new Date(now.getFullYear(), now.getMonth() - m, 1, 9, 30);
@@ -249,7 +375,7 @@ async function seed() {
       status: 'confirmed',
     });
 
-    // Apartment rent for past 3 months
+    // Apartment rent for past 3 months (linked to Landlord Sharma)
     const rentDate = new Date(now.getFullYear(), now.getMonth() - m, 2, 11, 0);
     transactionsToInsert.push({
       userId: primaryUser._id,
@@ -261,6 +387,7 @@ async function seed() {
       description: 'House rent for month',
       paymentMethod: 'bank',
       source: 'manual',
+      personId: landlordPerson._id,
       transactionDate: rentDate,
       notes: 'Flat 402 Rent',
       status: 'confirmed',

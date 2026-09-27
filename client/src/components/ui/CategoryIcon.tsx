@@ -17,6 +17,7 @@ import {
   Tag,
   DollarSign,
   Coffee,
+  Users,
   HelpCircle,
   LucideIcon,
 } from 'lucide-react';
@@ -39,6 +40,7 @@ const iconMap: Record<string, LucideIcon> = {
   Tag,
   DollarSign,
   Coffee,
+  Users,
 };
 
 interface CategoryIconProps {

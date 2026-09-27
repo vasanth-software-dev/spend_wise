@@ -4,6 +4,7 @@ import { categoryRepository } from '../repositories/CategoryRepository.js';
 import { IDetectedTransaction, ITransaction } from '../types/index.js';
 import { Types } from 'mongoose';
 import { predictCategoryName, findMatchingCategoryId } from '../utils/categoryPredictor.js';
+import { personService } from './PersonService.js';
 
 export interface ConfirmDetectedDTO {
   categoryId?: string;
@@ -14,8 +15,8 @@ export interface ConfirmDetectedDTO {
 }
 
 export class DetectedTransactionService {
-  async getPending(userId: string): Promise<IDetectedTransaction[]> {
-    return detectedTransactionRepository.findPendingByUserId(userId);
+  async getPending(userId: string, limit = 500): Promise<IDetectedTransaction[]> {
+    return detectedTransactionRepository.findPendingByUserId(userId, limit);
   }
 
   async getAll(userId: string, status?: string): Promise<IDetectedTransaction[]> {
@@ -46,18 +47,27 @@ export class DetectedTransactionService {
       if (matched) categoryId = matched;
     }
 
+    const parsedVpa = typeof detected.rawMetadata?.vpa === 'string' ? detected.rawMetadata.vpa : undefined;
+    const finalMerchant = (overrides?.merchant || detected.merchant).trim();
+    const person = await personService.identifyAndLinkPerson(userId, {
+      merchant: finalMerchant,
+      vpa: parsedVpa,
+    });
+
     // Create confirmed transaction in financial ledger
     const transaction = await transactionRepository.create({
       userId: new Types.ObjectId(userId),
       type: detected.transactionType,
       amount: overrides?.amount || detected.amount,
       currency: detected.currency,
-      categoryId: categoryId ? new Types.ObjectId(categoryId) : null,
-      merchant: (overrides?.merchant || detected.merchant).trim(),
+      categoryId: categoryId && Types.ObjectId.isValid(categoryId) ? new Types.ObjectId(categoryId) : null,
+      merchant: finalMerchant,
       description: `Detected from ${detected.sender} (${detected.subject})`,
       paymentMethod: detected.upiReference ? 'upi' : 'bank',
       source: 'email',
       sourceAccountId: new Types.ObjectId(detected.emailAccountId),
+      personId: person?._id ? new Types.ObjectId(person._id) : null,
+      vpa: parsedVpa || person?.vpa || null,
       externalTransactionId: detected.upiReference || detected.bankReference || undefined,
       transactionDate: overrides?.transactionDate ? new Date(overrides.transactionDate) : detected.transactionDate,
       notes: overrides?.notes || undefined,
@@ -68,6 +78,8 @@ export class DetectedTransactionService {
         confidenceScore: detected.confidenceScore,
         sender: detected.sender,
         subject: detected.subject,
+        vpa: parsedVpa || person?.vpa || null,
+        personName: person?.name || undefined,
       },
     });
 
@@ -75,6 +87,47 @@ export class DetectedTransactionService {
     await detectedTransactionRepository.updateStatus(detectedId, userId, 'confirmed');
 
     return transaction;
+  }
+
+  async update(
+    userId: string,
+    detectedId: string,
+    updates: {
+      merchant?: string;
+      amount?: number;
+      categoryId?: string | null;
+      suggestedCategory?: string;
+      notes?: string;
+    }
+  ): Promise<IDetectedTransaction> {
+    const detected = await detectedTransactionRepository.findById(detectedId, userId);
+    if (!detected) {
+      throw new Error('Detected transaction not found');
+    }
+
+    const updateData: Partial<IDetectedTransaction> = {};
+    if (updates.merchant !== undefined) updateData.merchant = updates.merchant.trim();
+    if (updates.amount !== undefined) updateData.amount = updates.amount;
+    if (updates.categoryId !== undefined) {
+      if (updates.categoryId && Types.ObjectId.isValid(updates.categoryId)) {
+        updateData.categoryId = new Types.ObjectId(updates.categoryId) as any;
+        const category = await categoryRepository.findById(updates.categoryId);
+        if (category) {
+          updateData.suggestedCategory = category.name;
+        }
+      } else {
+        updateData.categoryId = null as any;
+      }
+    }
+    if (updates.suggestedCategory !== undefined && updates.categoryId === undefined) {
+      updateData.suggestedCategory = updates.suggestedCategory;
+    }
+
+    const updated = await detectedTransactionRepository.update(detectedId, userId, updateData);
+    if (!updated) {
+      throw new Error('Failed to update detected transaction');
+    }
+    return updated;
   }
 
   async reject(userId: string, detectedId: string): Promise<boolean> {

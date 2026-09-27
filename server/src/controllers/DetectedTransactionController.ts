@@ -7,7 +7,8 @@ export class DetectedTransactionController {
   async getPending(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.userId;
-      const detected = await detectedTransactionService.getPending(userId);
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 500;
+      const detected = await detectedTransactionService.getPending(userId, limit);
       sendSuccess(res, { detectedTransactions: detected });
     } catch (err) {
       next(err);
@@ -53,6 +54,17 @@ export class DetectedTransactionController {
       const { id } = req.params;
       await detectedTransactionService.markDuplicate(userId, id);
       sendSuccess(res, null, 'Transaction marked as duplicate');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async update(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const { id } = req.params;
+      const updated = await detectedTransactionService.update(userId, id, req.body);
+      sendSuccess(res, { detectedTransaction: updated }, 'Detected transaction updated');
     } catch (err) {
       next(err);
     }

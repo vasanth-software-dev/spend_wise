@@ -14,6 +14,7 @@ export interface TransactionFilterParams {
   minAmount?: number;
   maxAmount?: number;
   merchant?: string;
+  personId?: string;
   search?: string;
   page?: number;
   limit?: number;
@@ -33,7 +34,10 @@ export class TransactionRepository {
   }
 
   async findById(id: string, userId: string): Promise<ITransaction | null> {
-    return TransactionModel.findOne({ _id: id, userId }).populate('categoryId').lean();
+    return TransactionModel.findOne({ _id: id, userId })
+      .populate('categoryId')
+      .populate('personId')
+      .lean();
   }
 
   async update(id: string, userId: string, updateData: Partial<ITransaction>): Promise<ITransaction | null> {
@@ -43,6 +47,7 @@ export class TransactionRepository {
       { new: true }
     )
       .populate('categoryId')
+      .populate('personId')
       .lean();
   }
 
@@ -120,6 +125,10 @@ export class TransactionRepository {
       query.merchant = { $regex: params.merchant, $options: 'i' };
     }
 
+    if (params.personId) {
+      query.personId = new Types.ObjectId(params.personId);
+    }
+
     if (params.search) {
       const searchRegex = { $regex: params.search, $options: 'i' };
       query.$or = [
@@ -127,6 +136,7 @@ export class TransactionRepository {
         { description: searchRegex },
         { notes: searchRegex },
         { externalTransactionId: searchRegex },
+        { vpa: searchRegex },
       ];
     }
 
@@ -139,6 +149,7 @@ export class TransactionRepository {
         .skip(skip)
         .limit(limit)
         .populate('categoryId')
+        .populate('personId', 'name vpa email')
         .populate('sourceAccountId', 'email provider')
         .lean(),
       TransactionModel.countDocuments(query),
