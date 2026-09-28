@@ -38,12 +38,15 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 transition-colors">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white shadow-md font-extrabold text-2xl">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#070b13] flex flex-col justify-center py-12 sm:px-6 lg:px-8 transition-colors relative overflow-hidden">
+      {/* Background ambient lighting */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center relative z-10">
+        <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white shadow-glow-emerald font-extrabold text-2xl tracking-tighter">
           ₹
         </div>
-        <h2 className="mt-4 text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+        <h2 className="mt-4 text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
           Create SpendWise Account
         </h2>
         <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
@@ -51,10 +54,10 @@ export const RegisterPage: React.FC = () => {
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white dark:bg-slate-900 py-8 px-6 sm:px-10 shadow-premium border border-slate-200/80 dark:border-slate-800 rounded-3xl">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0 relative z-10">
+        <div className="bg-white dark:bg-[#0d1322] py-8 px-6 sm:px-10 shadow-fintech-lg border border-slate-200/90 dark:border-white/10 rounded-3xl">
           {error && (
-            <div className="p-3 mb-5 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-medium">
+            <div className="p-3 mb-5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold animate-in fade-in">
               {error}
             </div>
           )}
@@ -74,7 +77,7 @@ export const RegisterPage: React.FC = () => {
               <div className="w-full border-t border-slate-200 dark:border-slate-800" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white dark:bg-slate-900 px-3 text-slate-400 font-medium tracking-wider">
+              <span className="bg-white dark:bg-[#0d1322] px-3 text-slate-400 font-semibold tracking-wider text-[10px]">
                 or sign up with email
               </span>
             </div>
@@ -114,11 +117,11 @@ export const RegisterPage: React.FC = () => {
                 type="submit"
                 variant="primary"
                 size="lg"
-                className="w-full shadow-sm"
+                className="w-full shadow-2xs font-bold"
                 isLoading={loading}
                 rightIcon={<ArrowRight className="w-4 h-4" />}
               >
-                Get Started
+                Create Account
               </Button>
             </div>
           </form>
@@ -128,7 +131,7 @@ export const RegisterPage: React.FC = () => {
               Already have an account?{' '}
               <Link
                 to="/login"
-                className="font-bold text-brand-600 dark:text-brand-400 hover:underline"
+                className="font-bold text-brand-600 dark:text-brand-400 hover:underline ml-1"
               >
                 Sign In
               </Link>

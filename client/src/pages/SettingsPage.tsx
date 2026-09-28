@@ -5,6 +5,10 @@ import {
   Trash2,
   Plus,
   CheckCircle,
+  User,
+  Shield,
+  Tag,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import { logoutThunk } from '../store/slices/authSlice.js';
@@ -34,6 +38,7 @@ export const SettingsPage: React.FC = () => {
   const [currency, setCurrency] = useState(user?.currency || 'INR');
   const [timezone, setTimezone] = useState(user?.timezone || 'Asia/Kolkata');
   const [profileSaved, setProfileSaved] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Sessions state
   const [sessions, setSessions] = useState<any[]>([]);
@@ -45,6 +50,7 @@ export const SettingsPage: React.FC = () => {
   const [newCatType, setNewCatType] = useState<'expense' | 'income' | 'both'>('expense');
   const [newCatIcon, setNewCatIcon] = useState('Tag');
   const [newCatColor, setNewCatColor] = useState('#10b981');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
   // Danger Zone
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -68,12 +74,15 @@ export const SettingsPage: React.FC = () => {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSavingProfile(true);
     try {
       await api.patch('/users/profile', { name, currency, timezone });
       setProfileSaved(true);
       setTimeout(() => setProfileSaved(false), 3000);
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
@@ -98,6 +107,7 @@ export const SettingsPage: React.FC = () => {
   const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName.trim()) return;
+    setIsCreatingCategory(true);
     try {
       await dispatch(
         createCategoryThunk({
@@ -111,6 +121,8 @@ export const SettingsPage: React.FC = () => {
       setNewCatName('');
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsCreatingCategory(false);
     }
   };
 
@@ -133,91 +145,82 @@ export const SettingsPage: React.FC = () => {
     'Briefcase', 'TrendingUp', 'Coffee', 'Users'
   ];
 
+  interface TabItem {
+    id: 'profile' | 'sessions' | 'categories' | 'privacy' | 'danger';
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    danger?: boolean;
+  }
+
+  const tabs: TabItem[] = [
+    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'sessions', label: 'Sessions', icon: Laptop },
+    { id: 'categories', label: 'Categories', icon: Tag },
+    { id: 'privacy', label: 'Privacy & Security', icon: Shield },
+    { id: 'danger', label: 'Danger Zone', icon: AlertTriangle, danger: true },
+  ];
+
   return (
-    <div className="space-y-6 sm:space-y-8 max-w-5xl mx-auto pb-12">
+    <div className="space-y-6 sm:space-y-8 max-w-5xl mx-auto pb-16">
+      {/* Header */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-          Account Settings
+        <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+          Account Settings & Security
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Manage your personal details, sessions, custom categories, and security parameters.
+          Manage your personal identity, device authorizations, spending taxonomy, and privacy controls.
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('profile')}
-          className={`flex-1 py-2 px-3 text-xs sm:text-sm font-semibold rounded-xl transition-all whitespace-nowrap ${
-            activeTab === 'profile'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs'
-              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          Profile
-        </button>
-        <button
-          onClick={() => setActiveTab('sessions')}
-          className={`flex-1 py-2 px-3 text-xs sm:text-sm font-semibold rounded-xl transition-all whitespace-nowrap ${
-            activeTab === 'sessions'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs'
-              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          Active Sessions
-        </button>
-        <button
-          onClick={() => setActiveTab('categories')}
-          className={`flex-1 py-2 px-3 text-xs sm:text-sm font-semibold rounded-xl transition-all whitespace-nowrap ${
-            activeTab === 'categories'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs'
-              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          Categories
-        </button>
-        <button
-          onClick={() => setActiveTab('privacy')}
-          className={`flex-1 py-2 px-3 text-xs sm:text-sm font-semibold rounded-xl transition-all whitespace-nowrap ${
-            activeTab === 'privacy'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs'
-              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          Privacy & Security
-        </button>
-        <button
-          onClick={() => setActiveTab('danger')}
-          className={`flex-1 py-2 px-3 text-xs sm:text-sm font-semibold rounded-xl transition-all text-rose-600 dark:text-rose-400 whitespace-nowrap ${
-            activeTab === 'danger'
-              ? 'bg-rose-50 dark:bg-rose-950/60 shadow-xs font-bold'
-              : 'hover:bg-rose-50/50'
-          }`}
-        >
-          Danger Zone
-        </button>
+      {/* Segmented Fintech Tab Bar */}
+      <div className="flex bg-slate-100 dark:bg-surface-elevated/90 p-1.5 rounded-2xl border border-slate-200/60 dark:border-white/5 overflow-x-auto scrollbar-none">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 py-2 px-3.5 text-xs sm:text-sm font-semibold rounded-xl transition-all whitespace-nowrap ${
+                isActive
+                  ? tab.danger
+                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 font-bold'
+                    : 'bg-white dark:bg-surface text-slate-900 dark:text-white shadow-xs border border-slate-200/80 dark:border-white/10 font-bold'
+                  : tab.danger
+                  ? 'text-rose-500/80 hover:text-rose-600 hover:bg-rose-50/40 dark:hover:bg-rose-950/20'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab: Profile */}
       {activeTab === 'profile' && (
-        <Card className="p-6">
-          <CardHeader>
-            <CardTitle>Profile & Regional Preferences</CardTitle>
-            <CardDescription>Configure your personal identification and default currency.</CardDescription>
+        <Card variant="elevated" className="p-6 sm:p-7">
+          <CardHeader className="pb-5 border-b border-slate-100 dark:border-white/5">
+            <CardTitle className="text-lg font-bold">Profile & Regional Preferences</CardTitle>
+            <CardDescription className="text-xs">
+              Configure your primary identity parameters, operating currency, and financial timezone.
+            </CardDescription>
           </CardHeader>
 
           {profileSaved && (
-            <div className="p-3 mb-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" />
-              <span>Profile updated successfully!</span>
+            <div className="p-3.5 mt-5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 flex-shrink-0" />
+              <span>Personal preferences successfully saved and synchronized.</span>
             </div>
           )}
 
-          <form onSubmit={handleSaveProfile} className="space-y-4 max-w-lg">
+          <form onSubmit={handleSaveProfile} className="space-y-5 mt-6 max-w-xl">
             <Input
               label="Full Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Vasanth"
               required
             />
 
@@ -225,44 +228,48 @@ export const SettingsPage: React.FC = () => {
               label="Email Address"
               value={user?.email || ''}
               disabled
-              helperText="Email cannot be changed directly."
+              helperText="Managed by primary authentication provider."
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                   Default Currency
                 </label>
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full py-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm"
-                >
-                  <option value="INR">INR (₹) - Indian Rupee</option>
-                  <option value="USD">USD ($) - US Dollar</option>
-                  <option value="EUR">EUR (€) - Euro</option>
-                  <option value="GBP">GBP (£) - British Pound</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className="w-full py-2.5 px-3.5 bg-white dark:bg-surface-elevated/80 border border-slate-200 dark:border-white/10 rounded-xl text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  >
+                    <option value="INR">INR (₹) - Indian Rupee</option>
+                    <option value="USD">USD ($) - US Dollar</option>
+                    <option value="EUR">EUR (€) - Euro</option>
+                    <option value="GBP">GBP (£) - British Pound</option>
+                  </select>
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">
-                  Timezone
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Timezone Standard
                 </label>
-                <select
-                  value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                  className="w-full py-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm"
-                >
-                  <option value="Asia/Kolkata">Asia/Kolkata (IST +5:30)</option>
-                  <option value="UTC">UTC</option>
-                  <option value="America/New_York">America/New_York (EST)</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    className="w-full py-2.5 px-3.5 bg-white dark:bg-surface-elevated/80 border border-slate-200 dark:border-white/10 rounded-xl text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  >
+                    <option value="Asia/Kolkata">Asia/Kolkata (IST +5:30)</option>
+                    <option value="UTC">UTC (Coordinated Universal Time)</option>
+                    <option value="America/New_York">America/New_York (EST)</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className="pt-2">
-              <Button type="submit" variant="primary" size="sm">
+            <div className="pt-3">
+              <Button type="submit" variant="primary" size="sm" isLoading={isSavingProfile}>
                 Save Preferences
               </Button>
             </div>
@@ -270,46 +277,46 @@ export const SettingsPage: React.FC = () => {
         </Card>
       )}
 
-      {/* Tab: Sessions (Requirement 10) */}
+      {/* Tab: Sessions */}
       {activeTab === 'sessions' && (
-        <Card className="p-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+        <Card variant="elevated" className="p-6 sm:p-7">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 dark:border-white/5 gap-3">
             <div>
-              <CardTitle>Active Multi-Device Sessions</CardTitle>
-              <CardDescription>
-                Track devices, browsers, and IP addresses authenticated to your SpendWise account.
+              <CardTitle className="text-lg font-bold">Active Device Sessions</CardTitle>
+              <CardDescription className="text-xs">
+                Review hardware, browser clients, and IP addresses authenticated to your financial portal.
               </CardDescription>
             </div>
             {sessions.length > 1 && (
-              <Button size="sm" variant="outline" onClick={handleLogoutAllOther}>
-                Logout Other Devices
+              <Button size="sm" variant="outline" onClick={handleLogoutAllOther} className="self-start sm:self-auto">
+                Revoke Other Sessions
               </Button>
             )}
           </div>
 
-          <div className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="mt-4 divide-y divide-slate-100 dark:divide-white/5">
             {sessions.map((sess) => {
               const isCurrent = sess._id === currentSessionId;
               return (
                 <div
                   key={sess._id}
-                  className="py-3.5 flex items-center justify-between text-xs sm:text-sm"
+                  className="py-4 flex items-center justify-between text-xs sm:text-sm"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                      <Laptop className="w-5 h-5" />
+                  <div className="flex items-center gap-3.5">
+                    <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-surface-elevated text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-white/5">
+                      <Laptop className="w-4 h-4" />
                     </div>
                     <div>
                       <p className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                         {sess.browser} on {sess.os}
                         {isCurrent && (
-                          <Badge variant="emerald" size="sm">
-                            CURRENT SESSION
+                          <Badge variant="emerald" size="sm" dot>
+                            CURRENT
                           </Badge>
                         )}
                       </p>
-                      <p className="text-slate-400 text-xs mt-0.5">
-                        IP: {sess.ipAddress} • Last active: {formatRelativeDate(sess.lastActive)}
+                      <p className="text-slate-400 font-mono text-[11px] mt-0.5">
+                        IP: {sess.ipAddress} • Last active {formatRelativeDate(sess.lastActive)}
                       </p>
                     </div>
                   </div>
@@ -319,7 +326,7 @@ export const SettingsPage: React.FC = () => {
                       size="sm"
                       variant="ghost"
                       onClick={() => handleRevokeSession(sess._id)}
-                      className="text-rose-600 hover:text-rose-700"
+                      className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs"
                     >
                       Revoke
                     </Button>
@@ -333,27 +340,30 @@ export const SettingsPage: React.FC = () => {
 
       {/* Tab: Categories */}
       {activeTab === 'categories' && (
-        <Card className="p-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+        <Card variant="elevated" className="p-6 sm:p-7">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 dark:border-white/5 gap-3">
             <div>
-              <CardTitle>Spending & Income Categories</CardTitle>
-              <CardDescription>System default categories and your custom categories.</CardDescription>
+              <CardTitle className="text-lg font-bold">Spending & Income Taxonomy</CardTitle>
+              <CardDescription className="text-xs">
+                System default ledgers and your personalized classification categories.
+              </CardDescription>
             </div>
             <Button
               size="sm"
               variant="primary"
-              leftIcon={<Plus className="w-4 h-4" />}
+              leftIcon={<Plus className="w-4 h-4 stroke-[2.5]" />}
               onClick={() => setIsAddCatModalOpen(true)}
+              className="self-start sm:self-auto shadow-2xs"
             >
               Add Category
             </Button>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {categories.map((c) => (
               <div
                 key={c._id}
-                className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-2.5 bg-slate-50/50 dark:bg-slate-800/40"
+                className="p-3.5 rounded-xl border border-slate-200/80 dark:border-white/5 flex items-center gap-3 bg-white dark:bg-surface-elevated/60 hover:border-slate-300 dark:hover:border-white/10 transition-colors"
               >
                 <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -365,7 +375,7 @@ export const SettingsPage: React.FC = () => {
                   <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
                     {c.name}
                   </p>
-                  <span className="text-[10px] uppercase font-semibold text-slate-400">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mt-0.5">
                     {c.isDefault ? 'Default' : 'Custom'}
                   </span>
                 </div>
@@ -377,13 +387,13 @@ export const SettingsPage: React.FC = () => {
           <Modal
             isOpen={isAddCatModalOpen}
             onClose={() => setIsAddCatModalOpen(false)}
-            title="Create Custom Category"
-            description="Add a personalized category for transaction tracking."
+            title="Create Custom Classification"
+            description="Add a personalized category with tailored iconography and color accents."
           >
             <form onSubmit={handleCreateCategory} className="space-y-4">
               <Input
                 label="Category Name"
-                placeholder="e.g. Pet Care, Gadgets"
+                placeholder="e.g. Pet Care, Software Subscriptions"
                 value={newCatName}
                 onChange={(e) => setNewCatName(e.target.value)}
                 required
@@ -391,36 +401,36 @@ export const SettingsPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">
-                    Type
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                    Flow Classification
                   </label>
                   <select
                     value={newCatType}
                     onChange={(e) => setNewCatType(e.target.value as any)}
-                    className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm"
+                    className="w-full py-2.5 px-3 bg-white dark:bg-surface-elevated/80 border border-slate-200 dark:border-white/10 rounded-xl text-xs sm:text-sm font-medium"
                   >
-                    <option value="expense">Expense</option>
-                    <option value="income">Income</option>
-                    <option value="both">Both</option>
+                    <option value="expense">Expense Only</option>
+                    <option value="income">Income Only</option>
+                    <option value="both">Both (Bi-directional)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">
-                    Color
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                    Accent Color
                   </label>
                   <input
                     type="color"
                     value={newCatColor}
                     onChange={(e) => setNewCatColor(e.target.value)}
-                    className="w-full h-10 p-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl cursor-pointer"
+                    className="w-full h-10 p-1 bg-white dark:bg-surface-elevated/80 border border-slate-200 dark:border-white/10 rounded-xl cursor-pointer"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">
-                  Select Icon
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  Select Visual Icon
                 </label>
                 <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
                   {iconOptions.map((iconName) => (
@@ -428,10 +438,10 @@ export const SettingsPage: React.FC = () => {
                       type="button"
                       key={iconName}
                       onClick={() => setNewCatIcon(iconName)}
-                      className={`p-2 rounded-xl border flex items-center justify-center transition-all ${
+                      className={`p-2.5 rounded-xl border flex items-center justify-center transition-all ${
                         newCatIcon === iconName
-                          ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-600'
-                          : 'border-slate-200 dark:border-slate-700 text-slate-500'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                          : 'border-slate-200 dark:border-white/5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                       }`}
                     >
                       <CategoryIcon name={iconName} className="w-4 h-4" />
@@ -440,12 +450,12 @@ export const SettingsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
+              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-white/5">
                 <Button variant="outline" size="sm" onClick={() => setIsAddCatModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button variant="primary" size="sm" type="submit">
-                  Save Category
+                <Button variant="primary" size="sm" type="submit" isLoading={isCreatingCategory}>
+                  Create Category
                 </Button>
               </div>
             </form>
@@ -453,60 +463,66 @@ export const SettingsPage: React.FC = () => {
         </Card>
       )}
 
-      {/* Tab: Privacy & Security (Requirement 48) */}
+      {/* Tab: Privacy & Security */}
       {activeTab === 'privacy' && (
-        <Card className="p-6 space-y-4">
-          <CardHeader>
-            <CardTitle>Security Architecture & Privacy Policy</CardTitle>
-            <CardDescription>
-              How SpendWise guarantees the confidentiality and security of your financial data.
+        <Card variant="elevated" className="p-6 sm:p-7 space-y-5">
+          <CardHeader className="pb-4 border-b border-slate-100 dark:border-white/5">
+            <CardTitle className="text-lg font-bold">Privacy Architecture & Security Model</CardTitle>
+            <CardDescription className="text-xs">
+              SpendWise is built upon strict zero-knowledge principles and encrypted storage guarantees.
             </CardDescription>
           </CardHeader>
 
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
-            <h4 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-500" />
-              1. Zero-Credential Financial Model
-            </h4>
-            <p className="leading-relaxed">
-              SpendWise never asks for, captures, or stores your banking passwords, Net Banking PINs, ATM PINs, UPI PINs, or One-Time Passwords (OTPs). All email access is negotiated using Google OAuth 2.0 with minimal read-only transaction search scopes.
-            </p>
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-surface-elevated/60 border border-slate-200/80 dark:border-white/5">
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                Zero-Credential Access Guarantee
+              </h4>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
+                SpendWise never requests, inspects, or stores banking passwords, Net Banking logins, ATM PINs, UPI PINs, or One-Time Passwords (OTPs). All email access is performed through authorized read-only Google OAuth 2.0 transaction search scopes.
+              </p>
+            </div>
 
-            <h4 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 pt-2">
-              <CheckCircle className="w-4 h-4 text-emerald-500" />
-              2. AES-256-GCM Token Encryption at Rest
-            </h4>
-            <p className="leading-relaxed">
-              Every third-party OAuth access token and refresh token is encrypted with military-grade AES-256-GCM authenticated cipher before being saved to the database. Tokens are never exposed to the frontend browser or recorded in server log files.
-            </p>
+            <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-surface-elevated/60 border border-slate-200/80 dark:border-white/5">
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                AES-256-GCM Authenticated Encryption at Rest
+              </h4>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
+                OAuth access tokens and refresh secrets are encrypted with authenticated military-grade AES-256-GCM cipher before writing to the database. Plaintext tokens never reach web browser clients or log files.
+              </p>
+            </div>
 
-            <h4 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 pt-2">
-              <CheckCircle className="w-4 h-4 text-emerald-500" />
-              3. Data Minimization Principle
-            </h4>
-            <p className="leading-relaxed">
-              We never store full marketing or personal email bodies permanently. Only parsed transaction metadata (Amount, Merchant, UTR, Date) is saved, leaving sensitive inbox content untouched.
-            </p>
+            <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-surface-elevated/60 border border-slate-200/80 dark:border-white/5">
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                Strict Data Minimization
+              </h4>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
+                Email bodies are discarded immediately after extraction. Only financial ledger transaction parameters (Amount, Merchant, Payment Method, Date, UTR) are persisted to your private ledger.
+              </p>
+            </div>
           </div>
         </Card>
       )}
 
-      {/* Tab: Danger Zone (Requirement 76) */}
+      {/* Tab: Danger Zone */}
       {activeTab === 'danger' && (
-        <Card className="p-6 border-rose-200 dark:border-rose-900/60">
-          <CardHeader>
-            <CardTitle className="text-rose-600 dark:text-rose-400">
-              Danger Zone — Permanent Data Erasure
+        <Card variant="elevated" className="p-6 sm:p-7 border-rose-500/20 dark:border-rose-500/20">
+          <CardHeader className="pb-4 border-b border-rose-100 dark:border-rose-950/40">
+            <CardTitle className="text-lg font-bold text-rose-600 dark:text-rose-400">
+              Irreversible Account Erasure
             </CardTitle>
-            <CardDescription>
-              Permanently delete your account and all associated transactions, categories, budgets, and email links.
+            <CardDescription className="text-xs">
+              Permanently delete your profile, transaction ledger, connected email channels, and historical statements.
             </CardDescription>
           </CardHeader>
 
-          <div className="p-4 rounded-xl bg-rose-50/60 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/80 text-xs text-rose-800 dark:text-rose-200 space-y-2">
-            <p className="font-bold">This action cannot be undone.</p>
+          <div className="mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-800 dark:text-rose-300 space-y-2">
+            <p className="font-bold">Caution: This operation is immediate and permanent.</p>
             <p className="leading-relaxed">
-              All financial records, manually added transactions, linked email providers, active sessions, and budgets will be permanently destroyed from the database in compliance with privacy regulations.
+              All financial history, manual entries, connected accounts, and user settings will be expunged from the database in compliance with GDPR and data privacy laws.
             </p>
           </div>
 
@@ -517,7 +533,7 @@ export const SettingsPage: React.FC = () => {
               leftIcon={<Trash2 className="w-4 h-4" />}
               onClick={() => setIsDeleteModalOpen(true)}
             >
-              Delete Entire SpendWise Account
+              Permanently Delete Account
             </Button>
           </div>
 
@@ -526,7 +542,7 @@ export const SettingsPage: React.FC = () => {
             isOpen={isDeleteModalOpen}
             onClose={() => setIsDeleteModalOpen(false)}
             title="Confirm Account Deletion"
-            description="Type DELETE below to confirm irreversible removal of your account."
+            description="Type DELETE below to confirm the irreversible removal of your account."
           >
             <div className="space-y-4">
               <Input
@@ -536,7 +552,7 @@ export const SettingsPage: React.FC = () => {
                 onChange={(e) => setDeleteConfirmation(e.target.value)}
               />
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-white/5">
                 <Button
                   variant="outline"
                   size="sm"
@@ -551,7 +567,7 @@ export const SettingsPage: React.FC = () => {
                   isLoading={isDeleting}
                   onClick={handleDeleteAccount}
                 >
-                  Permanently Delete Everything
+                  Confirm Permanent Erasure
                 </Button>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, PiggyBank, AlertTriangle, AlertCircle, Trash2 } from 'lucide-react';
+import { Plus, PiggyBank, Trash2 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import {
   fetchBudgetsThunk,
@@ -100,30 +100,28 @@ export const BudgetsPage: React.FC = () => {
             const percentage = Math.min(100, b.percentageUsed);
 
             return (
-              <Card key={b._id} className="p-5 flex flex-col justify-between">
+              <Card key={b._id} interactive className="p-5 sm:p-6 flex flex-col justify-between group">
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
                         {b.name}
                       </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-400 mt-0.5 font-medium">
                         {cat?.name || 'Overall Monthly Spending'}
                       </p>
                     </div>
 
                     {b.isExceeded ? (
-                      <Badge variant="rose" className="gap-1 font-bold">
-                        <AlertCircle className="w-3.5 h-3.5" />
+                      <Badge variant="rose" dot className="font-bold">
                         EXCEEDED
                       </Badge>
                     ) : b.isWarning ? (
-                      <Badge variant="amber" className="gap-1 font-bold">
-                        <AlertTriangle className="w-3.5 h-3.5" />
+                      <Badge variant="amber" dot className="font-bold">
                         NEAR LIMIT ({b.percentageUsed}%)
                       </Badge>
                     ) : (
-                      <Badge variant="emerald" className="font-bold">
+                      <Badge variant="emerald" dot className="font-bold">
                         HEALTHY
                       </Badge>
                     )}
@@ -132,38 +130,38 @@ export const BudgetsPage: React.FC = () => {
                   {/* Amounts */}
                   <div className="mt-5 flex items-baseline justify-between">
                     <div>
-                      <span className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
+                      <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-mono tabular-financial">
                         {formatINR(b.spent)}
                       </span>
-                      <span className="text-xs text-slate-400 font-medium ml-1">
+                      <span className="text-xs text-slate-400 font-medium ml-1.5">
                         spent
                       </span>
                     </div>
-                    <div className="text-right text-xs text-slate-500">
+                    <div className="text-right text-xs text-slate-500 dark:text-slate-400">
                       Cap:{' '}
-                      <span className="font-bold text-slate-700 dark:text-slate-300">
+                      <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">
                         {formatINR(b.amount)}
                       </span>
                     </div>
                   </div>
 
                   {/* Progress Bar */}
-                  <div className="mt-3">
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                  <div className="mt-3.5 space-y-2">
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
                       <div
-                        className={`h-2.5 rounded-full transition-all duration-500 ${
+                        className={`h-full rounded-full transition-all duration-500 ${
                           b.isExceeded
                             ? 'bg-rose-500'
                             : b.isWarning
                             ? 'bg-amber-500'
-                            : 'bg-brand-500'
+                            : 'bg-emerald-500'
                         }`}
                         style={{ width: `${percentage}%` }}
                       />
                     </div>
-                    <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-                      <span>{b.percentageUsed}% utilized</span>
-                      <span>
+                    <div className="flex items-center justify-between text-xs font-medium">
+                      <span className="text-slate-400 font-mono">{b.percentageUsed}% utilized</span>
+                      <span className={b.isExceeded ? 'text-rose-500 font-bold' : 'text-slate-500 dark:text-slate-400'}>
                         {b.isExceeded
                           ? `₹${(b.spent - b.amount).toLocaleString('en-IN')} over cap`
                           : `₹${b.remaining.toLocaleString('en-IN')} remaining`}
@@ -173,15 +171,17 @@ export const BudgetsPage: React.FC = () => {
                 </div>
 
                 {/* Footer Actions */}
-                <div className="mt-6 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
+                <div className="mt-6 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400">Alert at {b.notificationThreshold || 80}%</span>
                   <button
                     onClick={() => {
                       if (confirm(`Delete budget "${b.name}"?`)) {
                         dispatch(deleteBudgetThunk(b._id));
                       }
                     }}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors rounded-lg"
+                    className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-500/10"
                     title="Delete budget"
+                    aria-label="Delete budget"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

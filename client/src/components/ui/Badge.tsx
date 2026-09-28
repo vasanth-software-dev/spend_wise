@@ -1,37 +1,53 @@
 import React from 'react';
 
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: 'emerald' | 'rose' | 'amber' | 'blue' | 'purple' | 'slate';
+  variant?: 'emerald' | 'rose' | 'amber' | 'blue' | 'purple' | 'slate' | 'gold';
   size?: 'sm' | 'md';
+  dot?: boolean;
 }
 
 export const Badge: React.FC<BadgeProps> = ({
   children,
   variant = 'slate',
   size = 'md',
+  dot = false,
   className = '',
   ...props
 }) => {
   const variants = {
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/80',
-    rose: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-400 dark:border-rose-800/80',
-    amber: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800/80',
-    blue: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-800/80',
-    purple: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-400 dark:border-purple-800/80',
-    slate: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+    emerald: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20',
+    rose: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20',
+    amber: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20',
+    blue: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20',
+    purple: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20',
+    slate: 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-slate-700/60',
+    gold: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30',
+  };
+
+  const dotColors = {
+    emerald: 'bg-emerald-500',
+    rose: 'bg-rose-500',
+    amber: 'bg-amber-500',
+    blue: 'bg-sky-500',
+    purple: 'bg-indigo-500',
+    slate: 'bg-slate-400',
+    gold: 'bg-amber-500',
   };
 
   const sizes = {
-    sm: 'text-[11px] px-2 py-0.5 font-medium',
-    md: 'text-xs px-2.5 py-1 font-medium',
+    sm: 'text-[10px] sm:text-[11px] px-2 py-0.5 font-semibold',
+    md: 'text-xs px-2.5 py-0.5 font-semibold',
   };
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border tracking-tight ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
     >
-      {children}
+      {dot && (
+        <span className={`w-1.5 h-1.5 rounded-full ${dotColors[variant]}`} />
+      )}
+      <span>{children}</span>
     </span>
   );
 };

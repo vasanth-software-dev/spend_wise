@@ -16,13 +16,13 @@ export const MainLayout: React.FC = () => {
   // Still checking initial HttpOnly cookie refresh token
   if (isInitializing) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center">
-        <div className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center text-white font-bold text-xl mb-4 animate-pulse">
+      <div className="min-h-screen bg-slate-50 dark:bg-[#070b13] flex flex-col items-center justify-center">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white font-extrabold text-xl mb-4 shadow-glow-emerald animate-pulse">
           ₹
         </div>
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
-          <Loader2 className="w-4 h-4 animate-spin text-brand-600" />
-          <span>Starting SpendWise Session...</span>
+        <div className="flex items-center gap-2.5 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <Loader2 className="w-4 h-4 animate-spin text-brand-600 dark:text-brand-400" />
+          <span>Authenticating SpendWise...</span>
         </div>
       </div>
     );
@@ -34,7 +34,7 @@ export const MainLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex transition-colors">
+    <div className="min-h-screen bg-slate-50/70 dark:bg-[#070b13] text-slate-900 dark:text-slate-100 flex transition-colors selection:bg-brand-500 selection:text-white">
       {/* Desktop Sidebar (hidden on mobile) */}
       <div className="hidden lg:block w-64 h-screen sticky top-0 flex-shrink-0 z-30">
         <Sidebar />
@@ -44,23 +44,23 @@ export const MainLayout: React.FC = () => {
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className="relative w-64 h-full bg-white dark:bg-slate-900 z-10 shadow-2xl">
+          <div className="relative w-64 h-full bg-white dark:bg-[#0b101d] z-10 shadow-fintech-lg">
             <Sidebar onCloseMobile={() => setIsMobileMenuOpen(false)} />
           </div>
         </div>
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 pb-20 lg:pb-6">
+      <div className="flex-1 flex flex-col min-w-0 pb-20 lg:pb-8">
         <Navbar
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           onOpenAddModal={() => setIsAddModalOpen(true)}
         />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 xl:p-10 overflow-y-auto">
           <Outlet />
         </main>
       </div>

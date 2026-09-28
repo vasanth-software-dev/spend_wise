@@ -109,22 +109,22 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
       />
 
       {/* Drawer Panel */}
-      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-premium h-full z-10 flex flex-col justify-between overflow-y-auto">
-        <div className="p-6">
+      <div className="relative w-full max-w-md bg-white dark:bg-[#0c121e] border-l border-slate-200/90 dark:border-white/10 shadow-fintech-lg h-full z-10 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-250">
+        <div className="p-6 sm:p-7">
           {/* Top Bar */}
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800/80">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Transaction Details
             </span>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleTriggerEdit}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200/80 dark:border-slate-700/80 shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold tracking-tight text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200/80 dark:border-slate-700/80 shadow-2xs"
                 title="Edit Transaction"
               >
                 <Edit3 className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
@@ -132,7 +132,8 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
               </button>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                aria-label="Close drawer"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -140,28 +141,28 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
           </div>
 
           {/* Amount and Merchant Header */}
-          <div className="mt-6 text-center">
+          <div className="mt-7 text-center">
             <div
-              className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3 ${
+              className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3.5 shadow-2xs ${
                 isExpense
-                  ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400'
-                  : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
+                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
               }`}
             >
               <CategoryIcon name={category?.icon || 'Tag'} className="w-7 h-7" />
             </div>
 
-            <h3 className="text-3xl font-extrabold text-slate-900 dark:text-slate-100">
+            <h3 className="text-3xl sm:text-4xl font-extrabold font-mono tracking-tight text-slate-900 dark:text-white tabular-financial">
               {isExpense ? '-' : '+'}
               {formatINR(transaction.amount)}
             </h3>
 
-            <p className="text-base font-semibold text-slate-700 dark:text-slate-300 mt-1">
+            <p className="text-base font-bold tracking-tight text-slate-800 dark:text-slate-200 mt-1.5">
               {transaction.merchant}
             </p>
 
-            <div className="mt-2.5 flex items-center justify-center gap-2">
-              <Badge variant={isExpense ? 'rose' : 'emerald'}>
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <Badge variant={isExpense ? 'rose' : 'emerald'} dot>
                 {transaction.type.toUpperCase()}
               </Badge>
               <Badge variant="slate">
@@ -177,7 +178,7 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
           </div>
 
           {/* Metadata Grid */}
-          <div className="mt-8 space-y-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+          <div className="mt-8 space-y-3.5 bg-slate-50/70 dark:bg-slate-850/40 p-4 sm:p-5 rounded-2xl border border-slate-200/60 dark:border-white/5">
             <div className="flex items-center justify-between text-xs sm:text-sm">
               <div className="flex items-center gap-2 text-slate-500">
                 <Calendar className="w-4 h-4" />

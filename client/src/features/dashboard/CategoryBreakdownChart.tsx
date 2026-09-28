@@ -14,13 +14,13 @@ interface CategoryBreakdownChartProps {
 }
 
 const DEFAULT_COLORS = [
-  '#10B981', '#6366F1', '#F59E0B', '#EF4444', '#EC4899', '#8B5CF6', '#06B6D4', '#64748B'
+  '#10B981', '#6366F1', '#F59E0B', '#F43F5E', '#8B5CF6', '#06B6D4', '#64748B', '#EC4899'
 ];
 
 export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ data }) => {
   if (!data || data.length === 0) {
     return (
-      <div className="h-64 flex items-center justify-center text-xs text-slate-400">
+      <div className="h-64 flex items-center justify-center text-xs text-slate-400 font-medium">
         No category spending recorded
       </div>
     );
@@ -33,10 +33,10 @@ export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ 
       const item = payload[0].payload as CategoryBreakdownItem;
       const percentage = total > 0 ? Math.round((item.totalAmount / total) * 100) : 0;
       return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl shadow-lg text-xs">
+        <div className="bg-white/95 dark:bg-[#0c121e]/95 backdrop-blur-md border border-slate-200/90 dark:border-white/10 p-3 rounded-2xl shadow-fintech-lg text-xs">
           <p className="font-bold text-slate-800 dark:text-slate-200">{item.categoryName}</p>
-          <p className="text-slate-600 dark:text-slate-400 mt-0.5">
-            {formatINR(item.totalAmount)} ({percentage}%)
+          <p className="text-slate-600 dark:text-slate-400 mt-1 font-mono">
+            {formatINR(item.totalAmount)} <span className="text-slate-400">({percentage}%)</span>
           </p>
         </div>
       );
@@ -45,8 +45,8 @@ export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ 
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-center gap-4 h-72">
-      <div className="w-full sm:w-1/2 h-52">
+    <div className="flex flex-col sm:flex-row items-center gap-6 h-auto sm:h-72 pt-2">
+      <div className="w-full sm:w-1/2 h-56 relative flex items-center justify-center">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Tooltip content={customTooltip} />
@@ -56,9 +56,10 @@ export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ 
               nameKey="categoryName"
               cx="50%"
               cy="50%"
-              innerRadius={50}
-              outerRadius={80}
-              paddingAngle={2}
+              innerRadius={54}
+              outerRadius={82}
+              paddingAngle={3}
+              stroke="transparent"
             >
               {data.map((entry, index) => (
                 <Cell
@@ -69,27 +70,46 @@ export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ 
             </Pie>
           </PieChart>
         </ResponsiveContainer>
+
+        {/* Center Donut Label */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+            Total Spent
+          </span>
+          <span className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 dark:text-white tabular-financial">
+            {formatINR(total)}
+          </span>
+        </div>
       </div>
 
-      <div className="w-full sm:w-1/2 max-h-56 overflow-y-auto space-y-2 pr-2">
+      <div className="w-full sm:w-1/2 max-h-60 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
         {data.slice(0, 6).map((item, index) => {
           const percentage = total > 0 ? Math.round((item.totalAmount / total) * 100) : 0;
           const color = item.categoryColor || DEFAULT_COLORS[index % DEFAULT_COLORS.length];
           return (
-            <div key={item._id || index} className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 truncate">
-                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                <span className="truncate text-slate-700 dark:text-slate-300 font-medium">
-                  {item.categoryName}
-                </span>
+            <div key={item._id || index} className="space-y-1 group">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 truncate">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                  <span className="truncate text-slate-700 dark:text-slate-300 font-semibold tracking-tight text-[11px] sm:text-xs">
+                    {item.categoryName}
+                  </span>
+                </div>
+                <div className="text-right flex items-center gap-2 font-mono">
+                  <span className="font-bold text-slate-900 dark:text-white tabular-financial text-xs">
+                    {formatINR(item.totalAmount)}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-semibold w-7 text-right">
+                    {percentage}%
+                  </span>
+                </div>
               </div>
-              <div className="text-right flex items-center gap-2">
-                <span className="font-bold text-slate-900 dark:text-slate-100">
-                  {formatINR(item.totalAmount)}
-                </span>
-                <span className="text-[11px] text-slate-400 font-mono w-7 text-right">
-                  {percentage}%
-                </span>
+              {/* Subtle Progress Bar */}
+              <div className="w-full bg-slate-100 dark:bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${percentage}%`, backgroundColor: color }}
+                />
               </div>
             </div>
           );

@@ -66,11 +66,15 @@ export const RecurringPage: React.FC = () => {
     }
   };
 
+  const totalMonthlyCommitment = recurringList
+    .filter((item) => item.type === 'expense')
+    .reduce((sum, item) => sum + item.amount, 0);
+
   return (
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             Recurring Bills & Subscriptions
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -81,12 +85,37 @@ export const RecurringPage: React.FC = () => {
         <Button
           size="sm"
           variant="primary"
-          leftIcon={<Plus className="w-4 h-4" />}
+          leftIcon={<Plus className="w-4 h-4 stroke-[2.5]" />}
           onClick={() => setIsModalOpen(true)}
+          className="shadow-2xs"
         >
           Add Recurring Item
         </Button>
       </div>
+
+      {/* Summary KPI Tile */}
+      {recurringList.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card className="p-5 bg-gradient-to-b from-white to-slate-50/40 dark:from-slate-900 dark:to-slate-900/60 border-slate-200/80 dark:border-white/5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Total Monthly Commitment
+            </span>
+            <div className="text-2xl sm:text-3xl font-extrabold font-mono tabular-financial text-slate-900 dark:text-white mt-1.5">
+              {formatINR(totalMonthlyCommitment)}
+            </div>
+            <span className="text-xs text-slate-400 mt-1 block">Active recurring outflows</span>
+          </Card>
+          <Card className="p-5 bg-gradient-to-b from-white to-slate-50/40 dark:from-slate-900 dark:to-slate-900/60 border-slate-200/80 dark:border-white/5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Active Subscriptions
+            </span>
+            <div className="text-2xl sm:text-3xl font-extrabold font-mono tabular-financial text-slate-900 dark:text-white mt-1.5">
+              {recurringList.length}
+            </div>
+            <span className="text-xs text-slate-400 mt-1 block">Scheduled automated cycles</span>
+          </Card>
+        </div>
+      )}
 
       {recurringList.length === 0 ? (
         <EmptyState
@@ -107,59 +136,60 @@ export const RecurringPage: React.FC = () => {
                 : null;
 
             return (
-              <Card key={item._id} className="p-5 flex flex-col justify-between">
+              <Card key={item._id} interactive className="p-5 sm:p-6 flex flex-col justify-between group">
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
                         {item.name}
                       </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-400 mt-0.5 font-medium">
                         {item.merchant} • {cat?.name || 'Uncategorized'}
                       </p>
                     </div>
 
-                    <Badge variant={isExpense ? 'rose' : 'emerald'}>
+                    <Badge variant={isExpense ? 'rose' : 'emerald'} dot>
                       {item.frequency.toUpperCase()}
                     </Badge>
                   </div>
 
                   <div className="mt-4 flex items-baseline justify-between">
                     <span
-                      className={`text-2xl font-extrabold ${
+                      className={`text-2xl font-extrabold font-mono tabular-financial ${
                         isExpense
-                          ? 'text-slate-900 dark:text-slate-100'
+                          ? 'text-slate-900 dark:text-white'
                           : 'text-emerald-600 dark:text-emerald-400'
                       }`}
                     >
                       {isExpense ? '-' : '+'}
                       {formatINR(item.amount)}
                     </span>
-                    <span className="text-xs uppercase font-semibold text-slate-400">
+                    <span className="text-[11px] uppercase font-bold text-slate-400">
                       via {item.paymentMethod}
                     </span>
                   </div>
 
-                  <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl text-xs flex items-center justify-between text-slate-600 dark:text-slate-300">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                  <div className="mt-4 p-3 bg-slate-50/80 dark:bg-slate-850/60 rounded-xl text-xs flex items-center justify-between text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-white/5">
+                    <div className="flex items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
+                      <Calendar className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
                       <span>Next Due:</span>
                     </div>
-                    <span className="font-bold text-slate-900 dark:text-slate-100">
+                    <span className="font-bold font-mono text-slate-900 dark:text-white">
                       {formatDate(item.nextDueDate, 'dd MMM yyyy')}
                     </span>
                   </div>
                 </div>
 
-                <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
+                <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-end">
                   <button
                     onClick={() => {
                       if (confirm(`Remove recurring item "${item.name}"?`)) {
                         dispatch(deleteRecurringThunk(item._id));
                       }
                     }}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors rounded-lg"
+                    className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-500/10"
                     title="Delete recurring payment"
+                    aria-label="Delete recurring payment"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

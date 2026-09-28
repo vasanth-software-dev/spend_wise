@@ -154,30 +154,30 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing ? 'Edit Transaction' : 'Add Transaction'}
+      title={isEditing ? 'Edit Transaction' : 'Record Transaction'}
       description={
         isEditing
-          ? 'Update transaction details in your financial ledger.'
-          : 'Record a manual financial activity in your ledger.'
+          ? 'Update entry details in your financial ledger.'
+          : 'Log an immediate debit, credit, or transfer.'
       }
       maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs rounded-xl font-medium">
+          <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs rounded-xl font-semibold animate-in fade-in">
             {error}
           </div>
         )}
 
         {/* Transaction Type Segmented Control */}
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+        <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/60 dark:border-white/5">
           <button
             type="button"
             onClick={() => setType('expense')}
-            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
+            className={`flex-1 py-2 text-xs font-bold tracking-tight rounded-lg transition-all ${
               type === 'expense'
-                ? 'bg-rose-500 text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                ? 'bg-rose-500 text-white shadow-2xs'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             Expense
@@ -185,10 +185,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <button
             type="button"
             onClick={() => setType('income')}
-            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
+            className={`flex-1 py-2 text-xs font-bold tracking-tight rounded-lg transition-all ${
               type === 'income'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                ? 'bg-emerald-600 text-white shadow-2xs'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             Income
@@ -196,23 +196,27 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <button
             type="button"
             onClick={() => setType('transfer')}
-            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
+            className={`flex-1 py-2 text-xs font-bold tracking-tight rounded-lg transition-all ${
               type === 'transfer'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                ? 'bg-indigo-600 text-white shadow-2xs'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             Transfer
           </button>
         </div>
 
-        {/* Large Numeric Amount Input */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-            Amount (INR)
-          </label>
+        {/* Tactile Financial Amount Input */}
+        <div className="bg-slate-50/60 dark:bg-slate-850/40 p-4 rounded-2xl border border-slate-200/70 dark:border-white/5">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Amount (INR)
+            </label>
+            <span className="text-[10px] font-semibold text-slate-400">Indian Rupee (₹)</span>
+          </div>
+
           <div className="relative flex items-center">
-            <span className="absolute left-4 text-2xl font-bold text-slate-400">
+            <span className="absolute left-3.5 text-2xl sm:text-3xl font-bold text-slate-400 dark:text-slate-500 font-mono pointer-events-none">
               ₹
             </span>
             <input
@@ -223,16 +227,31 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               autoFocus
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-              className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all placeholder:text-slate-300"
+              placeholder="0.00"
+              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 tabular-financial shadow-2xs"
             />
+          </div>
+
+          {/* Quick Amount Suggestion Chips */}
+          <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto pb-0.5">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mr-1">Quick:</span>
+            {[100, 250, 500, 1000, 2000, 5000].map((val) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setAmount(String(val))}
+                className="px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 transition-colors shadow-2xs"
+              >
+                +₹{val >= 1000 ? `${val / 1000}k` : val}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Merchant / Payee */}
         <Input
-          label={type === 'income' ? 'Received From (Source / Company)' : 'Paid To (Merchant / Payee)'}
-          placeholder={type === 'income' ? 'e.g. Infosys, Freelance Client' : 'e.g. Swiggy, Amazon, Uber'}
+          label={type === 'income' ? 'Received From (Source / Client)' : 'Paid To (Merchant / Payee)'}
+          placeholder={type === 'income' ? 'e.g. Infosys, Consulting, Client' : 'e.g. Amazon, Swiggy, Uber, Landlord'}
           value={merchant}
           onChange={(e) => setMerchant(e.target.value)}
           required
@@ -240,10 +259,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
         {/* Category Picker */}
         <div>
-          <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
             Category
           </label>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-36 overflow-y-auto pr-1">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-36 overflow-y-auto pr-1 custom-scrollbar">
             {filteredCategories.map((c) => (
               <button
                 type="button"
@@ -251,8 +270,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 onClick={() => setCategoryId(c._id)}
                 className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border text-center transition-all ${
                   categoryId === c._id
-                    ? 'border-brand-500 bg-brand-50/50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300 font-semibold ring-1 ring-brand-500'
-                    : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300'
+                    ? 'border-brand-500 bg-brand-500/10 text-brand-700 dark:text-brand-300 font-bold ring-1 ring-brand-500 shadow-2xs'
+                    : 'border-slate-200/70 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300'
                 }`}
               >
                 <div
@@ -261,7 +280,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 >
                   <CategoryIcon name={c.icon} className="w-4 h-4" color={c.color} />
                 </div>
-                <span className="text-[11px] truncate w-full">{c.name}</span>
+                <span className="text-[11px] truncate w-full font-medium">{c.name}</span>
               </button>
             ))}
           </div>
@@ -270,13 +289,13 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         {/* Payment Method & Date */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
               Payment Method
             </label>
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-              className="w-full py-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors shadow-2xs font-medium"
             >
               {paymentMethods.map((pm) => (
                 <option key={pm.id} value={pm.id}>
@@ -287,14 +306,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
               Date
             </label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full py-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors shadow-2xs font-medium"
             />
           </div>
         </div>
@@ -307,11 +326,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           onChange={(e) => setNotes(e.target.value)}
         />
 
-        <div className="pt-2 flex items-center justify-end gap-2.5">
-          <Button type="button" variant="outline" size="md" onClick={onClose}>
+        <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100 dark:border-slate-800">
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" size="md" isLoading={isSubmitting}>
+          <Button type="submit" variant="primary" size="sm" isLoading={isSubmitting}>
             {isEditing ? 'Update Transaction' : 'Save Transaction'}
           </Button>
         </div>

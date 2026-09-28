@@ -72,30 +72,40 @@ export const DashboardPage: React.FC = () => {
       {/* Top Welcome Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-            {getGreeting()}, {user?.name?.split(' ')[0] || 'User'} 👋
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2 py-0.5 rounded-full">
+              Financial Command Center
+            </span>
+            <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
+              • Real-time
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            {getGreeting()}, {user?.name?.split(' ')[0] || 'User'}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Here's your real-time financial intelligence and spending overview.
+            Here is your live balance, cash flow distribution, and spending intelligence.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           {/* Refresh Button */}
           <button
             onClick={() => dispatch(fetchDashboardThunk(timeRange))}
-            className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            className="p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-2xs"
             title="Refresh analytics"
+            aria-label="Refresh analytics"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-brand-600' : ''}`} />
           </button>
 
           {/* Quick Add Button */}
           <Button
             size="sm"
             variant="primary"
-            leftIcon={<Plus className="w-4 h-4" />}
+            leftIcon={<Plus className="w-4 h-4 stroke-[2.5]" />}
             onClick={() => setIsAddModalOpen(true)}
+            className="shadow-2xs"
           >
             Add Transaction
           </Button>
@@ -105,8 +115,8 @@ export const DashboardPage: React.FC = () => {
       {/* Detected Transactions Review Center (Top priority if any pending) */}
       <DetectedTransactionReviewCenter />
 
-      {/* 4 Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 4 Stat Cards - Financial Overview */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {loading && !summary ? (
           <>
             <StatCardSkeleton />
@@ -120,32 +130,38 @@ export const DashboardPage: React.FC = () => {
               title="Total Balance"
               amount={formatINR(summary?.totalBalance || 0)}
               subtitle="All-time confirmed balance"
-              icon={<Wallet className="w-5 h-5" />}
-              accentColor="indigo"
+              icon={<Wallet className="w-4.5 h-4.5" />}
+              accentColor="emerald"
+              isHero={true}
+              trend={{
+                value: (summary?.savingsThisMonth || 0) >= 0 ? '+ Active' : 'Deficit',
+                isPositive: (summary?.savingsThisMonth || 0) >= 0,
+              }}
             />
             <StatCard
               title="Income This Month"
               amount={formatINR(summary?.incomeThisMonth || 0)}
               subtitle="Salary & inflows"
-              icon={<ArrowUpRight className="w-5 h-5" />}
+              icon={<ArrowUpRight className="w-4.5 h-4.5" />}
               accentColor="emerald"
-              trend={{ value: '+100%', isPositive: true }}
+              trend={{ value: 'Inflows', isPositive: true }}
             />
             <StatCard
               title="Expenses This Month"
               amount={formatINR(summary?.expensesThisMonth || 0)}
               subtitle="All debit transactions"
-              icon={<ArrowDownLeft className="w-5 h-5" />}
+              icon={<ArrowDownLeft className="w-4.5 h-4.5" />}
               accentColor="rose"
+              trend={{ value: 'Outflows', isPositive: false }}
             />
             <StatCard
               title="Savings This Month"
               amount={formatINR(summary?.savingsThisMonth || 0)}
               subtitle={`${summary?.savingsRate || 0}% Savings rate`}
-              icon={<PiggyBank className="w-5 h-5" />}
+              icon={<PiggyBank className="w-4.5 h-4.5" />}
               accentColor="amber"
               trend={{
-                value: `${summary?.savingsRate || 0}%`,
+                value: `${summary?.savingsRate || 0}% Rate`,
                 isPositive: (summary?.savingsThisMonth || 0) >= 0,
               }}
             />
@@ -156,22 +172,22 @@ export const DashboardPage: React.FC = () => {
       {/* Main Charts Section */}
       <div className="space-y-6">
         {/* Spending Trend Chart Card */}
-        <Card className="p-5 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-3">
+        <Card className="p-5 sm:p-7">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-4">
             <div>
               <CardTitle>Income & Expense Trend</CardTitle>
-              <CardDescription>Daily cash flow vs spending patterns</CardDescription>
+              <CardDescription>Daily cash inflows compared against debit expenditures</CardDescription>
             </div>
 
             {/* Time Range Filter Pills */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl self-start sm:self-auto">
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl self-start sm:self-auto border border-slate-200/50 dark:border-white/5">
               {(['today', '7d', '30d', '3m', '6m', '1y'] as const).map((r) => (
                 <button
                   key={r}
                   onClick={() => handleRangeChange(r)}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+                  className={`px-3 py-1 text-xs font-bold tracking-tight rounded-lg transition-all whitespace-nowrap ${
                     timeRange === r
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-xs'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
@@ -186,18 +202,18 @@ export const DashboardPage: React.FC = () => {
 
         {/* 2-Column Grid: Category Breakdown & Top Merchants */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-5 sm:p-6">
+          <Card className="p-5 sm:p-7">
             <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle>Category Spending</CardTitle>
-              <CardDescription>Distribution of expenses by category</CardDescription>
+              <CardTitle>Category Distribution</CardTitle>
+              <CardDescription>Proportional spending across defined categories</CardDescription>
             </CardHeader>
             <CategoryBreakdownChart data={categoryBreakdown} />
           </Card>
 
-          <Card className="p-5 sm:p-6">
+          <Card className="p-5 sm:p-7">
             <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
               <CardTitle>Top Merchants</CardTitle>
-              <CardDescription>Where your money went the most</CardDescription>
+              <CardDescription>Concentration of highest debit transactions</CardDescription>
             </CardHeader>
             <TopMerchantsChart data={topMerchants} />
           </Card>
@@ -209,39 +225,41 @@ export const DashboardPage: React.FC = () => {
         {/* Upcoming Recurring Bills Card (1 col) */}
         <Card className="p-5 sm:p-6 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
-                <Repeat className="w-4 h-4 text-brand-600 dark:text-brand-400" />
+                <div className="p-1.5 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400">
+                  <Repeat className="w-4 h-4" />
+                </div>
                 <CardTitle className="text-sm sm:text-base">Upcoming Bills</CardTitle>
               </div>
               <Link
                 to="/recurring"
-                className="text-xs text-brand-600 dark:text-brand-400 hover:underline font-semibold"
+                className="text-xs text-brand-600 dark:text-brand-400 hover:underline font-bold"
               >
                 View all
               </Link>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 space-y-2.5">
               {upcomingBills.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">
-                  No upcoming recurring bills
+                <p className="text-xs text-slate-400 py-6 text-center font-medium">
+                  No upcoming recurring bills scheduled
                 </p>
               ) : (
                 upcomingBills.slice(0, 4).map((bill) => (
                   <div
                     key={bill._id}
-                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs"
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50/70 dark:bg-slate-850/50 border border-slate-100 dark:border-slate-800/80 text-xs hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
                   >
                     <div>
-                      <p className="font-bold text-slate-800 dark:text-slate-200">
+                      <p className="font-bold text-slate-800 dark:text-slate-200 tracking-tight">
                         {bill.name}
                       </p>
-                      <p className="text-slate-400 mt-0.5">
+                      <p className="text-slate-400 text-[11px] mt-0.5 font-medium">
                         Due {formatDate(bill.nextDueDate, 'dd MMM')}
                       </p>
                     </div>
-                    <span className="font-extrabold text-slate-900 dark:text-slate-100">
+                    <span className="font-extrabold text-slate-900 dark:text-white tabular-financial font-mono text-xs sm:text-sm">
                       {formatINR(bill.amount)}
                     </span>
                   </div>
@@ -250,12 +268,12 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-6 pt-3 border-t border-slate-100 dark:border-slate-800 text-center">
+          <div className="mt-6 pt-3.5 border-t border-slate-100 dark:border-slate-800 text-center">
             <Link
               to="/recurring"
-              className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 flex items-center justify-center gap-1"
+              className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center justify-center gap-1 transition-colors"
             >
-              Manage subscriptions & EMI
+              Manage subscriptions & EMI commitments
               <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -264,20 +282,20 @@ export const DashboardPage: React.FC = () => {
         {/* Recent Transactions List (2 cols) */}
         <Card className="lg:col-span-2 p-5 sm:p-6 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <CardTitle className="text-sm sm:text-base">Recent Transactions</CardTitle>
-                <CardDescription>Latest financial activity</CardDescription>
+                <CardTitle className="text-sm sm:text-base">Recent Ledger Activity</CardTitle>
+                <CardDescription>Latest confirmed debits & credits</CardDescription>
               </div>
               <Link
                 to="/transactions"
-                className="text-xs text-brand-600 dark:text-brand-400 hover:underline font-semibold"
+                className="text-xs text-brand-600 dark:text-brand-400 hover:underline font-bold"
               >
                 View all transactions
               </Link>
             </div>
 
-            <div className="mt-2 divide-y divide-slate-100 dark:divide-slate-800/80">
+            <div className="mt-2 divide-y divide-slate-100 dark:divide-slate-800/60">
               {loading && recentTransactions.length === 0 ? (
                 <>
                   <TableRowSkeleton />
@@ -285,8 +303,8 @@ export const DashboardPage: React.FC = () => {
                   <TableRowSkeleton />
                 </>
               ) : recentTransactions.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400">
-                  No transactions yet. Click "+ Add Transaction" to begin.
+                <div className="py-10 text-center text-xs text-slate-400 font-medium">
+                  No transactions recorded yet. Click "+ Add Transaction" to begin.
                 </div>
               ) : (
                 recentTransactions.map((tx) => {
@@ -299,40 +317,46 @@ export const DashboardPage: React.FC = () => {
                     <div
                       key={tx._id}
                       onClick={() => setSelectedTx(tx)}
-                      className="py-3 px-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl cursor-pointer transition-colors"
+                      className="py-3 px-2 flex items-center justify-between hover:bg-slate-50/90 dark:hover:bg-slate-800/40 rounded-xl cursor-pointer transition-all duration-150 group"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105 ${
                             isExpense
-                              ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400'
-                              : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
+                              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                           }`}
                         >
-                          <CategoryIcon name={cat?.icon || 'Tag'} className="w-5 h-5" />
+                          <CategoryIcon name={cat?.icon || 'Tag'} className="w-4.5 h-4.5" />
                         </div>
-                        <div>
-                          <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate tracking-tight">
                             {tx.merchant}
                           </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            {cat?.name || 'Uncategorized'} • {formatRelativeDate(tx.transactionDate)}
-                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[11px] text-slate-400 font-medium">
+                              {formatRelativeDate(tx.transactionDate)}
+                            </span>
+                            <span className="text-[10px] text-slate-300 dark:text-slate-600">•</span>
+                            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded">
+                              {cat?.name || 'Uncategorized'}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="text-right">
+                      <div className="text-right flex-shrink-0 pl-3">
                         <span
-                          className={`text-xs sm:text-sm font-extrabold ${
+                          className={`text-xs sm:text-sm font-extrabold tabular-financial font-mono ${
                             isExpense
-                              ? 'text-slate-900 dark:text-slate-100'
+                              ? 'text-slate-900 dark:text-white'
                               : 'text-emerald-600 dark:text-emerald-400'
                           }`}
                         >
                           {isExpense ? '-' : '+'}
                           {formatINR(tx.amount)}
                         </span>
-                        <span className="block text-[10px] uppercase font-semibold text-slate-400">
+                        <span className="block text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 mt-0.5 tracking-wider">
                           {tx.paymentMethod}
                         </span>
                       </div>
@@ -343,10 +367,10 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-center">
+          <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800 text-center">
             <Link
               to="/transactions"
-              className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 flex items-center justify-center gap-1"
+              className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center justify-center gap-1 transition-colors"
             >
               Open Full Transactions Ledger
               <ChevronRight className="w-3.5 h-3.5" />
