@@ -19,7 +19,26 @@
     "test:client": "cd client && npm test",
     "lint": "cd server && npm run lint && cd ../client && npm run lint"
   },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.3.1",
+    "fast-csv": "^5.0.1",
+    "googleapis": "^140.0.1",
+    "helmet": "^7.1.0",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.5.1",
+    "morgan": "^1.10.0",
+    "nodemailer": "^6.9.14",
+    "zod": "^3.23.8"
+  },
   "devDependencies": {
+    "@types/node": "^20.14.11",
+    "@vercel/node": "^3.2.0",
     "concurrently": "^8.2.2"
   }
 }
