@@ -1,8 +1,13 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/authMiddleware.js';
 import { transactionService } from '../services/TransactionService.js';
+import { categoryRepository } from '../repositories/CategoryRepository.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
-import { predictCategoryName, predictCategoryWithAPI } from '../utils/categoryPredictor.js';
+import { predictCategoryWithAPI } from '../utils/categoryPredictor.js';
+import {
+  mapToExistingCategoryName,
+  transactionClassificationService,
+} from '../services/TransactionClassificationService.js';
 
 export class TransactionController {
   async predictCategory(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
@@ -23,19 +28,52 @@ export class TransactionController {
         return;
       }
 
+      const userId = req.user!.userId;
+      const categories = await categoryRepository.findByUserId(userId);
       const results = await Promise.all(
-        items.map(async (it: any) => {
-          const text = it.notes || it.text || it.narration || '';
-          const merchant = it.merchant || '';
-          let type = it.type || 'expense';
-          const category = await predictCategoryWithAPI(text, { merchant, vpa: it.vpa });
+        items.map(async (item: {
+          id?: string;
+          description?: string;
+          notes?: string;
+          text?: string;
+          narration?: string;
+          merchant?: string;
+          amount?: number;
+          date?: string;
+          type?: string;
+          category?: string;
+          vpa?: string;
+        }) => {
+          const description = item.description || item.notes || item.text || item.narration || item.merchant || '';
+          const merchant = item.merchant || '';
+          const type = item.type || 'expense';
+          const parserCategory = item.category || await predictCategoryWithAPI(description, { merchant, vpa: item.vpa });
+          const classification = await transactionClassificationService.classify(
+            {
+              description,
+              amount: Number(item.amount) || 0,
+              type,
+              date: item.date || '',
+              merchant,
+            },
+            { name: merchant, category: parserCategory }
+          );
+          const category = mapToExistingCategoryName(categories, classification.category)
+            || parserCategory
+            || 'Other';
+          let resolvedType = type;
+          if (classification.category === 'Salary / Income' || classification.category === 'Refund') {
+            resolvedType = 'income';
+          }
+
           if (category === 'Salary') {
-            type = 'income';
+            resolvedType = 'income';
           }
           return {
-            id: it.id,
-            category: category !== 'Other' ? category : it.category || 'Other',
-            type,
+            id: item.id,
+            name: classification.name,
+            category,
+            type: resolvedType,
           };
         })
       );

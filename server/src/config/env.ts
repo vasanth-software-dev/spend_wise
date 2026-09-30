@@ -23,8 +23,11 @@ const envSchema = z.object({
   GOOGLE_AUTH_REDIRECT_URI: z.string().default('http://localhost:8080/api/v1/auth/google/callback'),
   INBOUND_FORWARDING_DOMAIN: z.string().default('sync.spendwise.local'),
   INBOUND_WEBHOOK_SECRET: z.string().optional(),
-  OPENAI_API_KEY: z.string().optional(),
+OPENAI_API_KEY: z.string().optional(),
   AI_API_KEY: z.string().optional(),
+  AI_API_URL: z.string().url().default('https://api.openai.com/v1/chat/completions'),
+  AI_MODEL: z.string().default('gpt-4o-mini'),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().max(60000).default(8000),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -113,6 +113,9 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
             id: t.id,
             merchant: t.merchant,
             notes: t.notes,
+            description: t.notes || t.merchant,
+            amount: t.amount,
+            date: t.date,
             type: t.type,
             category: t.category,
           })),
@@ -121,8 +124,13 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
           const predMap = new Map(batchRes.data.data.predictions.map((p: any) => [p.id, p]));
           finalTransactions = res.transactions.map((t) => {
             const pred = predMap.get(t.id) as any;
-            if (pred && pred.category && pred.category !== 'Other') {
-              return { ...t, category: pred.category, type: pred.type || t.type };
+            if (pred && pred.category) {
+              return {
+                ...t,
+                merchant: pred.name || pred.merchant || t.merchant,
+                category: pred.category,
+                type: pred.type || t.type,
+              };
             }
             return t;
           });
