@@ -71,7 +71,7 @@ export class EmailParserRegistry {
     this.parsers.push(parser);
   }
 
-  parse(email: EmailMessage): Promise<ParsedTransaction | null> {
+  async parse(email: EmailMessage): Promise<ParsedTransaction | null> {
     // Drop promotional, marketing, job alerts, and travel booking confirmations
     if (isUnwantedEmail(email)) {
       return null;

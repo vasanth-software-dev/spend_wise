@@ -33,7 +33,7 @@ export class BankParser implements TransactionEmailParser {
     return bankKeywords.some((kw) => text.includes(kw));
   }
 
-  parse(email: EmailMessage): Promise<ParsedTransaction | null> {
+  async parse(email: EmailMessage): Promise<ParsedTransaction | null> {
     const content = `${email.subject}\n${email.snippet || ''}\n${email.bodyText}`;
 
     // Match amount

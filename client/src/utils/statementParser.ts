@@ -487,6 +487,7 @@ export function cleanMerchantName(narration: string): string {
   // 2. Strip leading Indian banking entry prefixes and codes:
   clean = clean.replace(/^(BY\s+TRANSFER|TO\s+TRANSFER|BY\s+CLG|TO\s+CLG|BY\s+CLEARING|TO\s+CLEARING)[-\s:/_]*/i, '');
   clean = clean.replace(/^(RECEIVED\s+FROM|PAID\s+TO|SENT\s+TO|TRANSFER\s+TO|CREDIT\s+FROM|DEBIT\s+TO)[-\s:/_]*/i, '');
+  clean = clean.replace(/^(UPI)[-\s:/_]*(CR|DR|REV)?[-\s:/_]*\d{1,8}(?=\s)/i, '$1 ');
   clean = clean.replace(/^(INB\s+NEFT|INB\s+IMPS|NEFT|IMPS|RTGS|UPI|NACH|ACH|P2P|P2A)[-\s:/_]*(CR|DR|REV)?[-\s:/_]*/i, '');
   clean = clean.replace(/^UPI[-\s:/_]*(CR|DR|REV)?[-\s:/_]*/i, '');
   clean = clean.replace(/^A2AINT\d*[-\s:]*/i, '');
@@ -514,8 +515,12 @@ export function cleanMerchantName(narration: string): string {
       'PAY', 'BILL', 'COLLECT', 'REQUEST', 'DEP', 'WDL', 'INWARD', 'OUTWARD', 'A2A', 'A2AINT'
     ]);
 
+    // Some tokens carry a leading numeric channel / transaction code that is not part of the name
+    // e.g. "25151 APOLLO PHARMAC" -> "APOLLO PHARMAC", "05 ASDA BIRYAN" -> "ASDA BIRYAN"
+    const normalizeToken = (p: string): string => p.replace(/^\d{1,8}(?:[-/]\d{1,8})*\s+/, '').trim();
+
     // Priority 1: Find a clean alphabetic name token that is not a QR handle or bank ID
-    const cleanNameCandidate = rawTokens.find((p) => {
+    const cleanNameCandidate = rawTokens.map(normalizeToken).find((p) => {
       const u = p.toUpperCase();
       if (ignoreSet.has(u)) return false;
       if (/^\d+$/.test(p)) return false;
@@ -529,7 +534,7 @@ export function cleanMerchantName(narration: string): string {
     if (cleanNameCandidate) {
       clean = cleanNameCandidate;
     } else {
-      const candidate = rawTokens.find((p) => {
+      const candidate = rawTokens.map(normalizeToken).find((p) => {
         const u = p.toUpperCase();
         if (ignoreSet.has(u)) return false;
         if (/^\d+$/.test(p)) return false;
@@ -571,8 +576,8 @@ export function cleanMerchantName(narration: string): string {
     { pattern: /\b(PROVISION)[A-Za-z0-9]*\b/gi },
     { pattern: /\b(TEXTILE)[A-Za-z0-9]*\b/gi },
     { pattern: /\b(GARMENT)[A-Za-z0-9]*\b/gi },
-    { pattern: /\b(BAKERY|BAKERIES)[A-Za-z0-9]*\b/gi, fix: 'BAKERY' },
-    { pattern: /\b(PHARMACY|PHARMACIES)[A-Za-z0-9]*\b/gi, fix: 'PHARMACY' },
+    { pattern: /\bBAKER(?:Y|IES)?[A-Za-z0-9]*\b/gi, fix: 'BAKERY' },
+    { pattern: /\bPHARMAC(?:Y|IES)?[A-Za-z0-9]*\b/gi, fix: 'PHARMACY' },
     { pattern: /\b(SUPERMARKET)[A-Za-z0-9]*\b/gi },
     { pattern: /\b(MART)[A-Za-z0-9]*\b/gi },
     { pattern: /\b(HOTEL)[A-Za-z0-9]*\b/gi },
@@ -641,6 +646,22 @@ export function extractReferenceNumber(text: string, explicitRefColVal?: unknown
   }
 
   return undefined;
+}
+
+/**
+ * A reference number is considered valid only when it carries a real transaction identifier
+ * (UPI RRN, UTR, RRN, cheque series, ...). Placeholder values such as "-", "NA", "N/A" or a
+ * short numeric counter are rejected so the row can be excluded from the imported list.
+ */
+export function hasValidReferenceNumber(refNo?: string | null): boolean {
+  if (refNo === undefined || refNo === null) return false;
+
+  const trimmed = String(refNo).trim();
+  if (!trimmed) return false;
+  if (/^(?:n\/?a|none|null|nil|na|-{1,3}|\.{1,3})$/i.test(trimmed)) return false;
+
+  const digits = trimmed.replace(/\D/g, '');
+  return digits.length >= 6 && trimmed.length >= 6;
 }
 
 /**
@@ -1370,6 +1391,17 @@ export async function parsePDFFile(
 }
 
 /**
+ * Apply the final import rules shared by every statement format (Excel, PDF, CSV, TXT).
+ * Rows without a valid transaction/reference number are removed here, BEFORE the list is
+ * displayed or sent for OpenAI merchant/category checking, so every format yields the
+ * exact same processed dataset.
+ */
+function applyFinalImportRules(result: ParseResult): ParseResult {
+  const transactions = result.transactions.filter((t) => hasValidReferenceNumber(t.refNo));
+  return { ...result, transactions, totalRows: transactions.length };
+}
+
+/**
  * Universal Statement Parser Dispatcher
  */
 export async function parseStatementFile(
@@ -1380,15 +1412,15 @@ export async function parseStatementFile(
   const name = file.name.toLowerCase();
 
   if (name.endsWith('.pdf')) {
-    return parsePDFFile(file, pdfPassword, knownPeopleNames);
+    return applyFinalImportRules(await parsePDFFile(file, pdfPassword, knownPeopleNames));
   }
 
   if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-    return parseExcelFile(file, knownPeopleNames);
+    return applyFinalImportRules(await parseExcelFile(file, knownPeopleNames));
   }
 
   if (name.endsWith('.csv') || name.endsWith('.txt') || name.endsWith('.tsv')) {
-    return parseCSVOrText(file, knownPeopleNames);
+    return applyFinalImportRules(await parseCSVOrText(file, knownPeopleNames));
   }
 
   throw new Error(`Unsupported file type: ${file.name}. Please select a .pdf, .xlsx, .xls, .csv, or .txt file.`);
