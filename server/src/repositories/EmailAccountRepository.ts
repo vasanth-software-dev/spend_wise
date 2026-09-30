@@ -77,7 +77,7 @@ export class EmailAccountRepository {
 
     return accounts.filter((acc) => {
       if (!acc.lastSyncAt) return true;
-      const freq = acc.syncFrequencyMinutes || defaultFrequencyMinutes;
+      const freq = acc.syncFrequencyMinutes ? Math.min(acc.syncFrequencyMinutes, defaultFrequencyMinutes) : defaultFrequencyMinutes;
       const nextDue = new Date(acc.lastSyncAt.getTime() + freq * 60 * 1000);
       return now >= nextDue;
     });

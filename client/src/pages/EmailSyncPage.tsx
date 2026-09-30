@@ -97,6 +97,12 @@ export const EmailSyncPage: React.FC = () => {
     dispatch(fetchPendingDetectedThunk());
     dispatch(fetchCategoriesThunk());
 
+    // Auto-refresh accounts & detected transactions every 15 seconds to reflect background sync in real time
+    const interval = setInterval(() => {
+      dispatch(fetchAccountsThunk());
+      dispatch(fetchPendingDetectedThunk());
+    }, 15000);
+
     if (urlConnected === 'gmail_success') {
       setBannerNotice({
         type: 'success',
@@ -108,6 +114,8 @@ export const EmailSyncPage: React.FC = () => {
         message: decodeURIComponent(urlError),
       });
     }
+
+    return () => clearInterval(interval);
   }, [dispatch, urlConnected, urlError]);
 
   const handleConnectMock = async (e: React.FormEvent) => {
@@ -411,16 +419,25 @@ export const EmailSyncPage: React.FC = () => {
                       </div>
                     )}
 
-                    <div className="mt-3 space-y-1.5 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl">
-                      <div className="flex justify-between">
-                        <span>Last activity:</span>
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    <div className="mt-3 space-y-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-white/5">
+                      <div className="flex justify-between items-center">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          Last synced:
+                        </span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
                           {acc.lastSyncAt ? formatRelativeDate(acc.lastSyncAt) : 'Never synced'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Background Sync:</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full text-[11px]">
+                          ⚡ Auto Every {acc.syncFrequencyMinutes || 3} Mins
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span>Transactions detected:</span>
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        <span className="font-bold text-slate-800 dark:text-slate-200 tabular-financial font-mono">
                           {acc.detectedCount}
                         </span>
                       </div>

@@ -24,13 +24,14 @@ export function formatRelativeDate(date: string | Date): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(d.getTime())) return '';
 
+  const distance = formatDistanceToNow(d, { addSuffix: true });
   if (isToday(d)) {
-    return `Today at ${format(d, 'h:mm a')}`;
+    return `Today at ${format(d, 'h:mm a')} (${distance})`;
   }
   if (isYesterday(d)) {
-    return `Yesterday at ${format(d, 'h:mm a')}`;
+    return `Yesterday at ${format(d, 'h:mm a')} (${distance})`;
   }
-  return formatDistanceToNow(d, { addSuffix: true });
+  return distance;
 }
 
 export function getConfidenceBadge(score: number): { label: string; color: string } {
