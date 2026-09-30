@@ -10,6 +10,7 @@ import emailAccountReducer from './slices/emailAccountSlice.js';
 import detectedTransactionReducer from './slices/detectedTransactionSlice.js';
 import notificationReducer from './slices/notificationSlice.js';
 import themeReducer from './slices/themeSlice.js';
+import debtReducer from './slices/debtSlice.js';
 
 export const store = configureStore({
   reducer: {
@@ -23,6 +24,7 @@ export const store = configureStore({
     detectedTransactions: detectedTransactionReducer,
     notifications: notificationReducer,
     theme: themeReducer,
+    debts: debtReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

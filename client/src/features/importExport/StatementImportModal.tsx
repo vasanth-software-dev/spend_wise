@@ -29,6 +29,11 @@ import {
   predictCategoryAndType,
 } from '../../utils/statementParser.js';
 import { formatINR } from '../../utils/format.js';
+import {
+  SELF_TRANSFER_CATEGORY,
+  isTransferCategoryName,
+} from '../../constants/categories.js';
+import { CategorySelect } from '../../components/ui/CategorySelect.js';
 
 interface StatementImportModalProps {
   isOpen: boolean;
@@ -199,13 +204,20 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
     );
   };
 
-  // Toggle transaction type (Expense <-> Income) and auto-select compatible Category
+  // Toggle transaction type (Expense -> Income -> Transfer -> Expense) and auto-select compatible Category
   const toggleRowType = (id: string) => {
     setParsedTransactions((prev) =>
       prev.map((t) => {
         if (t.id !== id) return t;
-        const newType: 'expense' | 'income' =
-          t.type === 'expense' ? 'income' : 'expense';
+        const newType: 'expense' | 'income' | 'transfer' =
+          t.type === 'expense' ? 'income' : t.type === 'income' ? 'transfer' : 'expense';
+
+        // Self Transfer only makes sense for the transfer type
+        if (isTransferCategoryName(t.category)) {
+          if (newType === 'transfer') return { ...t, type: newType };
+          const predicted = predictCategoryAndType(t.notes || t.merchant, newType, undefined, knownPeople);
+          return { ...t, type: newType, category: predicted.category };
+        }
 
         // If Friends & Family, it supports both income and expense
         if (t.category === 'Friends & Family') {
@@ -227,6 +239,8 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
           // Auto-select best expense category
           const predicted = predictCategoryAndType(t.notes || t.merchant, 'expense', undefined, knownPeople);
           newCategory = predicted.category;
+        } else if (newType === 'transfer') {
+          newCategory = SELF_TRANSFER_CATEGORY;
         }
 
         return { ...t, type: newType, category: newCategory };
@@ -241,6 +255,11 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
         if (t.id !== id) return t;
         if (newCategory === 'Friends & Family') {
           return { ...t, category: newCategory };
+        }
+
+        // Self Transfer maps to the transfer transaction type
+        if (isTransferCategoryName(newCategory)) {
+          return { ...t, category: newCategory, type: 'transfer' };
         }
 
         const matchedCat = categories.find(
@@ -627,60 +646,16 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
 
                       {/* Category selector with auto-type indicator */}
                       <td className="p-3">
-                        <select
+                        <CategorySelect
+                          categories={categories}
                           value={tx.category || 'Other'}
-                          onChange={(e) => updateRowCategory(tx.id, e.target.value)}
-                          className="px-2 py-1 text-xs rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        >
-                          <optgroup label="── Income (Auto-sets Income) ──">
-                            {categories
-                              .filter((c) => c.type === 'income' || c.name.toLowerCase() === 'salary' || c.name.toLowerCase() === 'investments')
-                              .map((c) => (
-                                <option key={c._id} value={c.name}>
-                                  {c.name} (Income)
-                                </option>
-                              ))}
-                            {!categories.some((c) => c.name.toLowerCase() === 'salary') && (
-                              <option value="Salary">Salary (Income)</option>
-                            )}
-                            {!categories.some((c) => c.name.toLowerCase() === 'investments') && (
-                              <option value="Investments">Investments (Income)</option>
-                            )}
-                          </optgroup>
-                          <optgroup label="── Expense (Auto-sets Expense) ──">
-                            {categories
-                              .filter((c) => c.type === 'expense' && !['salary', 'investments'].includes(c.name.toLowerCase()))
-                              .map((c) => (
-                                <option key={c._id} value={c.name}>
-                                  {c.name} (Expense)
-                                </option>
-                              ))}
-                            {!categories.some((c) => c.name.toLowerCase().includes('salon')) && (
-                              <option value="Salon & Grooming">Salon & Grooming (Expense)</option>
-                            )}
-                            {!categories.some((c) => c.name.toLowerCase().includes('atm')) && (
-                              <option value="ATM & Cash">ATM & Cash (Expense)</option>
-                            )}
-                            {categories.length === 0 && (
-                              <>
-                                <option value="Food & Dining">Food & Dining (Expense)</option>
-                                <option value="Groceries">Groceries (Expense)</option>
-                                <option value="Shopping">Shopping (Expense)</option>
-                                <option value="Transport">Transport (Expense)</option>
-                                <option value="Fuel">Fuel (Expense)</option>
-                                <option value="Bills & Utilities">Bills & Utilities (Expense)</option>
-                                <option value="Rent">Rent (Expense)</option>
-                                <option value="Entertainment">Entertainment (Expense)</option>
-                                <option value="Health & Medical">Health & Medical (Expense)</option>
-                                <option value="Subscriptions">Subscriptions (Expense)</option>
-                              </>
-                            )}
-                          </optgroup>
-                          <optgroup label="── General / Other ──">
-                            <option value="Friends & Family">Friends & Family</option>
-                            <option value="Other">Other</option>
-                          </optgroup>
-                        </select>
+                          onChange={(value) => updateRowCategory(tx.id, value)}
+                          valueMode="name"
+                          grouped
+                          size="sm"
+                          triggerClassName="w-full px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 hover:border-brand-400 focus-visible:ring-1 focus-visible:ring-brand-500"
+                          title="Map this statement row to a category"
+                        />
                       </td>
 
                       {/* Type toggle */}
@@ -690,9 +665,11 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
                           className={`px-2 py-0.5 rounded-md text-[11px] font-bold capitalize transition-colors ${
                             tx.type === 'income'
                               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                              : tx.type === 'transfer'
+                              ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 hover:bg-sky-500/20'
                               : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20'
                           }`}
-                          title="Click to toggle between Expense and Income"
+                          title="Click to toggle between Expense, Income and Transfer"
                         >
                           {tx.type}
                         </button>
@@ -703,6 +680,8 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
                         className={`p-3 text-right font-mono font-bold whitespace-nowrap ${
                           tx.type === 'income'
                             ? 'text-emerald-600 dark:text-emerald-400'
+                            : tx.type === 'transfer'
+                            ? 'text-sky-600 dark:text-sky-400'
                             : 'text-slate-900 dark:text-slate-100'
                         }`}
                       >

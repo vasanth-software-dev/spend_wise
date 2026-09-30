@@ -29,6 +29,7 @@ import { Button } from '../components/ui/Button.js';
 import { Card } from '../components/ui/Card.js';
 import { Modal } from '../components/ui/Modal.js';
 import { CategoryIcon } from '../components/ui/CategoryIcon.js';
+import { CategorySelect } from '../components/ui/CategorySelect.js';
 import { TableRowSkeleton } from '../components/ui/Skeleton.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
 import { formatINR, formatDate } from '../utils/format.js';
@@ -161,21 +162,19 @@ export const TransactionsPage: React.FC = () => {
           {/* Quick Filter Selects */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 custom-scrollbar">
             {/* Category Filter */}
-            <select
+            <CategorySelect
+              categories={categories}
               value={filters.categoryId || ''}
-              onChange={(e) => {
-                dispatch(setFilters({ categoryId: e.target.value }));
-                dispatch(fetchTransactionsThunk({ categoryId: e.target.value, page: 1 }));
+              onChange={(value) => {
+                dispatch(setFilters({ categoryId: value }));
+                dispatch(fetchTransactionsThunk({ categoryId: value, page: 1 }));
               }}
-              className="text-xs py-2 px-3 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl border border-slate-200/60 dark:border-white/5 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-700 dark:text-slate-200 font-semibold shadow-2xs"
-            >
-              <option value="">All Categories</option>
-              {categories.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              placeholder="All Categories"
+              grouped
+              size="sm"
+              className="min-w-[200px]"
+              triggerClassName="w-full py-2 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl border border-slate-200/60 dark:border-white/5 focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 text-slate-700 dark:text-slate-200 font-semibold shadow-2xs"
+            />
 
             {/* Type Filter */}
             <select
@@ -370,7 +369,7 @@ export const TransactionsPage: React.FC = () => {
                                   VPA: {tx.vpa}
                                 </span>
                               )}
-                              {tx.notes && !tx.vpa && (
+                              {tx.notes && (
                                 <span className="text-[11px] text-slate-400 truncate block mt-0.5 font-normal">
                                   {tx.notes}
                                 </span>
@@ -497,6 +496,11 @@ export const TransactionsPage: React.FC = () => {
                             </>
                           )}
                         </div>
+                        {tx.notes && (
+                          <span className="text-[11px] text-slate-400 truncate block mt-0.5 font-normal">
+                            {tx.notes}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -559,18 +563,13 @@ export const TransactionsPage: React.FC = () => {
           description="Select a target category to apply to all selected items."
         >
           <div className="space-y-4">
-            <select
+            <CategorySelect
+              categories={categories}
               value={selectedBulkCategory}
-              onChange={(e) => setSelectedBulkCategory(e.target.value)}
-              className="w-full py-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm"
-            >
-              <option value="">Select Category...</option>
-              {categories.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedBulkCategory}
+              placeholder="Select Category..."
+              grouped
+            />
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"

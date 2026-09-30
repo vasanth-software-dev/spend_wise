@@ -25,6 +25,7 @@ export const DEFAULT_SYSTEM_CATEGORIES: Array<{
   { name: 'Investments', type: 'income', icon: 'TrendingUp', color: '#0284c7' },
   { name: 'Salon & Grooming', type: 'expense', icon: 'Scissors', color: '#d946ef' },
   { name: 'ATM & Cash', type: 'expense', icon: 'Banknote', color: '#059669' },
+  { name: 'Self Transfer', type: 'both', icon: 'ArrowLeftRight', color: '#0ea5e9' },
   { name: 'Other', type: 'both', icon: 'MoreHorizontal', color: '#64748b' },
 ];
 

@@ -19,6 +19,7 @@ import {
   CreditCard,
   Mail,
   ChevronRight,
+  Star,
 } from 'lucide-react';
 import { api } from '../services/api.js';
 import { Person, Transaction } from '../types/index.js';
@@ -57,7 +58,7 @@ export const PeoplePage: React.FC = () => {
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'has_vpa' | 'sent' | 'received'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'favorites' | 'has_vpa' | 'sent' | 'received'>('all');
 
   // Details State
   const [details, setDetails] = useState<PersonDetailsResponse | null>(null);
@@ -90,6 +91,34 @@ export const PeoplePage: React.FC = () => {
     navigator.clipboard.writeText(text);
     setCopiedVpa(text);
     setTimeout(() => setCopiedVpa(null), 2000);
+  };
+
+  const handleToggleFavorite = async (person: Person, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const previousPeople = people;
+    const previousDetails = details;
+    const nextFavorite = !person.isFavorite;
+    setPeople((prev) =>
+      prev.map((p) => (p._id === person._id ? { ...p, isFavorite: nextFavorite } : p))
+    );
+    if (previousDetails) {
+      setDetails({ ...previousDetails, person: { ...previousDetails.person, isFavorite: nextFavorite } });
+    }
+    try {
+      const response = await api.patch(`/people/${person._id}/favorite`);
+      if (!response.data.success) {
+        throw new Error('Failed to update favorite status');
+      }
+      toast.success(
+        nextFavorite ? `Added ${person.name} to favorites` : `${person.name} removed from favorites`
+      );
+    } catch {
+      setPeople(previousPeople);
+      if (previousDetails) {
+        setDetails(previousDetails);
+      }
+      toast.error('Failed to update favorite status');
+    }
   };
 
   const loadPeople = async () => {
@@ -239,6 +268,7 @@ export const PeoplePage: React.FC = () => {
       if (filterType === 'has_vpa') return !!p.vpa;
       if (filterType === 'sent') return (p.totalSent || 0) > 0;
       if (filterType === 'received') return (p.totalReceived || 0) > 0;
+      if (filterType === 'favorites') return p.isFavorite === true;
 
       return true;
     });
@@ -467,6 +497,18 @@ export const PeoplePage: React.FC = () => {
           </Link>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant={person.isFavorite ? 'primary' : 'outline'}
+              size="sm"
+              leftIcon={
+                <Star
+                  className={`w-4 h-4 ${person.isFavorite ? 'fill-white text-white' : 'fill-none'}`}
+                />
+              }
+              onClick={() => handleToggleFavorite(person)}
+            >
+              {person.isFavorite ? 'Favorited' : 'Add to Favorites'}
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -939,6 +981,19 @@ export const PeoplePage: React.FC = () => {
             All People ({people.length})
           </button>
           <button
+            onClick={() => setFilterType('favorites')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+              filterType === 'favorites'
+                ? 'bg-amber-500 text-white'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-slate-300'
+            }`}
+          >
+            <span className="inline-flex items-center gap-1">
+              <Star className="w-3.5 h-3.5" />
+              Favorites ({people.filter((p) => p.isFavorite).length})
+            </span>
+          </button>
+          <button
             onClick={() => setFilterType('has_vpa')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
               filterType === 'has_vpa'
@@ -1028,6 +1083,19 @@ export const PeoplePage: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => handleToggleFavorite(person, e)}
+                        className={`p-1.5 rounded-lg text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors ${
+                          person.isFavorite ? 'text-amber-400 bg-amber-50 dark:bg-amber-950/40' : ''
+                        }`}
+                        title={person.isFavorite ? 'Unmark as favorite' : 'Mark as favorite'}
+                      >
+                        <Star
+                          className={`w-4 h-4 ${
+                            person.isFavorite ? 'fill-amber-400 text-amber-400' : 'fill-none'
+                          }`}
+                        />
+                      </button>
                       <button
                         onClick={(e) => handleOpenEditModal(person, e)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"

@@ -48,6 +48,21 @@ export class TransactionController {
           const merchant = item.merchant || '';
           const type = item.type || 'expense';
           const parserCategory = item.category || await predictCategoryWithAPI(description, { merchant, vpa: item.vpa });
+
+          // Self transfers are neither income nor expense: keep the parser result and skip AI
+          if (type === 'transfer' || /self\s*transfer/i.test(parserCategory)) {
+            const transferCategory =
+              categories.find((c) => /self\s*transfer/i.test(c.name))?.name ||
+              categories.find((c) => c.type === 'both' && /transfer/i.test(c.name))?.name ||
+              'Self Transfer';
+            return {
+              id: item.id,
+              name: merchant,
+              category: transferCategory,
+              type: 'transfer',
+            };
+          }
+
           const classification = await transactionClassificationService.classify(
             {
               description,

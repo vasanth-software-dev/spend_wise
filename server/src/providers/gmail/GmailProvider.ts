@@ -2,6 +2,11 @@ import { google } from 'googleapis';
 import { env } from '../../config/env.js';
 import { decrypt } from '../../utils/encryption.js';
 import { EmailMessage, EmailProvider, SyncOptions } from '../../types/index.js';
+import {
+  formatGmailDate,
+  getMonthYearRange,
+  isValidMonthYear,
+} from '../../utils/dateRange.js';
 
 function decodeBody(data: string): string {
   return Buffer.from(data, 'base64url').toString('utf8');
@@ -206,20 +211,14 @@ export class GmailProvider implements EmailProvider {
 
     let searchQuery = defaultQuery;
 
-    if (options?.month && options?.year) {
-      const month = options.month; // 1 to 12
-      const year = options.year;
-      // Start of selected month: year/month/01
-      const startOfMonth = new Date(year, month - 1, 1, 0, 0, 0);
-      // Start of next month:
-      const startOfNextMonth = new Date(year, month, 1, 0, 0, 0);
+    if (isValidMonthYear(options?.month, options?.year)) {
+      const { start, end } = getMonthYearRange(options!.month!, options!.year!);
 
-      // Add 1-day safety buffer for timezones
-      const afterDate = new Date(startOfMonth.getTime() - 86400 * 1000);
-      const beforeDate = new Date(startOfNextMonth.getTime() + 86400 * 1000);
-
-      const afterStr = `${afterDate.getFullYear()}/${String(afterDate.getMonth() + 1).padStart(2, '0')}/${String(afterDate.getDate()).padStart(2, '0')}`;
-      const beforeStr = `${beforeDate.getFullYear()}/${String(beforeDate.getMonth() + 1).padStart(2, '0')}/${String(beforeDate.getDate()).padStart(2, '0')}`;
+      // Widen the Gmail query by one day on each side: message Date headers can trail the
+      // transaction date by timezone boundaries. The sync service applies the strict
+      // month/year filter on the parsed transaction date afterwards.
+      const afterStr = formatGmailDate(new Date(start.getTime() - 86400 * 1000));
+      const beforeStr = formatGmailDate(new Date(end.getTime() + 86400 * 1000));
 
       searchQuery = `${defaultQuery} after:${afterStr} before:${beforeStr}`;
     } else {
@@ -238,7 +237,7 @@ export class GmailProvider implements EmailProvider {
       }
 
       const afterDate = new Date(effectiveDate.getTime() - 86400 * 1000);
-      const afterStr = `${afterDate.getFullYear()}/${String(afterDate.getMonth() + 1).padStart(2, '0')}/${String(afterDate.getDate()).padStart(2, '0')}`;
+      const afterStr = formatGmailDate(afterDate);
       searchQuery = `${defaultQuery} after:${afterStr}`;
     }
 

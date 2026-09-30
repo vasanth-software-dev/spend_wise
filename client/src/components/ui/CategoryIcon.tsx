@@ -1,51 +1,5 @@
 import React from 'react';
-import {
-  Utensils,
-  ShoppingBag,
-  ShoppingCart,
-  Car,
-  Fuel,
-  Zap,
-  Home,
-  Film,
-  HeartPulse,
-  GraduationCap,
-  Plane,
-  CreditCard,
-  Briefcase,
-  TrendingUp,
-  Tag,
-  DollarSign,
-  Coffee,
-  Users,
-  Scissors,
-  Banknote,
-  HelpCircle,
-  LucideIcon,
-} from 'lucide-react';
-
-const iconMap: Record<string, LucideIcon> = {
-  Utensils,
-  ShoppingBag,
-  ShoppingCart,
-  Car,
-  Fuel,
-  Zap,
-  Home,
-  Film,
-  HeartPulse,
-  GraduationCap,
-  Plane,
-  CreditCard,
-  Briefcase,
-  TrendingUp,
-  Tag,
-  DollarSign,
-  Coffee,
-  Users,
-  Scissors,
-  Banknote,
-};
+import { getCategoryIcon } from '../../constants/categoryIcons.js';
 
 interface CategoryIconProps {
   name?: string;
@@ -54,11 +8,11 @@ interface CategoryIconProps {
 }
 
 export const CategoryIcon: React.FC<CategoryIconProps> = ({
-  name = 'Tag',
+  name,
   className = 'w-5 h-5',
   color,
 }) => {
-  const IconComponent = iconMap[name] || HelpCircle;
+  const IconComponent = getCategoryIcon(name);
 
   return (
     <IconComponent

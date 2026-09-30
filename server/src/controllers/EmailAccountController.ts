@@ -3,6 +3,8 @@ import { AuthenticatedRequest } from '../middleware/authMiddleware.js';
 import { emailSyncService } from '../services/EmailSyncService.js';
 import { GmailProvider } from '../providers/gmail/GmailProvider.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
+import { isValidMonthYear } from '../utils/dateRange.js';
+import { SyncOptions } from '../types/index.js';
 import { env } from '../config/env.js';
 
 export class EmailAccountController {
@@ -101,10 +103,23 @@ export class EmailAccountController {
       const { id } = req.params;
       const month = req.body?.month || req.query?.month;
       const year = req.body?.year || req.query?.year;
-      const options = (month && year) ? {
-        month: parseInt(String(month), 10),
-        year: parseInt(String(year), 10),
-      } : undefined;
+      const parsedMonth = month === undefined ? undefined : parseInt(String(month), 10);
+      const parsedYear = year === undefined ? undefined : parseInt(String(year), 10);
+      const hasMonthOrYear = parsedMonth !== undefined || parsedYear !== undefined;
+
+      let options: SyncOptions | undefined;
+      if (hasMonthOrYear) {
+        if (!isValidMonthYear(parsedMonth, parsedYear)) {
+          sendError(
+            res,
+            'month must be between 1 and 12 and year must be a 4-digit year',
+            400,
+            'INVALID_SYNC_PERIOD'
+          );
+          return;
+        }
+        options = { month: Number(parsedMonth), year: Number(parsedYear) };
+      }
 
       const result = await emailSyncService.syncAccount(userId, id, options);
       sendSuccess(res, result, 'Email sync completed');

@@ -57,6 +57,8 @@ export interface Person {
   normalizedName?: string;
   vpa?: string | null;
   email?: string | null;
+  isDeleted?: boolean;
+  isFavorite?: boolean;
   transactionCount?: number;
   totalAmount?: number;
   totalSent?: number;
@@ -208,4 +210,49 @@ export interface ApiResponse<T = unknown> {
     total: number;
     totalPages: number;
   };
+}
+
+export type DebtDirection = 'I_OWE' | 'OWED_TO_ME';
+export type DebtStatus = 'ACTIVE' | 'PARTIALLY_PAID' | 'OVERDUE' | 'SETTLED';
+
+export interface DebtPayment {
+  _id: string;
+  debtId: string;
+  amount: number;
+  paymentDate: string;
+  accountId?: { _id: string; email: string; provider: string } | string | null;
+  note?: string;
+  createdAt: string;
+}
+
+export interface Debt {
+  _id: string;
+  userId: string;
+  personName: string;
+  description?: string;
+  originalAmount: number;
+  direction: DebtDirection;
+  debtDate: string;
+  dueDate?: string | null;
+  categoryId?: Category | string | null;
+  accountId?: { _id: string; email: string; provider: string } | string | null;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Computed fields returned by the backend
+  totalPaid?: number;
+  remainingAmount?: number;
+  status?: DebtStatus;
+  isOverdue?: boolean;
+  payments?: DebtPayment[];
+}
+
+export interface DebtSummary {
+  totalIOwe: number;
+  totalOwedToMe: number;
+  netBalance: number;
+  activeDebts: number;
+  overdueDebts: number;
+  settledDebts: number;
+  partiallyPaidDebts: number;
 }

@@ -175,13 +175,9 @@ Available Balance: INR 32,100.00.`,
   }
 
   async sync(cursor?: string, options?: SyncOptions): Promise<{ messages: EmailMessage[]; newCursor?: string }> {
-    let messages = await this.getMessages(undefined, 20);
-    if (options?.month && options?.year) {
-      messages = messages.filter((m) => {
-        const d = new Date(m.date);
-        return d.getMonth() + 1 === options.month && d.getFullYear() === options.year;
-      });
-    }
+    // Month/year filtering happens in the sync service against the parsed transaction
+    // date, so the provider returns the full window here.
+    const messages = await this.getMessages(undefined, 20);
     const newCursor = `mock-cursor-${Date.now()}`;
     return { messages, newCursor };
   }

@@ -9,6 +9,7 @@ const personSchema = new Schema<IPerson>(
     vpa: { type: String, trim: true, lowercase: true },
     email: { type: String, trim: true, lowercase: true },
     isDeleted: { type: Boolean, default: false, index: true },
+    isFavorite: { type: Boolean, default: false, index: true },
   },
   { timestamps: true }
 );

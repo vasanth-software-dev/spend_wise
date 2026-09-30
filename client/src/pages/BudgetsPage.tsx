@@ -13,6 +13,7 @@ import { Modal } from '../components/ui/Modal.js';
 import { Input } from '../components/ui/Input.js';
 import { Badge } from '../components/ui/Badge.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
+import { CategorySelect } from '../components/ui/CategorySelect.js';
 import { formatINR } from '../utils/format.js';
 
 export const BudgetsPage: React.FC = () => {
@@ -222,18 +223,13 @@ export const BudgetsPage: React.FC = () => {
             <label className="block text-xs font-semibold text-slate-500 mb-1">
               Category (Optional, leave blank for total monthly budget)
             </label>
-            <select
+            <CategorySelect
+              categories={categories}
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full py-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm"
-            >
-              <option value="">All Spending (Overall Monthly)</option>
-              {categories.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              onChange={setCategoryId}
+              placeholder="All Spending (Overall Monthly)"
+              grouped
+            />
           </div>
 
           <div>

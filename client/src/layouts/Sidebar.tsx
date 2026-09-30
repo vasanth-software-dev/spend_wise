@@ -13,6 +13,7 @@ import {
   Moon,
   Sun,
   Laptop,
+  Coins,
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../store/index.js';
 import { setThemeMode } from '../store/slices/themeSlice.js';
@@ -33,6 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
     { label: 'Transactions', to: '/transactions', icon: Receipt },
     { label: 'People', to: '/people', icon: Users },
     { label: 'Budgets', to: '/budgets', icon: PiggyBank },
+    { label: 'Debts', to: '/debts', icon: Coins },
     { label: 'Recurring Bills', to: '/recurring', icon: Repeat },
     {
       label: 'Email Sync',

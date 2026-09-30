@@ -16,6 +16,7 @@ import { LoginPage } from '../pages/LoginPage.js';
 import { RegisterPage } from '../pages/RegisterPage.js';
 import { AuthCallbackPage } from '../pages/AuthCallbackPage.js';
 import { PeoplePage } from '../pages/PeoplePage.js';
+import { DebtsPage } from '../pages/DebtsPage.js';
 import { ToastContainer } from '../components/ui/Toast.js';
 
 export const App: React.FC = () => {
@@ -46,6 +47,7 @@ export const App: React.FC = () => {
         <Route path="recurring" element={<RecurringPage />} />
         <Route path="email-sync" element={<EmailSyncPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="debts" element={<DebtsPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 

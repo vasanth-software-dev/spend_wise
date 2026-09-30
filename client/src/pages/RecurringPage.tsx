@@ -13,6 +13,7 @@ import { Modal } from '../components/ui/Modal.js';
 import { Input } from '../components/ui/Input.js';
 import { Badge } from '../components/ui/Badge.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
+import { CategorySelect } from '../components/ui/CategorySelect.js';
 import { formatINR, formatDate } from '../utils/format.js';
 import { RecurringFrequency, PaymentMethod, TransactionType } from '../types/index.js';
 
@@ -272,18 +273,13 @@ export const RecurringPage: React.FC = () => {
               <label className="block text-xs font-semibold text-slate-500 mb-1">
                 Category
               </label>
-              <select
+              <CategorySelect
+                categories={categories}
                 value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full py-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm"
-              >
-                <option value="">Select Category...</option>
-                {categories.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setCategoryId}
+                placeholder="Select Category..."
+                grouped
+              />
             </div>
 
             <div>

@@ -31,6 +31,7 @@ import {
   extractGmailVerificationCode,
   unwrapForwardedEmail,
 } from '../utils/inboundEmailUnwrapper.js';
+import { isDateInMonthYear, toValidDate } from '../utils/dateRange.js';
 
 export class EmailSyncService {
   private async classifyDetectedTransaction(
@@ -198,7 +199,7 @@ export class EmailSyncService {
     userId: string,
     emailAccountId: string,
     options?: SyncOptions
-  ): Promise<{ scanned: number; detected: number; duplicates: number }> {
+  ): Promise<{ scanned: number; detected: number; duplicates: number; skipped: number }> {
     const account = await emailAccountRepository.findById(emailAccountId, userId);
     if (!account) {
       throw new Error('Email account not found');
@@ -221,6 +222,7 @@ export class EmailSyncService {
         scanned: 0,
         detected: 0,
         duplicates: 0,
+        skipped: 0,
       };
     }
 
@@ -237,22 +239,23 @@ export class EmailSyncService {
       const { messages, newCursor } = await provider.sync(account.syncCursor, options);
       let detectedCount = 0;
       let duplicateCount = 0;
+      let skippedCount = 0;
 
       for (const msg of messages) {
-        // Enforce month and year filter if specified
-        if (options?.month && options?.year) {
-          const msgDate = new Date(msg.date);
-          if (
-            msgDate.getMonth() + 1 !== options.month ||
-            msgDate.getFullYear() !== options.year
-          ) {
-            continue;
-          }
-        }
-
         // Parse email using registered parsers
         const parsed = await emailParserRegistry.parse(msg);
         if (!parsed) continue;
+
+        // Enforce the selected month/year on the effective transaction date, not the
+        // email header date. Bank alerts are often delivered a day (or more) after the
+        // transaction, which otherwise leaks neighbouring months into the sync result.
+        if (options?.month && options?.year) {
+          const effectiveDate = toValidDate(parsed.transactionDate) || toValidDate(msg.date);
+          if (!effectiveDate || !isDateInMonthYear(effectiveDate, options.month, options.year)) {
+            skippedCount++;
+            continue;
+          }
+        }
 
         // Check duplicates
         const dupResult = await duplicateDetectionService.checkDuplicate(userId, parsed, msg.id);
@@ -283,7 +286,7 @@ export class EmailSyncService {
           continue;
         }
 
-const classification = await this.classifyDetectedTransaction(
+        const classification = await this.classifyDetectedTransaction(
           userId,
           parsed,
           `${msg.subject}\n${msg.snippet || ''}\n${msg.bodyText}`,
@@ -323,12 +326,16 @@ const classification = await this.classifyDetectedTransaction(
       );
 
       if (detectedCount > 0) {
+        const periodLabel =
+          options?.month && options?.year
+            ? ` for ${String(options.month).padStart(2, '0')}/${options.year}`
+            : '';
         await notificationRepository.create({
           userId: new Types.ObjectId(userId),
           title: 'New Transactions Detected',
-          message: `${detectedCount} new transaction${detectedCount > 1 ? 's' : ''} detected from ${account.email}. Ready for your review.`,
+          message: `${detectedCount} new transaction${detectedCount > 1 ? 's' : ''} detected from ${account.email}${periodLabel}. Ready for your review.`,
           type: 'detected_transaction',
-          data: { emailAccountId, detectedCount },
+          data: { emailAccountId, detectedCount, month: options?.month, year: options?.year },
         });
       }
 
@@ -340,6 +347,9 @@ const classification = await this.classifyDetectedTransaction(
           scanned: messages.length,
           detected: detectedCount,
           duplicates: duplicateCount,
+          skipped: skippedCount,
+          month: options?.month,
+          year: options?.year,
         },
       });
 
@@ -347,6 +357,7 @@ const classification = await this.classifyDetectedTransaction(
         scanned: messages.length,
         detected: detectedCount,
         duplicates: duplicateCount,
+        skipped: skippedCount,
       };
     } catch (err) {
       const errorMsg = (err as Error).message;
@@ -552,7 +563,7 @@ const classification = await this.classifyDetectedTransaction(
       };
     }
 
-const classification = await this.classifyDetectedTransaction(
+    const classification = await this.classifyDetectedTransaction(
       userId,
       parsed,
       `${unwrapped.subject}\n${unwrapped.snippet || ''}\n${unwrapped.bodyText}`,

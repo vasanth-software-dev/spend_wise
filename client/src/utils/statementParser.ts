@@ -121,7 +121,17 @@ const CATEGORY_RULES: Record<string, string[]> = {
     'rent', 'house rent', 'flat rent', 'society maintenance', 'nobroker',
     'maintenance fee', 'apartment maintenance', 'landlord', 'pg rent', 'hostel'
   ],
+  'Self Transfer': [
+    'self transfer', 'self-transfer', 'self transfer to', 'self credit', 'self debit',
+    'self neft', 'self rtgs', 'self imps', 'self upi', 'to own account', 'own account',
+    'own a/c', 'own accounts', 'between own', 'between my accounts', 'internal transfer',
+    'transfer to self', 'transferred to self', 'self transfer in'
+  ],
 };
+
+export const TRANSFER_CATEGORIES = new Set([
+  'self transfer', 'transfer', 'transfers', 'account transfer'
+]);
 
 export const INCOME_CATEGORIES = new Set([
   'salary', 'investments', 'rental income', 'freelance', 'dividend', 'interest', 'bonus', 'refund', 'cashback', 'income'
@@ -133,9 +143,17 @@ export const EXPENSE_CATEGORIES = new Set([
   'salon & grooming', 'salon', 'atm & cash', 'atm'
 ]);
 
+const SELF_TRANSFER_REGEX = /\bself[\s\-_]*(transfer|credit|debit|neft|rtgs|imps|upi)\b|\btransfer\w*\s+(to|received\s+from)\s+self\b|\bown\s+(account|a\/c|accounts)\b|\bbetween\s+(my\s+)?own\b|\binternal\s+transfer\b/i;
+
+export function isSelfTransferText(text?: string | null): boolean {
+  if (!text || !text.trim()) return false;
+  return SELF_TRANSFER_REGEX.test(text) || TRANSFER_CATEGORIES.has(text.trim().toLowerCase());
+}
+
 export function getCategoryType(categoryName?: string): 'expense' | 'income' | 'both' {
   if (!categoryName) return 'both';
   const lower = categoryName.trim().toLowerCase();
+  if (TRANSFER_CATEGORIES.has(lower)) return 'both';
   if (INCOME_CATEGORIES.has(lower) || lower.includes('salary') || lower.includes('dividend') || lower.includes('investment')) {
     return 'income';
   }
@@ -350,20 +368,24 @@ export function predictCategoryAndType(
   explicitType?: 'expense' | 'income' | 'transfer',
   explicitCategory?: string,
   knownPeopleNames: string[] = []
-): { category: string; type: 'expense' | 'income' } {
+): { category: string; type: 'expense' | 'income' | 'transfer' } {
   const lower = (text || '').toLowerCase();
   const cleanedPayee = cleanMerchantName(text);
 
   // 1. If explicitCategory is passed (e.g. from file column)
   if (explicitCategory && explicitCategory.trim().length > 0) {
-    const catType = getCategoryType(explicitCategory);
+    const categoryName = explicitCategory.trim();
+    if (TRANSFER_CATEGORIES.has(categoryName.toLowerCase())) {
+      return { category: categoryName, type: 'transfer' };
+    }
+    const catType = getCategoryType(categoryName);
     let resolvedType: 'expense' | 'income' = explicitType === 'income' ? 'income' : 'expense';
     if (catType === 'income') {
       resolvedType = 'income';
     } else if (catType === 'expense') {
       resolvedType = 'expense';
     }
-    return { category: explicitCategory.trim(), type: resolvedType };
+    return { category: categoryName, type: resolvedType };
   }
 
   // 2. Check Credit / Debit indications from text or explicitType
@@ -394,6 +416,10 @@ export function predictCategoryAndType(
   // Check merchant, narration, and raw text across all category keywords (e.g. "REMY CINEMAS" -> "Entertainment", "MURUGAN BAKERY" -> "Food & Dining", "BEST LOOK" -> "Salon & Grooming")
   const detectedCategory = matchCategoryFromText(cleanedPayee) || matchCategoryFromText(text);
   if (detectedCategory) {
+    // Self transfers are neither income nor expense - they move money between own accounts
+    if (TRANSFER_CATEGORIES.has(detectedCategory.toLowerCase())) {
+      return { category: detectedCategory, type: 'transfer' };
+    }
     const catType = getCategoryType(detectedCategory);
     let resolvedType: 'expense' | 'income';
     if (catType === 'income') {
@@ -406,7 +432,12 @@ export function predictCategoryAndType(
     return { category: detectedCategory, type: explicitType === 'income' ? 'income' : (explicitType === 'expense' ? 'expense' : resolvedType) };
   }
 
-  // 5. PERSON CHECK (Friends & Family):
+  // 5. SELF TRANSFER: money moved between the user's own accounts (narration only)
+  if (isSelfTransferText(text)) {
+    return { category: 'Self Transfer', type: 'transfer' };
+  }
+
+  // 6. PERSON CHECK (Friends & Family):
   // Check cleanedPayee or isolated words from narration for person names like "ABIRAMI P", "BOOBAL"
   const isPerson =
     isLikelyPersonName(cleanedPayee, knownPeopleNames) ||
@@ -424,7 +455,7 @@ export function predictCategoryAndType(
     };
   }
 
-  // 6. Check other Income indicators (Investments, Cashback, Refund, Received transfers)
+  // 7. Check other Income indicators (Investments, Cashback, Refund, Received transfers)
   if (isCredit) {
     if (/\b(dividend|interest|mutual\s*fund|groww|zerodha|upstox|kuvera|sip|sebi|bse|nse|uti|camsonline)\b/i.test(lower)) {
       return { category: 'Investments', type: 'income' };
@@ -440,14 +471,14 @@ export function predictCategoryAndType(
     return { category: 'Other', type: 'income' };
   }
 
-  // 7. Non-commercial personal payee fallback -> Friends & Family
+  // 8. Non-commercial personal payee fallback -> Friends & Family
   if (!BUSINESS_KEYWORDS_REGEX.test(cleanedPayee) && !BUSINESS_KEYWORDS_REGEX.test(lower)) {
     if (cleanedPayee && cleanedPayee !== 'Unknown' && /^[a-zA-Z\s.]+$/.test(cleanedPayee)) {
       return { category: 'Friends & Family', type: 'expense' };
     }
   }
 
-  // 8. Default fallback
+  // 9. Default fallback
   return { category: 'Other', type: 'expense' };
 }
 

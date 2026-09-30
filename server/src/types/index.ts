@@ -109,6 +109,7 @@ export interface IPerson {
   vpa?: string | null;
   email?: string | null;
   isDeleted?: boolean;
+  isFavorite?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -289,4 +290,34 @@ export interface UserSessionPayload {
   userId: string;
   email: string;
   sessionId: string;
+}
+
+export type DebtDirection = 'I_OWE' | 'OWED_TO_ME';
+export type DebtStatus = 'ACTIVE' | 'PARTIALLY_PAID' | 'OVERDUE' | 'SETTLED';
+
+export interface IDebtPayment {
+  _id: Types.ObjectId | string;
+  debtId: Types.ObjectId | string;
+  amount: number;
+  paymentDate: Date;
+  accountId?: Types.ObjectId | string | null;
+  note?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IDebt {
+  _id: Types.ObjectId | string;
+  userId: Types.ObjectId | string;
+  personName: string;
+  description?: string;
+  originalAmount: number;
+  direction: DebtDirection;
+  debtDate: Date;
+  dueDate?: Date | null;
+  categoryId?: Types.ObjectId | string | null;
+  accountId?: Types.ObjectId | string | null;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }

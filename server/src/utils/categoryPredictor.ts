@@ -7,6 +7,10 @@ interface CategoryRule {
 
 export const CATEGORY_RULES: CategoryRule[] = [
   {
+    name: 'Self Transfer',
+    pattern: /self[\s\-_]*(transfer|credit|debit|neft|rtgs|imps|upi)|\btransfer\w*\s+(to|received\s+from)\s+self\b|\bown\s+(account|a\/c|accounts)\b|\bbetween\s+(my\s+)?own\b|\binternal\s+transfer\b/i,
+  },
+  {
     name: 'Health & Medical',
     pattern: /apollo|pharmacy|pharmeasy|1mg|netmeds|medplus|practo|lal\s*path|metropolis|hospital|clinic|chemist|medical|medicine|doctor|dent|dr\b|diagnost|healthcare|wellness|cult\.fit|gym|fitness/i,
   },
@@ -297,6 +301,7 @@ export function findMatchingCategoryId(
     'Salary / Income': ['Salary'],
     'Cash Withdrawal': ['ATM & Cash'],
     'Wallet / Transfer': ['Friends & Family', 'Other'],
+    'Self Transfer': ['Self Transfer'],
     'Software / Digital Services': ['Subscriptions', 'Shopping'],
     'Banking / Fees': ['Bills & Utilities', 'Other'],
     'Uncategorized': ['Other'],

@@ -24,6 +24,7 @@ import { Modal } from '../components/ui/Modal.js';
 import { Badge } from '../components/ui/Badge.js';
 import { formatRelativeDate } from '../utils/format.js';
 import { CategoryIcon } from '../components/ui/CategoryIcon.js';
+import { CATEGORY_ICON_NAMES } from '../constants/categoryIcons.js';
 
 export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -139,11 +140,7 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const iconOptions = [
-    'Tag', 'Utensils', 'ShoppingBag', 'ShoppingCart', 'Car', 'Fuel', 'Zap',
-    'Home', 'Film', 'HeartPulse', 'GraduationCap', 'Plane', 'CreditCard',
-    'Briefcase', 'TrendingUp', 'Coffee', 'Users'
-  ];
+  const iconOptions = CATEGORY_ICON_NAMES;
 
   interface TabItem {
     id: 'profile' | 'sessions' | 'categories' | 'privacy' | 'danger';

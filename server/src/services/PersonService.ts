@@ -243,8 +243,12 @@ export class PersonService {
 
   /**
    * List all detected people with aggregate stats and recent transactions.
+   * Accepts optional options: { favoriteOnly?: boolean; isFavorite?: boolean }
    */
-  async list(userId: string) {
+  async list(
+    userId: string,
+    options?: { favoriteOnly?: boolean; isFavorite?: boolean }
+  ) {
     const userObjectId = new Types.ObjectId(userId);
 
     // Auto-link any newly synced transactions
@@ -253,7 +257,13 @@ export class PersonService {
     } catch (_) {}
 
     const peopleWithStats = await PersonModel.aggregate([
-      { $match: { userId: userObjectId, isDeleted: { $ne: true } } },
+      {
+        $match: {
+          userId: userObjectId,
+          isDeleted: { $ne: true },
+          ...(options?.favoriteOnly ? { isFavorite: true } : {}),
+        },
+      },
       {
         $lookup: {
           from: 'transactions',
@@ -268,6 +278,7 @@ export class PersonService {
           normalizedName: 1,
           vpa: 1,
           email: 1,
+          isFavorite: 1,
           createdAt: 1,
           updatedAt: 1,
           transactionCount: { $size: '$transactions' },
@@ -318,7 +329,7 @@ export class PersonService {
           },
         },
       },
-      { $sort: { lastTransactionDate: -1, name: 1 } },
+       { $sort: { isFavorite: -1, lastTransactionDate: -1, name: 1 } },
     ]);
 
     return peopleWithStats;
@@ -412,12 +423,12 @@ export class PersonService {
   }
 
   /**
-   * Update person name, VPA, or email.
+   * Update person name, VPA, email, or favorite status.
    */
   async update(
     userId: string,
     personId: string,
-    input: { name?: string; vpa?: string | null; email?: string | null }
+    input: { name?: string; vpa?: string | null; email?: string | null; isFavorite?: boolean }
   ): Promise<IPerson | null> {
     if (!personId) return null;
 
@@ -470,14 +481,18 @@ export class PersonService {
       }
     }
 
-    if (input.email !== undefined) {
-      const trimmedEmail = input.email ? input.email.trim().toLowerCase() : '';
-      if (trimmedEmail) {
-        setOps.email = trimmedEmail;
-      } else {
-        unsetOps.email = 1;
-      }
-    }
+     if (input.email !== undefined) {
+       const trimmedEmail = input.email ? input.email.trim().toLowerCase() : '';
+       if (trimmedEmail) {
+         setOps.email = trimmedEmail;
+       } else {
+         unsetOps.email = 1;
+       }
+     }
+
+     if (input.isFavorite !== undefined) {
+       setOps.isFavorite = input.isFavorite;
+     }
 
     const updateOps: any = {};
     if (Object.keys(setOps).length > 0) updateOps.$set = setOps;
@@ -558,9 +573,37 @@ export class PersonService {
       { $set: updateFields },
       { new: true }
     )
-      .populate('categoryId')
+       .populate('categoryId')
       .populate('personId')
       .lean();
+  }
+
+  /**
+   * Toggle favorite status for a person.
+   */
+  async toggleFavorite(userId: string, personId: string): Promise<IPerson | null> {
+    if (!personId) return null;
+
+    let person = null;
+    if (Types.ObjectId.isValid(personId)) {
+      person = await PersonModel.findById(personId);
+    }
+    if (!person) {
+      person = await PersonModel.findOne({ _id: personId });
+    }
+    if (!person) return null;
+
+    if (person.userId && person.userId.toString() !== userId.toString()) {
+      return null;
+    }
+
+    const updated = await PersonModel.findByIdAndUpdate(
+      person._id,
+      { $set: { isFavorite: !person.isFavorite } },
+      { new: true }
+    ).lean();
+
+    return updated;
   }
 }
 

@@ -12,6 +12,7 @@ import { formatINR, formatDate, getConfidenceBadge } from '../../utils/format.js
 import { Button } from '../../components/ui/Button.js';
 import { Modal } from '../../components/ui/Modal.js';
 import { Input } from '../../components/ui/Input.js';
+import { CategorySelect } from '../../components/ui/CategorySelect.js';
 import { DetectedTransaction } from '../../types/index.js';
 
 export const DetectedTransactionReviewCenter: React.FC = () => {
@@ -195,19 +196,17 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
                     <Tag className="w-3 h-3 text-brand-500" />
                     Category:
                   </span>
-                  <select
+                  <CategorySelect
+                    categories={categories}
                     value={selectedCatId}
-                    onChange={(e) => handleInlineCategoryChange(tx, e.target.value)}
-                    className="flex-1 py-1 px-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer hover:border-brand-400 transition-colors"
+                    onChange={(value) => handleInlineCategoryChange(tx, value)}
+                    grouped
+                    placeholder="Uncategorized / Other"
+                    className="flex-1"
+                    size="sm"
+                    triggerClassName="w-full py-1 px-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 hover:border-brand-400 focus-visible:ring-1 focus-visible:ring-brand-500 transition-colors"
                     title="Change category for this transaction"
-                  >
-                    <option value="">Uncategorized / Other</option>
-                    {categories.map((c) => (
-                      <option key={c._id} value={c._id}>
-                        {c.icon ? `${c.icon} ` : '🏷️ '}{c.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div className="mt-3 text-xs space-y-1 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
@@ -298,18 +297,13 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
                 </label>
                 <span className="text-[11px] text-slate-400">Choose or change category</span>
               </div>
-              <select
+              <CategorySelect
+                categories={categories}
                 value={editCategory}
-                onChange={(e) => setEditCategory(e.target.value)}
-                className="w-full py-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="">Select Category...</option>
-                {categories.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.icon ? `${c.icon} ` : '🏷️ '}{c.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setEditCategory}
+                placeholder="Select Category..."
+                grouped
+              />
             </div>
             <Input
               label="Notes"

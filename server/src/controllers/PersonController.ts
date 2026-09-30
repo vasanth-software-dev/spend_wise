@@ -6,7 +6,10 @@ import { sendError, sendSuccess } from '../utils/apiResponse.js';
 export class PersonController {
   async list(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const people = await personService.list(req.user!.userId);
+      const { favorites } = req.query as { favorites?: string };
+      const people = await personService.list(req.user!.userId, {
+        favoriteOnly: favorites === 'true',
+      });
       sendSuccess(res, { people });
     } catch (error) {
       next(error);
@@ -81,6 +84,19 @@ export class PersonController {
         return;
       }
       sendSuccess(res, null, 'Person deleted successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async toggleFavorite(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const person = await personService.toggleFavorite(req.user!.userId, req.params.id);
+      if (!person) {
+        sendError(res, 'Person not found', 404);
+        return;
+      }
+      sendSuccess(res, { person }, 'Favorite status updated');
     } catch (error) {
       next(error);
     }
