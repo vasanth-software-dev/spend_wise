@@ -4,9 +4,12 @@ export function formatINR(amount: number, showSymbol = true): string {
   const absAmount = Math.abs(amount);
   const isNegative = amount < 0;
 
+  // Preserve exact fractional amount (e.g. 159.50 -> ₹159.50) without rounding
+  const hasDecimals = absAmount % 1 !== 0;
+
   const formatted = new Intl.NumberFormat('en-IN', {
-    maximumFractionDigits: 0,
-    minimumFractionDigits: 0,
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
   }).format(absAmount);
 
   return `${isNegative ? '-' : ''}${showSymbol ? '₹' : ''}${formatted}`;

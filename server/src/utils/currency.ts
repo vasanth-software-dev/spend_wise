@@ -52,13 +52,15 @@ export function calculatePercentage(part: number, total: number): number {
  * Example: 124500 -> ₹1,24,500
  */
 export function formatINR(amount: number, options: { showSymbol?: boolean; showDecimals?: boolean } = {}): string {
-  const { showSymbol = true, showDecimals = false } = options;
+  const { showSymbol = true, showDecimals } = options;
   const absAmount = Math.abs(amount);
   const isNegative = amount < 0;
 
+  const hasDecimals = showDecimals !== undefined ? showDecimals : (absAmount % 1 !== 0);
+
   const formattedNumber = new Intl.NumberFormat('en-IN', {
-    minimumFractionDigits: showDecimals ? 2 : 0,
-    maximumFractionDigits: showDecimals ? 2 : 0,
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
   }).format(absAmount);
 
   const prefix = isNegative ? '-' : '';
