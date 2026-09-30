@@ -11,6 +11,7 @@ import {
   Receipt,
   Mail,
   UserRound,
+  Hash,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import {
@@ -152,7 +153,7 @@ export const TransactionsPage: React.FC = () => {
               type="text"
               value={filters.search}
               onChange={handleSearchChange}
-              placeholder="Search merchant, notes, UPI UTR..."
+              placeholder="Search merchant, Ref.No, notes, UPI UTR..."
               className="w-full bg-slate-100/80 dark:bg-slate-800/80 text-xs sm:text-sm pl-10 pr-4 py-2.5 rounded-xl border border-transparent focus:border-brand-500/50 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400 shadow-2xs"
             />
           </div>
@@ -303,6 +304,7 @@ export const TransactionsPage: React.FC = () => {
                     </th>
                     <th className="py-3 px-4">Merchant / Description</th>
                     <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Ref.No</th>
                     <th className="py-3 px-4">Method & Date</th>
                     <th className="py-3 px-4 text-right">Amount</th>
                   </tr>
@@ -381,6 +383,21 @@ export const TransactionsPage: React.FC = () => {
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700/50">
                             {cat?.name || 'Uncategorized'}
                           </span>
+                        </td>
+
+                        {/* Ref.No Column */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {tx.refNo || tx.externalTransactionId ? (
+                            <span
+                              className="inline-flex items-center gap-1 font-mono text-xs text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/90 px-2 py-0.5 rounded-lg border border-slate-200/70 dark:border-slate-700/70 hover:border-brand-500/40 transition-colors"
+                              title={`Reference: ${tx.refNo || tx.externalTransactionId}`}
+                            >
+                              <Hash className="w-3 h-3 text-brand-500 flex-shrink-0" />
+                              <span className="truncate max-w-[140px]">{tx.refNo || tx.externalTransactionId}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 dark:text-slate-600 text-xs font-mono">-</span>
+                          )}
                         </td>
 
                         <td className="py-3.5 px-4 whitespace-nowrap text-xs">
@@ -471,6 +488,14 @@ export const TransactionsPage: React.FC = () => {
                           <span>{formatDate(tx.transactionDate, 'dd MMM')}</span>
                           <span>•</span>
                           <span className="truncate">{cat?.name || 'Uncategorized'}</span>
+                          {(tx.refNo || tx.externalTransactionId) && (
+                            <>
+                              <span>•</span>
+                              <span className="font-mono text-[10px] text-brand-600 dark:text-brand-400 truncate max-w-[110px]" title={tx.refNo || tx.externalTransactionId}>
+                                #{tx.refNo || tx.externalTransactionId}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -14,6 +14,7 @@ export interface ParsedTransaction {
   merchant: string;
   category?: string;
   payment_method: 'upi' | 'bank' | 'card' | 'cash' | 'wallet' | 'other';
+  refNo?: string;
   notes?: string;
   rawText?: string;
   selected?: boolean;
@@ -483,11 +484,11 @@ export function cleanMerchantName(narration: string): string {
   clean = clean.replace(/^\d{1,2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{0,4}\s*/i, '');
   clean = clean.replace(/^\d{4}[/.\-]\d{1,2}[/.\-]\d{1,2}\s*/, '');
 
-  // 2. Strip leading Indian banking entry prefixes and codes (including UPI-S, UPI-CR, UPI-DR):
+  // 2. Strip leading Indian banking entry prefixes and codes:
   clean = clean.replace(/^(BY\s+TRANSFER|TO\s+TRANSFER|BY\s+CLG|TO\s+CLG|BY\s+CLEARING|TO\s+CLEARING)[-\s:/_]*/i, '');
   clean = clean.replace(/^(RECEIVED\s+FROM|PAID\s+TO|SENT\s+TO|TRANSFER\s+TO|CREDIT\s+FROM|DEBIT\s+TO)[-\s:/_]*/i, '');
-  clean = clean.replace(/^(INB\s+NEFT|INB\s+IMPS|NEFT|IMPS|RTGS|UPI|NACH|ACH|P2P|P2A)[-\s:/_]*(S|C|CR|DR|REV)?[-\s:/_]*/i, '');
-  clean = clean.replace(/^UPI[-\s:/_]*(S|C|CR|DR|REV)?[-\s:/_]*/i, '');
+  clean = clean.replace(/^(INB\s+NEFT|INB\s+IMPS|NEFT|IMPS|RTGS|UPI|NACH|ACH|P2P|P2A)[-\s:/_]*(CR|DR|REV)?[-\s:/_]*/i, '');
+  clean = clean.replace(/^UPI[-\s:/_]*(CR|DR|REV)?[-\s:/_]*/i, '');
   clean = clean.replace(/^A2AINT\d*[-\s:]*/i, '');
 
   // 3. Strip cheque numbers / series codes like "S 13", "S13", "S-13", "C 01" at start or anywhere:
@@ -597,6 +598,49 @@ export function cleanMerchantName(narration: string): string {
 
   if (!clean || clean.length < 2) return narration.substring(0, 30);
   return clean.substring(0, 45);
+}
+
+/**
+ * Extract reference number (UPI Ref / UTR / Chq No / RRN / Zero-padded ID)
+ * from explicit column or narration line.
+ * Handles cases like "0000130408174425" from statements and "130408174425" from emails.
+ */
+export function extractReferenceNumber(text: string, explicitRefColVal?: unknown): string | undefined {
+  if (explicitRefColVal !== undefined && explicitRefColVal !== null) {
+    const cleanCol = String(explicitRefColVal).trim();
+    if (cleanCol && cleanCol !== '-' && cleanCol.length >= 4) {
+      return cleanCol;
+    }
+  }
+
+  if (!text) return undefined;
+
+  // 1. Explicit labels: UPI/REF/UTR/RRN/TXN followed by alphanumeric ID or digits
+  // e.g. "UPI/0000130408174425/...", "UPI/130408174425", "UTR: 130408174425", "Ref: 0000130408174425"
+  const labelMatch = text.match(/\b(?:UPI|UTR|RRN|REF|TXN|IMPS|NEFT)[-/:#\s]+([A-Za-z0-9]{8,22})\b/i);
+  if (labelMatch && labelMatch[1] && /\d{4,}/.test(labelMatch[1])) {
+    return labelMatch[1].trim();
+  }
+
+  // 2. Slashed segment with 12-16 digits: e.g. /0000130408174425/ or /130408174425/
+  const slashMatch = text.match(/(?:^|[\s/])(0*\d{12})(?:[\s/]|$)/);
+  if (slashMatch && slashMatch[1]) {
+    return slashMatch[1].trim();
+  }
+
+  // 3. Leading-zero padded reference numbers (e.g. 0000130408174425) - classic Indian bank statement format
+  const paddedMatch = text.match(/\b(0{2,}\d{8,16})\b/);
+  if (paddedMatch && paddedMatch[1]) {
+    return paddedMatch[1].trim();
+  }
+
+  // 4. Exactly 12-digit UPI RRN / reference
+  const twelveDigitMatch = text.match(/\b(\d{12})\b/);
+  if (twelveDigitMatch && twelveDigitMatch[1]) {
+    return twelveDigitMatch[1].trim();
+  }
+
+  return undefined;
 }
 
 /**
@@ -744,6 +788,9 @@ export async function parseExcelFile(file: File, knownPeopleNames: string[] = []
   const amountCol = headers.findIndex((h) => h.includes('amount') || h === 'amt');
   const typeCol = headers.findIndex((h) => h === 'type' || h.includes('cr/dr') || h.includes('dr/cr'));
   const catCol = headers.findIndex((h) => h.includes('categor'));
+  const refCol = headers.findIndex((h) =>
+    h.includes('ref') || h.includes('reference') || h.includes('chq') || h.includes('cheque') || h.includes('utr') || h.includes('rrn') || h.includes('txn id') || h.includes('trans id')
+  );
 
   const transactions: ParsedTransaction[] = [];
 
@@ -793,6 +840,7 @@ export async function parseExcelFile(file: File, knownPeopleNames: string[] = []
     const explicitCat = (catCol !== -1 && row[catCol]) ? String(row[catCol]).trim() : undefined;
     const { category, type: resolvedType } = predictCategoryAndType(narration || merchant, type, explicitCat, knownPeopleNames);
     const paymentMethod = detectPaymentMethod(narration);
+    const refNo = extractReferenceNumber(narration, refCol !== -1 ? row[refCol] : undefined);
 
     transactions.push({
       id: `xlsx-${r}-${Date.now()}`,
@@ -802,6 +850,7 @@ export async function parseExcelFile(file: File, knownPeopleNames: string[] = []
       merchant,
       category,
       payment_method: paymentMethod,
+      refNo,
       notes: narration,
       rawText: JSON.stringify(row),
       selected: true,
@@ -885,6 +934,9 @@ export async function parseCSVOrText(file: File, knownPeopleNames: string[] = []
   const typeCol = headers.findIndex((h) => h === 'type' || h.includes('cr/dr') || h.includes('dr/cr'));
   const catCol = headers.findIndex((h) => h.includes('categor'));
   const methodCol = headers.findIndex((h) => h.includes('method') || h.includes('payment_method'));
+  const refCol = headers.findIndex((h) =>
+    h.includes('ref') || h.includes('reference') || h.includes('chq') || h.includes('cheque') || h.includes('utr') || h.includes('rrn') || h.includes('txn id') || h.includes('trans id')
+  );
 
   const transactions: ParsedTransaction[] = [];
 
@@ -936,6 +988,8 @@ export async function parseCSVOrText(file: File, knownPeopleNames: string[] = []
       ? (String(row[methodCol]).toLowerCase() as any)
       : detectPaymentMethod(narration);
 
+    const refNo = extractReferenceNumber(narration, refCol !== -1 ? row[refCol] : undefined);
+
     transactions.push({
       id: `csv-${r}-${Date.now()}`,
       date,
@@ -944,6 +998,7 @@ export async function parseCSVOrText(file: File, knownPeopleNames: string[] = []
       merchant,
       category,
       payment_method: paymentMethod,
+      refNo,
       notes: narration,
       selected: true,
     });
@@ -985,6 +1040,7 @@ function parseManualTextLines(fileName: string, lines: string[], delimiter = ','
         const desc = descParts.join(' ') || 'Transaction';
         if (amount > 0) {
           const { category, type: resolvedType } = predictCategoryAndType(line || desc, type, undefined, knownPeopleNames);
+          const refNo = extractReferenceNumber(line);
           transactions.push({
             id: `txt-${i}-${Date.now()}`,
             date,
@@ -993,6 +1049,7 @@ function parseManualTextLines(fileName: string, lines: string[], delimiter = ','
             merchant: cleanMerchantName(desc),
             category,
             payment_method: detectPaymentMethod(desc),
+            refNo,
             notes: line,
             selected: true,
           });
@@ -1023,6 +1080,7 @@ function parseManualTextLines(fileName: string, lines: string[], delimiter = ','
 
       if (amount > 0) {
         const { category, type: resolvedType } = predictCategoryAndType(line || desc, type, undefined, knownPeopleNames);
+        const refNo = extractReferenceNumber(line);
         transactions.push({
           id: `txt-${i}-${Date.now()}`,
           date,
@@ -1031,6 +1089,7 @@ function parseManualTextLines(fileName: string, lines: string[], delimiter = ','
           merchant: cleanMerchantName(desc || 'Transaction'),
           category,
           payment_method: detectPaymentMethod(desc),
+          refNo,
           notes: line,
           selected: true,
         });
@@ -1262,6 +1321,9 @@ export async function parsePDFFile(
 
       if (amount <= 0) continue;
 
+      // Extract reference number before stripping
+      const refNo = extractReferenceNumber(lineText);
+
       // Extract narration: remove date, amounts, CR/DR tokens, Chq/Ref series codes, and long numbers
       let narration = lineText
         .replace(dateMatch[0], '')
@@ -1292,6 +1354,7 @@ export async function parsePDFFile(
         merchant,
         category,
         payment_method: paymentMethod,
+        refNo,
         notes: narration || lineText,
         selected: true,
       });

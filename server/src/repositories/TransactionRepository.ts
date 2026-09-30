@@ -1,6 +1,7 @@
 import { TransactionModel } from '../models/Transaction.js';
 import { ITransaction } from '../types/index.js';
 import { Types } from 'mongoose';
+import { buildRefNoQueryPattern } from '../utils/referenceNumber.js';
 
 export interface TransactionFilterParams {
   userId: string;
@@ -131,13 +132,20 @@ export class TransactionRepository {
 
     if (params.search) {
       const searchRegex = { $regex: params.search, $options: 'i' };
-      query.$or = [
+      const searchOr: Record<string, unknown>[] = [
         { merchant: searchRegex },
         { description: searchRegex },
         { notes: searchRegex },
         { externalTransactionId: searchRegex },
+        { refNo: searchRegex },
         { vpa: searchRegex },
       ];
+      const refPattern = buildRefNoQueryPattern(params.search);
+      if (refPattern) {
+        searchOr.push({ externalTransactionId: { $regex: refPattern } });
+        searchOr.push({ refNo: { $regex: refPattern } });
+      }
+      query.$or = searchOr;
     }
 
     const sortField = params.sortBy || 'transactionDate';
@@ -382,15 +390,27 @@ export class TransactionRepository {
       merchant: string;
       transactionDate: Date;
       externalTransactionId?: string;
+      refNo?: string;
       toleranceMinutes?: number;
     }
   ): Promise<ITransaction | null> {
-    const { amount, merchant, transactionDate, externalTransactionId, toleranceMinutes = 120 } = criteria;
+    const { amount, merchant, transactionDate, externalTransactionId, refNo, toleranceMinutes = 120 } = criteria;
+    const refToSearch = refNo || externalTransactionId;
 
-    if (externalTransactionId) {
+    if (refToSearch) {
+      const refPattern = buildRefNoQueryPattern(refToSearch);
+      const orClauses: Record<string, unknown>[] = [
+        { externalTransactionId: refToSearch },
+        { refNo: refToSearch },
+      ];
+      if (refPattern) {
+        orClauses.push({ externalTransactionId: { $regex: refPattern } });
+        orClauses.push({ refNo: { $regex: refPattern } });
+      }
+
       const match = await TransactionModel.findOne({
         userId: new Types.ObjectId(userId),
-        externalTransactionId,
+        $or: orClauses,
       }).lean();
       if (match) return match;
     }

@@ -6,6 +6,7 @@ import { categoryRepository } from '../repositories/CategoryRepository.js';
 import { duplicateDetectionService } from './DuplicateDetectionService.js';
 import { emailParserRegistry } from '../providers/parsers/EmailParserRegistry.js';
 import { predictCategoryName, findMatchingCategoryId } from '../utils/categoryPredictor.js';
+import { aiClassificationService } from './AIClassificationService.js';
 import { GmailProvider } from '../providers/gmail/GmailProvider.js';
 import { MockEmailProvider } from '../providers/email/MockEmailProvider.js';
 import { encrypt } from '../utils/encryption.js';
@@ -199,7 +200,7 @@ export class EmailSyncService {
         }
 
         // Parse email using registered parsers
-        const parsed = emailParserRegistry.parse(msg);
+        const parsed = await emailParserRegistry.parse(msg);
         if (!parsed) continue;
 
         // Check duplicates
@@ -231,7 +232,33 @@ export class EmailSyncService {
           continue;
         }
 
-        const suggestedCategory = parsed.categoryHint || predictCategoryName(`${parsed.merchant} ${msg.subject}`);
+        // AI-powered merchant name cleaning & category classification
+        let suggestedCategory = parsed.categoryHint || predictCategoryName(`${parsed.merchant} ${msg.subject}`);
+        let aiMerchantName = parsed.merchant;
+        let aiCategory: string | null = null;
+        
+        try {
+          const aiInput = {
+            description: `${msg.subject}\n${msg.snippet || ''}\n${msg.bodyText}`,
+            amount: parsed.amount,
+            type: parsed.type === 'income' ? 'credit' as const : 'debit' as const,
+            date: parsed.transactionDate.toISOString().split('T')[0],
+            merchant: parsed.merchant,
+            vpa: (parsed.rawDetails?.vpa as string) || parsed.upiReference,
+            sender: parsed.sender || msg.sender,
+            subject: msg.subject,
+          };
+          
+          const aiResult = await aiClassificationService.classify(aiInput);
+          if (aiResult) {
+            aiMerchantName = aiResult.name;
+            aiCategory = aiResult.category;
+            suggestedCategory = aiCategory;
+          }
+        } catch (_) {
+          // Fallback to existing parser result
+        }
+
         let categoryId: Types.ObjectId | null = null;
         try {
           const userCategories = await categoryRepository.findByUserId(userId);
@@ -246,7 +273,7 @@ export class EmailSyncService {
           emailMessageId: msg.id,
           amount: parsed.amount,
           currency: parsed.currency,
-          merchant: parsed.merchant,
+          merchant: aiMerchantName,
           transactionDate: parsed.transactionDate,
           transactionType: parsed.type,
           upiReference: parsed.upiReference,
@@ -452,7 +479,7 @@ export class EmailSyncService {
     const { unwrapped, isForwarded } = unwrapForwardedEmail(rawEmailMessage);
 
     // 5. Parse with Transaction Parser Registry
-    const parsed = emailParserRegistry.parse(unwrapped);
+    const parsed = await emailParserRegistry.parse(unwrapped);
 
     if (!parsed) {
       await emailAccountRepository.update(String(account._id), userId, {
@@ -501,7 +528,33 @@ export class EmailSyncService {
       };
     }
 
-    const suggestedCategory = parsed.categoryHint || predictCategoryName(`${parsed.merchant} ${unwrapped.subject}`);
+    // AI-powered merchant name cleaning & category classification
+    let suggestedCategory = parsed.categoryHint || predictCategoryName(`${parsed.merchant} ${unwrapped.subject}`);
+    let aiMerchantName = parsed.merchant;
+    let aiCategory: string | null = null;
+    
+    try {
+      const aiInput = {
+        description: `${unwrapped.subject}\n${unwrapped.snippet || ''}\n${unwrapped.bodyText}`,
+        amount: parsed.amount,
+        type: parsed.type === 'income' ? 'credit' as const : 'debit' as const,
+        date: parsed.transactionDate.toISOString().split('T')[0],
+        merchant: parsed.merchant,
+        vpa: (parsed.rawDetails?.vpa as string) || parsed.upiReference,
+        sender: parsed.sender || unwrapped.sender,
+        subject: unwrapped.subject,
+      };
+      
+      const aiResult = await aiClassificationService.classify(aiInput);
+      if (aiResult) {
+        aiMerchantName = aiResult.name;
+        aiCategory = aiResult.category;
+        suggestedCategory = aiCategory;
+      }
+    } catch (_) {
+      // Fallback to existing parser result
+    }
+
     let categoryId: Types.ObjectId | null = null;
     try {
       const userCategories = await categoryRepository.findByUserId(userId);
@@ -516,7 +569,7 @@ export class EmailSyncService {
       emailMessageId: unwrapped.id,
       amount: parsed.amount,
       currency: parsed.currency,
-      merchant: parsed.merchant,
+      merchant: aiMerchantName,
       transactionDate: parsed.transactionDate,
       transactionType: parsed.type,
       upiReference: parsed.upiReference,

@@ -13,6 +13,7 @@ import {
   Sparkles,
   Loader2,
   Trash2,
+  Hash,
 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal.js';
 import { Button } from '../../components/ui/Button.js';
@@ -53,6 +54,7 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
   const [result, setResult] = useState<{
     importedCount: number;
     skippedCount: number;
+    skipped?: Array<{ row: unknown; reason: string }>;
   } | null>(null);
 
   const [knownPeople, setKnownPeople] = useState<string[]>([]);
@@ -279,6 +281,8 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
         merchant: t.merchant || 'Statement Entry',
         category: t.category || undefined,
         payment_method: t.payment_method || 'upi',
+        refNo: t.refNo || undefined,
+        externalTransactionId: t.refNo || undefined,
         notes: t.notes || undefined,
       }));
 
@@ -364,6 +368,26 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
                   ` (${result.skippedCount} duplicates/existing rows skipped automatically).`}
               </p>
             </div>
+
+            {result.skipped && result.skipped.length > 0 && (
+              <div className="mt-3 p-3 bg-white/80 dark:bg-slate-900/60 rounded-xl text-left border border-slate-200 dark:border-slate-800 max-h-36 overflow-y-auto custom-scrollbar text-[11px]">
+                <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                  Skipped Duplicates:
+                </p>
+                <ul className="space-y-1 text-slate-500 dark:text-slate-400">
+                  {result.skipped.slice(0, 8).map((s: any, idx: number) => (
+                    <li key={idx} className="truncate">
+                      • {s.reason || 'Duplicate transaction'}
+                    </li>
+                  ))}
+                  {result.skipped.length > 8 && (
+                    <li className="text-slate-400 italic">...and {result.skipped.length - 8} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
+
             <div className="pt-2 flex items-center justify-center gap-3">
               <Button
                 size="sm"
@@ -531,6 +555,7 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
                     </th>
                     <th className="p-3">Date</th>
                     <th className="p-3">Merchant / Narration</th>
+                    <th className="p-3">Ref.No</th>
                     <th className="p-3">Category</th>
                     <th className="p-3">Type</th>
                     <th className="p-3 text-right">Amount</th>
@@ -574,6 +599,21 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
                           <p className="text-[10px] text-slate-400 truncate max-w-[200px]" title={tx.notes}>
                             {tx.notes}
                           </p>
+                        )}
+                      </td>
+
+                      {/* Ref.No */}
+                      <td className="p-3 font-mono text-[11px] whitespace-nowrap">
+                        {tx.refNo ? (
+                          <span
+                            className="inline-flex items-center gap-1 font-mono text-[11px] text-brand-700 dark:text-brand-300 bg-brand-500/10 px-2 py-0.5 rounded border border-brand-500/20"
+                            title={`Reference: ${tx.refNo}`}
+                          >
+                            <Hash className="w-2.5 h-2.5 text-brand-500" />
+                            {tx.refNo}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-600 text-xs">-</span>
                         )}
                       </td>
 

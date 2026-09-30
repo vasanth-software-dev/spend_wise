@@ -71,7 +71,7 @@ export class EmailParserRegistry {
     this.parsers.push(parser);
   }
 
-  parse(email: EmailMessage): ParsedTransaction | null {
+  parse(email: EmailMessage): Promise<ParsedTransaction | null> {
     // Drop promotional, marketing, job alerts, and travel booking confirmations
     if (isUnwantedEmail(email)) {
       return null;
@@ -82,7 +82,7 @@ export class EmailParserRegistry {
     for (const parser of this.parsers) {
       if (parser.canParse(email)) {
         try {
-          const result = parser.parse(email);
+          const result = await parser.parse(email);
           if (result) {
             // Keep the result with the highest confidence score
             if (!bestResult || result.confidenceScore > bestResult.confidenceScore) {

@@ -1,5 +1,6 @@
 import { EmailMessage, ParsedTransaction, TransactionEmailParser, PaymentMethod } from '../../types/index.js';
 import { predictCategoryName } from '../../utils/categoryPredictor.js';
+import { aiClassificationService } from '../../services/AIClassificationService.js';
 
 function formatMerchantName(raw: string): string {
   const cleaned = raw
@@ -32,7 +33,7 @@ export class BankParser implements TransactionEmailParser {
     return bankKeywords.some((kw) => text.includes(kw));
   }
 
-  parse(email: EmailMessage): ParsedTransaction | null {
+  parse(email: EmailMessage): Promise<ParsedTransaction | null> {
     const content = `${email.subject}\n${email.snippet || ''}\n${email.bodyText}`;
 
     // Match amount
@@ -165,13 +166,37 @@ export class BankParser implements TransactionEmailParser {
     if (merchant !== 'Bank Transaction') confidenceScore += 2;
     confidenceScore = Math.min(99, confidenceScore);
 
-    const categoryHint = predictCategoryName(content, { merchant, vpa: extractedVpa });
+    let categoryHint = predictCategoryName(content, { merchant, vpa: extractedVpa });
+    let aiMerchantName = merchant;
+    let aiCategory: string | null = null;
+
+    try {
+      const aiInput = {
+        description: content,
+        amount,
+        type: type === 'income' ? 'credit' as const : 'debit' as const,
+        date: transactionDate.toISOString().split('T')[0],
+        merchant,
+        vpa: extractedVpa,
+        sender: email.sender,
+        subject: email.subject,
+      };
+
+      const aiResult = await aiClassificationService.classify(aiInput);
+      if (aiResult) {
+        aiMerchantName = aiResult.name;
+        aiCategory = aiResult.category;
+        categoryHint = aiCategory;
+      }
+    } catch (_) {
+      // Fallback to existing prediction
+    }
 
     return {
       amount,
       currency: 'INR',
       type,
-      merchant,
+      merchant: aiMerchantName,
       transactionDate,
       upiReference,
       bankReference,
@@ -180,7 +205,7 @@ export class BankParser implements TransactionEmailParser {
       notes: `Bank Alert: ${email.subject}`,
       sender: email.sender,
       categoryHint,
-      rawDetails: { subject: email.subject, messageId: email.id, categoryHint, vpa: extractedVpa },
+      rawDetails: { subject: email.subject, messageId: email.id, categoryHint, vpa: extractedVpa, aiCategory, aiMerchant: aiMerchantName },
     };
   }
 }

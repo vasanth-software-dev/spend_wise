@@ -20,16 +20,16 @@ export class GenericUPIParser implements TransactionEmailParser {
     );
   }
 
-  parse(email: EmailMessage): ParsedTransaction | null {
+  parse(email: EmailMessage): Promise<ParsedTransaction | null> {
     const content = `${email.subject}\n${email.snippet || ''}\n${email.bodyText}`;
 
     // Regex for amount: ₹ 500, Rs. 500, INR 500
     const amountRegex = /(?:₹|Rs\.?|INR)\s*([\d,]+(?:\.\d{1,2})?)/i;
     const amountMatch = content.match(amountRegex);
-    if (!amountMatch) return null;
+    if (!amountMatch) return Promise.resolve(null);
 
     const amount = parseFloat(amountMatch[1].replace(/,/g, ''));
-    if (isNaN(amount) || amount <= 0) return null;
+    if (isNaN(amount) || amount <= 0) return Promise.resolve(null);
 
     let upiReference: string | undefined;
     const refMatch = content.match(/(?:UPI Ref|UTR|Ref No|Txn ID)[:\s]+([A-Za-z0-9]{8,22})/i);
@@ -40,12 +40,12 @@ export class GenericUPIParser implements TransactionEmailParser {
     // Ensure this is an actual transaction statement, not promotional text
     const isActualTxn = /(?:paid|debited|credited|received|transferred|withdrawn|successful\s+payment|payment\s+of|payment\s+successful|txn\s+id|upi\s+ref|utr)/i.test(content);
     if (!isActualTxn && !upiReference) {
-      return null;
+      return Promise.resolve(null);
     }
 
     // Reject promotional amount matches like "Up to ₹2 Lakh", "₹1,000 Off"
     if (/(?:up to|upto|flat|save|off\*?|discount)\s*(?:₹|Rs\.?|INR)/i.test(email.subject) && !upiReference) {
-      return null;
+      return Promise.resolve(null);
     }
 
     const isIncome = /(?:received|credited|cashback|refund)\b/i.test(content);
@@ -59,7 +59,7 @@ export class GenericUPIParser implements TransactionEmailParser {
 
     const confidenceScore = upiReference ? 75 : 60;
 
-    return {
+    return Promise.resolve({
       amount,
       currency: 'INR',
       type,
@@ -71,6 +71,6 @@ export class GenericUPIParser implements TransactionEmailParser {
       notes: `Generic UPI: ${email.subject}`,
       sender: email.sender,
       rawDetails: { subject: email.subject, messageId: email.id },
-    };
+    });
   }
 }

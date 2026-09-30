@@ -92,9 +92,9 @@ export function predictCategoryName(
   rawMerchant = rawMerchant.replace(/^[/.\-]?\d{1,2}[/.\-]\d{1,2}([/.\-]\d{2,4})?\s*/, '').replace(/^\d{1,2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{0,4}\s*/i, '');
   rawText = rawText.replace(/^[/.\-]?\d{1,2}[/.\-]\d{1,2}([/.\-]\d{2,4})?\s*/, '').replace(/^\d{1,2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{0,4}\s*/i, '');
 
-  // Strip prefixes like UPI-S, UPI-
-  rawMerchant = rawMerchant.replace(/^UPI[-\s:/_]*(S|C|CR|DR|REV)?[-\s:/_]*/i, '');
-  rawText = rawText.replace(/^UPI[-\s:/_]*(S|C|CR|DR|REV)?[-\s:/_]*/i, '');
+  // Strip prefixes like UPI- (preserve 'S' so names like 'UPI-SUDHA' keep 'SUDHA')
+  rawMerchant = rawMerchant.replace(/^UPI[-\s:/_]*(CR|DR|REV)?[-\s:/_]*/i, '');
+  rawText = rawText.replace(/^UPI[-\s:/_]*(CR|DR|REV)?[-\s:/_]*/i, '');
 
   // Strip single-letter series prefix before name (e.g. "S SUDHA" -> "SUDHA")
   rawMerchant = rawMerchant.replace(/^[A-Za-z]\s+(?=[A-Za-z]{3,})/i, '');
@@ -286,6 +286,42 @@ export function findMatchingCategoryId(
   if (!predictedName || predictedName === 'Other') {
     const otherCat = categories.find((c) => /other/i.test(c.name));
     return otherCat ? String(otherCat._id) : null;
+  }
+
+  // Map AI categories to existing system categories
+  const aiCategoryMap: Record<string, string[]> = {
+    'Travel / Transport': ['Transport', 'Travel'],
+    'Medical / Pharmacy': ['Health & Medical'],
+    'Bills & Utilities': ['Bills & Utilities'],
+    'Person-to-Person': ['Friends & Family'],
+    'Salary / Income': ['Salary'],
+    'Cash Withdrawal': ['ATM & Cash'],
+    'Wallet / Transfer': ['Friends & Family', 'Other'],
+    'Software / Digital Services': ['Subscriptions', 'Shopping'],
+    'Banking / Fees': ['Bills & Utilities', 'Other'],
+    'Uncategorized': ['Other'],
+    'Food & Dining': ['Food & Dining'],
+    'Groceries': ['Groceries'],
+    'Shopping': ['Shopping'],
+    'Rent': ['Rent'],
+    'Education': ['Education'],
+    'Entertainment': ['Entertainment'],
+    'Subscriptions': ['Subscriptions'],
+    'Personal Care': ['Salon & Grooming', 'Health & Medical'],
+    'Electronics': ['Shopping'],
+    'Fuel': ['Fuel'],
+    'Insurance': ['Bills & Utilities', 'Investments'],
+    'Investments': ['Investments'],
+    'Refund': ['Other'],
+  };
+
+  // Try AI category mapping first
+  const mappedCategories = aiCategoryMap[predictedName];
+  if (mappedCategories) {
+    for (const mappedName of mappedCategories) {
+      const found = categories.find((c) => c.name.toLowerCase() === mappedName.toLowerCase());
+      if (found) return String(found._id);
+    }
   }
 
   // Exact or fuzzy match on category name

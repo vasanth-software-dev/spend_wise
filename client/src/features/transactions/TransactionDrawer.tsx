@@ -218,11 +218,11 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
               </div>
             )}
 
-            {transaction.externalTransactionId && (
+            {(transaction.refNo || transaction.externalTransactionId) && (
               <div className="flex items-center justify-between text-xs sm:text-sm">
-                <span className="text-slate-500">Reference / UTR</span>
-                <span className="font-mono text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 px-2 py-1 rounded border border-slate-200 dark:border-slate-700">
-                  {transaction.externalTransactionId}
+                <span className="text-slate-500 font-medium">Ref.No</span>
+                <span className="font-mono text-xs text-brand-700 dark:text-brand-300 bg-brand-500/10 px-2 py-1 rounded-lg border border-brand-500/20 font-semibold select-all">
+                  {transaction.refNo || transaction.externalTransactionId}
                 </span>
               </div>
             )}

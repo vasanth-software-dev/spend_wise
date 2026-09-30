@@ -17,6 +17,7 @@ export interface CreateTransactionDTO {
   source?: TransactionSource;
   sourceAccountId?: string | null;
   externalTransactionId?: string;
+  refNo?: string;
   transactionDate?: Date | string;
   notes?: string;
   isRecurring?: boolean;
@@ -33,6 +34,7 @@ export class TransactionService {
     }
 
     const txDate = data.transactionDate ? new Date(data.transactionDate) : new Date();
+    const refNo = data.refNo?.trim() || data.externalTransactionId?.trim() || undefined;
 
     // Check duplicate
     const dupCheck = await duplicateDetectionService.checkDuplicate(userId, {
@@ -41,7 +43,9 @@ export class TransactionService {
       type: data.type === 'income' ? 'income' : 'expense',
       merchant: data.merchant,
       transactionDate: txDate,
-      upiReference: data.externalTransactionId,
+      upiReference: refNo,
+      bankReference: refNo,
+      refNo: refNo,
       paymentMethod: data.paymentMethod,
       confidenceScore: 100,
     });
@@ -61,7 +65,8 @@ export class TransactionService {
       paymentMethod: data.paymentMethod,
       source: data.source || 'manual',
       sourceAccountId: data.sourceAccountId ? new Types.ObjectId(data.sourceAccountId) : null,
-      externalTransactionId: data.externalTransactionId?.trim() || undefined,
+      externalTransactionId: refNo,
+      refNo: refNo,
       transactionDate: txDate,
       notes: data.notes?.trim(),
       status: 'confirmed',
@@ -92,6 +97,11 @@ export class TransactionService {
     if (updateData.notes !== undefined) payload.notes = updateData.notes?.trim();
     if (updateData.paymentMethod) payload.paymentMethod = updateData.paymentMethod;
     if (updateData.transactionDate) payload.transactionDate = new Date(updateData.transactionDate);
+    if (updateData.refNo !== undefined || updateData.externalTransactionId !== undefined) {
+      const ref = (updateData.refNo ?? updateData.externalTransactionId)?.trim() || undefined;
+      payload.refNo = ref;
+      payload.externalTransactionId = ref;
+    }
     if (updateData.categoryId !== undefined) {
       payload.categoryId = updateData.categoryId ? new Types.ObjectId(updateData.categoryId) : null;
     }
@@ -185,6 +195,8 @@ export class TransactionService {
       category?: string;
       merchant: string;
       payment_method?: string;
+      refNo?: string;
+      externalTransactionId?: string;
       notes?: string;
     }>
   ) {
@@ -243,6 +255,8 @@ export class TransactionService {
           ? (paymentMethodStr as PaymentMethod)
           : 'upi';
 
+        const refNo = (row.refNo || row.externalTransactionId || '').trim() || undefined;
+
         // Check duplicate
         const dup = await duplicateDetectionService.checkDuplicate(userId, {
           amount,
@@ -251,6 +265,9 @@ export class TransactionService {
           merchant,
           transactionDate: date,
           paymentMethod,
+          upiReference: refNo,
+          bankReference: refNo,
+          refNo: refNo,
           confidenceScore: 100,
         });
 
@@ -287,6 +304,8 @@ export class TransactionService {
           merchant,
           paymentMethod,
           source: 'import',
+          externalTransactionId: refNo,
+          refNo: refNo,
           transactionDate: date,
           notes: row.notes?.trim(),
           status: 'confirmed',
@@ -309,7 +328,7 @@ export class TransactionService {
   // Export transactions to CSV format
   async exportTransactionsToCSV(params: TransactionFilterParams): Promise<string> {
     const result = await transactionRepository.findWithFilters({ ...params, limit: 10000 });
-    const headers = ['Date', 'Type', 'Amount', 'Currency', 'Category', 'Merchant', 'Payment Method', 'Source', 'Reference ID', 'Notes'];
+    const headers = ['Date', 'Type', 'Amount', 'Currency', 'Category', 'Merchant', 'Payment Method', 'Source', 'Ref.No', 'Notes'];
 
     const lines = [headers.join(',')];
 
@@ -324,7 +343,7 @@ export class TransactionService {
         `"${tx.merchant.replace(/"/g, '""')}"`,
         tx.paymentMethod,
         tx.source,
-        `"${(tx.externalTransactionId || '').replace(/"/g, '""')}"`,
+        `"${(tx.refNo || tx.externalTransactionId || '').replace(/"/g, '""')}"`,
         `"${(tx.notes || '').replace(/"/g, '""')}"`,
       ];
       lines.push(line.join(','));

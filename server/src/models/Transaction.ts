@@ -28,6 +28,7 @@ const transactionSchema = new Schema<ITransaction>(
     },
     sourceAccountId: { type: Schema.Types.ObjectId, ref: 'EmailAccount', default: null },
     externalTransactionId: { type: String, trim: true, default: null },
+    refNo: { type: String, trim: true, default: null },
     transactionDate: { type: Date, required: true, default: Date.now },
     notes: { type: String, trim: true },
     status: {
@@ -53,12 +54,23 @@ transactionSchema.virtual('person_id').get(function () {
   return this.personId;
 });
 
+// Pre-save hook to keep refNo and externalTransactionId in sync
+transactionSchema.pre('save', function (next) {
+  if (this.refNo && !this.externalTransactionId) {
+    this.externalTransactionId = this.refNo;
+  } else if (this.externalTransactionId && !this.refNo) {
+    this.refNo = this.externalTransactionId;
+  }
+  next();
+});
+
 // Indexed queries
 transactionSchema.index({ userId: 1, transactionDate: -1 });
 transactionSchema.index({ userId: 1, categoryId: 1 });
 transactionSchema.index({ userId: 1, source: 1 });
 transactionSchema.index({ userId: 1, status: 1 });
 transactionSchema.index({ userId: 1, externalTransactionId: 1 });
+transactionSchema.index({ userId: 1, refNo: 1 });
 transactionSchema.index({ userId: 1, personId: 1, transactionDate: -1 });
 transactionSchema.index({ userId: 1, merchant: 'text', description: 'text', notes: 'text' });
 

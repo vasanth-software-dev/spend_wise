@@ -39,6 +39,7 @@ export interface Transaction {
   source: TransactionSource;
   sourceAccountId?: { _id: string; email: string; provider: string } | string | null;
   externalTransactionId?: string;
+  refNo?: string;
   transactionDate: string;
   notes?: string;
   status: TransactionStatus;

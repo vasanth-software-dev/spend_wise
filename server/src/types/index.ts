@@ -87,6 +87,7 @@ export interface ITransaction {
   source: TransactionSource;
   sourceAccountId?: Types.ObjectId | string | null;
   externalTransactionId?: string;
+  refNo?: string;
   transactionDate: Date;
   notes?: string;
   status: TransactionStatus;
@@ -236,6 +237,7 @@ export interface ParsedTransaction {
   transactionDate: Date;
   upiReference?: string;
   bankReference?: string;
+  refNo?: string;
   paymentMethod: PaymentMethod;
   confidenceScore: number; // 0 to 100
   notes?: string;
@@ -247,7 +249,7 @@ export interface ParsedTransaction {
 export interface TransactionEmailParser {
   name: string;
   canParse(email: EmailMessage): boolean;
-  parse(email: EmailMessage): ParsedTransaction | null;
+  parse(email: EmailMessage): Promise<ParsedTransaction | null>;
 }
 
 export interface SyncOptions {

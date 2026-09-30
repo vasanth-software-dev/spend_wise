@@ -23,6 +23,8 @@ const envSchema = z.object({
   GOOGLE_AUTH_REDIRECT_URI: z.string().default('http://localhost:8080/api/v1/auth/google/callback'),
   INBOUND_FORWARDING_DOMAIN: z.string().default('sync.spendwise.local'),
   INBOUND_WEBHOOK_SECRET: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  AI_API_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -76,4 +76,36 @@ describe('DuplicateDetectionService', () => {
 
     expect(result.isDuplicate).toBe(false);
   });
+
+  it('detects duplicate when imported transaction with leading zeroes (0000130408174425) matches email reference (130408174425)', async () => {
+    vi.spyOn(detectedTransactionRepository, 'findByMessageId').mockResolvedValueOnce(null);
+    vi.spyOn(transactionRepository, 'findPotentialDuplicate').mockImplementationOnce(async (_userId, criteria) => {
+      // In real DB, findPotentialDuplicate uses buildRefNoQueryPattern which matches 130408174425 with 0000130408174425
+      if (criteria.refNo === '0000130408174425' || criteria.externalTransactionId === '0000130408174425') {
+        return {
+          _id: 'tx-email-130408174425',
+          amount: 1500,
+          merchant: 'Zomato',
+          externalTransactionId: '130408174425',
+          refNo: '130408174425',
+        } as any;
+      }
+      return null;
+    });
+
+    const result = await dupService.checkDuplicate('user-1', {
+      amount: 1500,
+      currency: 'INR',
+      merchant: 'Zomato',
+      transactionDate: new Date(),
+      paymentMethod: 'upi',
+      refNo: '0000130408174425',
+      confidenceScore: 100,
+      type: 'expense',
+    });
+
+    expect(result.isDuplicate).toBe(true);
+    expect(result.duplicateType).toBe('upi_reference');
+    expect(result.matchedTransactionId).toBe('tx-email-130408174425');
+  });
 });

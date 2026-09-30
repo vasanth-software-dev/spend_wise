@@ -35,6 +35,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [categoryId, setCategoryId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [refNo, setRefNo] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +52,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             : (transaction.categoryId as string) || '';
         setCategoryId(catId);
         setPaymentMethod(transaction.paymentMethod || 'upi');
+        setRefNo(transaction.refNo || transaction.externalTransactionId || '');
         setDate(
           transaction.transactionDate
             ? new Date(transaction.transactionDate).toISOString().split('T')[0]
@@ -62,6 +64,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setType(defaultType);
         setAmount('');
         setMerchant('');
+        setRefNo('');
         setNotes('');
         setError(null);
         setDate(new Date().toISOString().split('T')[0]);
@@ -89,6 +92,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     setError(null);
 
     try {
+      const trimmedRef = refNo.trim() || undefined;
+
       if (isEditing && transaction) {
         const res = await dispatch(
           updateTransactionThunk({
@@ -100,6 +105,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               categoryId: categoryId || null,
               merchant: merchant.trim(),
               paymentMethod,
+              refNo: trimmedRef,
+              externalTransactionId: trimmedRef,
               transactionDate: new Date(date),
               notes: notes.trim() || undefined,
             },
@@ -119,6 +126,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             categoryId: categoryId || undefined,
             merchant: merchant.trim(),
             paymentMethod,
+            refNo: trimmedRef,
+            externalTransactionId: trimmedRef,
             transactionDate: new Date(date),
             notes: notes.trim() || undefined,
             source: 'manual',
@@ -317,6 +326,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             />
           </div>
         </div>
+
+        {/* Ref.No / Reference ID */}
+        <Input
+          label="Ref.No / Reference ID (Optional)"
+          placeholder="e.g. 130408174425 or 0000130408174425"
+          value={refNo}
+          onChange={(e) => setRefNo(e.target.value)}
+        />
 
         {/* Notes */}
         <Input

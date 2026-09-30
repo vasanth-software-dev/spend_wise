@@ -8,15 +8,15 @@ export class PaytmParser implements TransactionEmailParser {
     return text.includes('paytm') || text.includes('no-reply@paytm.com');
   }
 
-  parse(email: EmailMessage): ParsedTransaction | null {
+  parse(email: EmailMessage): Promise<ParsedTransaction | null> {
     const content = `${email.subject}\n${email.snippet || ''}\n${email.bodyText}`;
 
     const amountRegex = /(?:₹|Rs\.?|INR)\s*([\d,]+(?:\.\d{1,2})?)/i;
     const amountMatch = content.match(amountRegex);
-    if (!amountMatch) return null;
+    if (!amountMatch) return Promise.resolve(null);
 
     const amount = parseFloat(amountMatch[1].replace(/,/g, ''));
-    if (isNaN(amount) || amount <= 0) return null;
+    if (isNaN(amount) || amount <= 0) return Promise.resolve(null);
 
     const isIncome = /(?:received|cashback|refund|credited)\b/i.test(email.subject) || /(?:cashback credited|money added)\b/i.test(content);
     const type: 'expense' | 'income' = isIncome ? 'income' : 'expense';
@@ -43,7 +43,7 @@ export class PaytmParser implements TransactionEmailParser {
     if (merchant !== 'Paytm Merchant') confidenceScore += 5;
     confidenceScore = Math.min(99, confidenceScore);
 
-    return {
+    return Promise.resolve({
       amount,
       currency: 'INR',
       type,
@@ -55,6 +55,6 @@ export class PaytmParser implements TransactionEmailParser {
       notes: `Parsed from Paytm notification (${email.subject})`,
       sender: email.sender,
       rawDetails: { subject: email.subject, messageId: email.id },
-    };
+    });
   }
 }

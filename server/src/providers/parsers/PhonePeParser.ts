@@ -8,16 +8,16 @@ export class PhonePeParser implements TransactionEmailParser {
     return text.includes('phonepe') || text.includes('noreply@phonepe.com');
   }
 
-  parse(email: EmailMessage): ParsedTransaction | null {
+  parse(email: EmailMessage): Promise<ParsedTransaction | null> {
     const content = `${email.subject}\n${email.snippet || ''}\n${email.bodyText}`;
 
     // Amount match
     const amountRegex = /(?:₹|Rs\.?|INR)\s*([\d,]+(?:\.\d{1,2})?)/i;
     const amountMatch = content.match(amountRegex);
-    if (!amountMatch) return null;
+    if (!amountMatch) return Promise.resolve(null);
 
     const amount = parseFloat(amountMatch[1].replace(/,/g, ''));
-    if (isNaN(amount) || amount <= 0) return null;
+    if (isNaN(amount) || amount <= 0) return Promise.resolve(null);
 
     const isIncome = /(?:received|credited|refund)\b/i.test(email.subject) || /(?:received from|credited with)\b/i.test(content);
     const type: 'expense' | 'income' = isIncome ? 'income' : 'expense';
@@ -51,7 +51,7 @@ export class PhonePeParser implements TransactionEmailParser {
     if (merchant !== 'Unknown Merchant') confidenceScore += 4;
     confidenceScore = Math.min(99, confidenceScore);
 
-    return {
+    return Promise.resolve({
       amount,
       currency: 'INR',
       type,
@@ -63,6 +63,6 @@ export class PhonePeParser implements TransactionEmailParser {
       notes: `Parsed from PhonePe notification (${email.subject})`,
       sender: email.sender,
       rawDetails: { subject: email.subject, messageId: email.id },
-    };
+    });
   }
 }

@@ -13,16 +13,16 @@ export class GPayParser implements TransactionEmailParser {
     );
   }
 
-  parse(email: EmailMessage): ParsedTransaction | null {
+  parse(email: EmailMessage): Promise<ParsedTransaction | null> {
     const content = `${email.subject}\n${email.snippet || ''}\n${email.bodyText}`;
 
     // Regex for amount: ₹ 500, Rs. 500, INR 500, INR 1,299.50
     const amountRegex = /(?:₹|Rs\.?|INR)\s*([\d,]+(?:\.\d{1,2})?)/i;
     const amountMatch = content.match(amountRegex);
-    if (!amountMatch) return null;
+    if (!amountMatch) return Promise.resolve(null);
 
     const amount = parseFloat(amountMatch[1].replace(/,/g, ''));
-    if (isNaN(amount) || amount <= 0) return null;
+    if (isNaN(amount) || amount <= 0) return Promise.resolve(null);
 
     // Detect type: paid/debited = expense, received/credited = income
     const isIncome = /(?:received|credited to|got)\b/i.test(email.subject) || /(?:received|credited)\b/i.test(content);
@@ -55,7 +55,7 @@ export class GPayParser implements TransactionEmailParser {
     if (content.toLowerCase().includes('google pay')) confidenceScore += 4;
     confidenceScore = Math.min(99, confidenceScore);
 
-    return {
+    return Promise.resolve({
       amount,
       currency: 'INR',
       type,
@@ -67,6 +67,6 @@ export class GPayParser implements TransactionEmailParser {
       notes: `Parsed from Google Pay notification (${email.subject})`,
       sender: email.sender,
       rawDetails: { subject: email.subject, messageId: email.id },
-    };
+    });
   }
 }

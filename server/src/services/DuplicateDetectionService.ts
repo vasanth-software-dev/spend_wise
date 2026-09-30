@@ -32,14 +32,16 @@ export class DuplicateDetectionService {
       }
     }
 
-    // 2. Check by UPI Reference (strongest uniqueness guarantee in Indian payments)
-    if (parsed.upiReference) {
+    // 2. Check by Reference / UPI Reference (strongest uniqueness guarantee in Indian payments)
+    const refNoToCheck = parsed.refNo || parsed.upiReference;
+    if (refNoToCheck) {
       // Check in confirmed transactions
       const existingTx = await transactionRepository.findPotentialDuplicate(userId, {
         amount: parsed.amount,
         merchant: parsed.merchant,
         transactionDate: parsed.transactionDate,
-        externalTransactionId: parsed.upiReference,
+        externalTransactionId: refNoToCheck,
+        refNo: refNoToCheck,
       });
 
       if (existingTx) {
@@ -47,14 +49,14 @@ export class DuplicateDetectionService {
           isDuplicate: true,
           duplicateType: 'upi_reference',
           matchedTransactionId: String(existingTx._id),
-          reason: `Matching UPI Reference ${parsed.upiReference} already confirmed`,
+          reason: `Matching Reference ${refNoToCheck} already confirmed`,
         };
       }
 
       // Check in detected transactions
       const existingDetected = await detectedTransactionRepository.findPotentialDuplicate(
         userId,
-        parsed.upiReference
+        refNoToCheck
       );
 
       if (existingDetected) {
@@ -62,7 +64,7 @@ export class DuplicateDetectionService {
           isDuplicate: true,
           duplicateType: 'upi_reference',
           matchedDetectedId: String(existingDetected._id),
-          reason: `Matching UPI Reference ${parsed.upiReference} already detected in inbox`,
+          reason: `Matching Reference ${refNoToCheck} already detected in inbox`,
         };
       }
     }
