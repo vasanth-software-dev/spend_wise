@@ -12,7 +12,7 @@ export const CATEGORY_RULES: CategoryRule[] = [
   },
   {
     name: 'Food & Dining',
-    pattern: /swiggy|zomato|eats|starbucks|mcdonald|kfc|burger|pizza|domino|subway|restaurant|cafe|bakery|dining|chaayos|chai|haldiram|food|dhaba|bistro|snacks|tiffin|sweets|juice|tea|coffee|mess|canteen|hotel|bites|kitchen|caterers|fast\s*food|shawarma|ice\s*cream|parlour|biryani|darshini/i,
+    pattern: /swiggy|zomato|eats|starbucks|mcdonald|kfc|burger|pizza|domino|subway|restaurant|cafe|bakery|dining|chaayos|chai|haldiram|food|dhaba|bistro|snacks|tiffin|sweets|juice|tea|coffee|mess|canteen|hotel|bites|kitchen|caterers|fast\s*food|shawarma|ice\s*cream|parlour|biryani|biryan|biriyani|darshini|stall|stalls|chat|chaat|dosa|dosai|s\s*d\s*o\s*sa|dish|cuisine/i,
   },
   {
     name: 'Groceries',
@@ -20,11 +20,11 @@ export const CATEGORY_RULES: CategoryRule[] = [
   },
   {
     name: 'Shopping',
-    pattern: /amazon|flipkart|myntra|ajio|meesho|nykaa|zara|h&m|uniqlo|shopping|retail|cloth|dress|croma|reliancedigital|electronics|fashion/i,
+    pattern: /amazon|flipkart|myntra|ajio|meesho|nykaa|zara|h&m|uniqlo|shopping|retail|cloth|dress|croma|reliancedigital|electronics?|electricals?|hardware|appliances?|electric\s*store|fashion|store|stores|agn\s*store/i,
   },
   {
     name: 'Transport',
-    pattern: /uber|ola|rapido|metro|irctc|redbus|rail|transit|auto|taxi|cab|bus|train/i,
+    pattern: /uber|ola|rapido|metro|irctc|redbus|abhibus|zingbus|travels|rail|transit|auto|taxi|cab|bus|train|ticketing|transportation/i,
   },
   {
     name: 'Travel',
@@ -32,11 +32,11 @@ export const CATEGORY_RULES: CategoryRule[] = [
   },
   {
     name: 'Fuel',
-    pattern: /fuel|petrol|diesel|cng|hpcl|bpcl|iocl|shell|gas\s*station/i,
+    pattern: /fuel|petrol|diesel|cng|hpcl|bpcl|iocl|shell|gas\s*station|petrol\s*bunk|bunk/i,
   },
   {
     name: 'Bills & Utilities',
-    pattern: /electric|tneb|bescom|cesc|tata\s*power|airtel|jio|vi\b|vodafone|broadband|water|gas|utility|bill|recharge|dth|postpaid/i,
+    pattern: /electric|tneb|bescom|cesc|tata\s*power|airtel|jio|vi\b|vodafone|broadband|water|gas|utility|bill|recharge|dth|postpaid|godaddy|domain|hosting|web\s*hosting|registrar|cloudflare|aws|payzapp|wallet/i,
   },
   {
     name: 'Subscriptions',
@@ -51,8 +51,24 @@ export const CATEGORY_RULES: CategoryRule[] = [
     pattern: /rent|landlord|maintenance|society|housing|apartment|pg\b|hostel/i,
   },
   {
+    name: 'Salon & Grooming',
+    pattern: /salon|saloon|parlour|parlor|barber|spa|haircut|hair|grooming|beauty|naturals|enrich|green\s*trends|jawed\s*habib|best\s*look|looks|look|facial|waxing|manicure|pedicure|massage/i,
+  },
+  {
+    name: 'ATM & Cash',
+    pattern: /atm|atm\s*wdl|atm\s*withdrawal|cash\s*wdl|cash\s*withdrawal|nfs\s*atm|matm|self\s*wdl|cash\s*deposit|atm\s*cash/i,
+  },
+  {
+    name: 'Entertainment',
+    pattern: /cinema|cinemas|theatre|theatres|theater|theaters|multiplex|screen|screens|movie|movies|film|films|imax|ticket|tickets|bookmyshow|pvr|inox|cinepolis|carnival|gaming|steam|playstation|xbox|amusement|concert|event|show|shows|bowling|fun\s*city|wonderla/i,
+  },
+  {
+    name: 'Education',
+    pattern: /school|college|university|tuition|udemy|coursera|unacademy|byju|coaching|academy|course|fees|exam\s*fee|bookstore|stationery|class/i,
+  },
+  {
     name: 'Salary',
-    pattern: /salary|payroll|stipend|bonus|pension/i,
+    pattern: /\b(salary|payroll|stipend|wages|bonus|pension|remuneration|monthly\s*pay|a2aint|a2a|elito|innovations)\b/i,
   },
 ];
 
@@ -68,37 +84,196 @@ export function predictCategoryName(
   text: string,
   options?: CategoryPredictOptions
 ): string {
-  const combined = `${options?.merchant || ''} ${options?.vpa || ''} ${text || ''}`.trim();
+  // Strip reference/cheque/account numbers from inputs
+  let rawMerchant = (options?.merchant || '').replace(/\b0+\d{4,}\b/g, '').replace(/\b\d{7,}\b/g, '').trim();
+  let rawText = (text || '').replace(/\b0+\d{4,}\b/g, '').replace(/\b\d{7,}\b/g, '').trim();
+
+  // Strip leading date prefixes (e.g. /09/26, 12SEP2, 12SEP24)
+  rawMerchant = rawMerchant.replace(/^[/.\-]?\d{1,2}[/.\-]\d{1,2}([/.\-]\d{2,4})?\s*/, '').replace(/^\d{1,2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{0,4}\s*/i, '');
+  rawText = rawText.replace(/^[/.\-]?\d{1,2}[/.\-]\d{1,2}([/.\-]\d{2,4})?\s*/, '').replace(/^\d{1,2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{0,4}\s*/i, '');
+
+  // Strip prefixes like UPI-S, UPI-
+  rawMerchant = rawMerchant.replace(/^UPI[-\s:/_]*(S|C|CR|DR|REV)?[-\s:/_]*/i, '');
+  rawText = rawText.replace(/^UPI[-\s:/_]*(S|C|CR|DR|REV)?[-\s:/_]*/i, '');
+
+  // Strip single-letter series prefix before name (e.g. "S SUDHA" -> "SUDHA")
+  rawMerchant = rawMerchant.replace(/^[A-Za-z]\s+(?=[A-Za-z]{3,})/i, '');
+  rawMerchant = rawMerchant.replace(/\bPAYZAPP(?:WALLET|\s*WALLET)?\b/gi, 'PAYZAPP WALLET');
+  rawText = rawText.replace(/\bPAYZAPP(?:WALLET|\s*WALLET)?\b/gi, 'PAYZAPP WALLET');
+
+  // Strip concatenated business roots like ELECTRICALSHAP / ELECTRICALSHAR -> ELECTRICAL
+  const rootReplacements: Array<{ pattern: RegExp; fix?: string }> = [
+    { pattern: /\b(ELECTRICAL)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(ELECTRONIC)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(ENTERPRISE)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(STORE)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(TRADER)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(HARDWARE)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(PROVISION)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(TEXTILE)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(GARMENT)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(BAKERY|BAKERIES)[A-Za-z0-9]*\b/gi, fix: 'BAKERY' },
+    { pattern: /\b(PHARMACY|PHARMACIES)[A-Za-z0-9]*\b/gi, fix: 'PHARMACY' },
+    { pattern: /\b(SUPERMARKET)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(MART)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(HOTEL)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(RESTAURANT)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(HOSPITAL)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(CLINIC)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(CINEMA)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(THEAT(?:RE|ER))[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(SALON)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(JEWELLER)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(AUTOMOBILE)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(MOTOR)[A-Za-z0-9]*\b/gi },
+    { pattern: /\b(SWEET)[A-Za-z0-9]*\b/gi, fix: 'SWEETS' },
+    { pattern: /\b(BAZAAR|BAZAR)[A-Za-z0-9]*\b/gi },
+  ];
+  for (const { pattern, fix } of rootReplacements) {
+    rawMerchant = rawMerchant.replace(pattern, (_m, p1) => fix || (p1 ? p1.toUpperCase() : ''));
+    rawText = rawText.replace(pattern, (_m, p1) => fix || (p1 ? p1.toUpperCase() : ''));
+  }
+
+  const combined = `${rawMerchant} ${options?.vpa || ''} ${rawText}`.trim();
   if (!combined) return 'Other';
 
-  const merchant = (options?.merchant || '').trim();
+  const merchant = rawMerchant;
   const vpa = (options?.vpa || '').trim();
 
-  // 1. Check commercial/business rules first
+  // 1. Strict Salary check: ONLY if explicitly mentions salary/payroll/wages or corporate credit
+  const hasSalaryKeywords = /\b(salary|payroll|stipend|wages|remuneration|pension|monthly\s*pay|a2aint|elito\s*innovations|innovations\s*private)\b/i.test(combined);
+
+  // 2. Check commercial/business rules first
   for (const rule of CATEGORY_RULES) {
+    if (rule.name === 'Salary') {
+      if (hasSalaryKeywords) return 'Salary';
+      continue;
+    }
     if (rule.pattern.test(merchant || combined)) {
       return rule.name;
     }
   }
 
-  // 2. Check Friend / Personal Peer-to-Peer Transfer heuristics
-  // Patterns:
-  // - VPA is a 10-digit mobile number (e.g., 8489906290@yapl, 9876543210@paytm)
-  // - Person's name with an initial (e.g., ABIRAMI P, PRIYA R, KUMAR S)
-  // - P2P/Friend keywords
+  // 3. Check Friend / Personal Peer-to-Peer Transfer heuristics
   const isP2PPhoneVpa = /^\d{10}@[a-zA-Z0-9.-]+/i.test(vpa);
-  const isPersonInitialName = /^[A-Za-z]{2,20}(\s+[A-Za-z]{2,20})?\s+[A-Za-z](\.?)$/i.test(merchant);
+  const isPersonName =
+    /^[A-Za-z]{2,25}(\s+[A-Za-z]{2,25})*\s+[A-Za-z](\.?)$/i.test(merchant) ||
+    /^[A-Za-z](\.?)\s+[A-Za-z]{2,25}/i.test(merchant) ||
+    /^[A-Za-z.-]{2,25}(\s+[A-Za-z.-]{1,25}){0,3}$/i.test(merchant);
   const hasFriendKeywords = /friend|splitwise|roommate|colleague|family|brother|sister|mom|dad|relative|p2p/i.test(combined);
 
-  const isBusiness = /pvt|ltd|store|shop|mart|bazaar|enterprises|agency|foods|snacks|pharmacy|fuel|hospital|hotel|bakery|restaurant|cafe|sweets/i.test(
+  const isBusiness = /pvt|ltd|store|stores|shop|shops|mart|bazaar|enterprises|agency|foods|snacks|pharmacy|fuel|hospital|hotel|bakery|restaurant|cafe|sweets|stall|stalls|abhibus|redbus|travels|bus|godaddy|innovations|cinema|cinemas|theatre|salon|salons|look|looks|spa|electrical|electricals|hardware|appliances|payzapp|payzappwallet/i.test(
     merchant || combined
   );
 
-  if ((isP2PPhoneVpa || isPersonInitialName || hasFriendKeywords) && !isBusiness) {
+  if ((isP2PPhoneVpa || isPersonName || hasFriendKeywords) && !isBusiness) {
     return 'Friends & Family';
   }
 
   return 'Other';
+}
+
+// In-memory cache for Open Source API predictions so we never re-query identical merchant/brand names
+const apiCategoryCache = new Map<string, string>();
+
+/**
+ * Detect category using Open Source APIs (DuckDuckGo Instant Answer API & Wikipedia Summary API).
+ * Queries public knowledge graphs to classify merchant names into personal finance categories.
+ */
+export async function detectCategoryWithOpenSourceAPI(nameOrNarration: string): Promise<string | null> {
+  if (!nameOrNarration) return null;
+  let query = nameOrNarration
+    .replace(/^UPI[-\s:/_]*/i, '')
+    .replace(/\b0+\d{4,}\b/g, '')
+    .replace(/\b\d{5,}\b/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (query.length < 3) return null;
+
+  const cacheKey = query.toLowerCase();
+  if (apiCategoryCache.has(cacheKey)) {
+    return apiCategoryCache.get(cacheKey)!;
+  }
+
+  // Strategy 1: DuckDuckGo Instant Answer API (Free, open, fast, zero auth required)
+  try {
+    const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`;
+    const res = await fetch(ddgUrl, { signal: AbortSignal.timeout(2500) });
+    if (res.ok) {
+      const data = (await res.json()) as any;
+      const combinedDdgText = [
+        data.AbstractText,
+        data.Heading,
+        data.meta?.description,
+        data.Entity,
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      if (combinedDdgText) {
+        for (const rule of CATEGORY_RULES) {
+          if (rule.name === 'Salary') continue;
+          if (rule.pattern.test(combinedDdgText)) {
+            apiCategoryCache.set(cacheKey, rule.name);
+            return rule.name;
+          }
+        }
+      }
+    }
+  } catch {
+    // Continue to Wikipedia fallback
+  }
+
+  // Strategy 2: Wikipedia REST Summary API (Public encyclopedia knowledge)
+  try {
+    const words = query.split(/\s+/).slice(0, 3).join(' ');
+    const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(words)}`;
+    const res = await fetch(wikiUrl, {
+      headers: { 'User-Agent': 'SpendWiseApp/1.0 (contact@spendwise.local)' },
+      signal: AbortSignal.timeout(2500),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as any;
+      const combinedWikiText = [data.title, data.description, data.extract].filter(Boolean).join(' ');
+      if (combinedWikiText) {
+        for (const rule of CATEGORY_RULES) {
+          if (rule.name === 'Salary') continue;
+          if (rule.pattern.test(combinedWikiText)) {
+            apiCategoryCache.set(cacheKey, rule.name);
+            return rule.name;
+          }
+        }
+      }
+    }
+  } catch {
+    // Fallback gracefully
+  }
+
+  return null;
+}
+
+/**
+ * Predicts category with instant local rule evaluation first,
+ * falling back to Open Source APIs (DuckDuckGo + Wikipedia) if category is unknown/Other.
+ */
+export async function predictCategoryWithAPI(
+  text: string,
+  options?: CategoryPredictOptions
+): Promise<string> {
+  const localPrediction = predictCategoryName(text, options);
+  if (localPrediction && localPrediction !== 'Other') {
+    return localPrediction;
+  }
+
+  const target = options?.merchant || text || '';
+  const apiDetected = await detectCategoryWithOpenSourceAPI(target);
+  if (apiDetected) {
+    return apiDetected;
+  }
+
+  return localPrediction || 'Other';
 }
 
 /**

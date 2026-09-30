@@ -12,6 +12,8 @@ router.use(requireAuth);
 router.get('/dashboard', (req, res, next) => transactionController.getDashboard(req, res, next));
 router.get('/export', (req, res, next) => transactionController.exportCSV(req, res, next));
 router.post('/import', (req, res, next) => transactionController.importCSV(req, res, next));
+router.post('/predict-category', (req, res, next) => transactionController.predictCategory(req, res, next));
+router.post('/predict-categories-batch', (req, res, next) => transactionController.predictCategoryBatch(req, res, next));
 router.post('/bulk-delete', (req, res, next) => transactionController.bulkDelete(req, res, next));
 router.post('/bulk-categorize', (req, res, next) => transactionController.bulkCategorize(req, res, next));
 

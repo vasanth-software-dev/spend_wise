@@ -2,8 +2,50 @@ import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/authMiddleware.js';
 import { transactionService } from '../services/TransactionService.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
+import { predictCategoryName, predictCategoryWithAPI } from '../utils/categoryPredictor.js';
 
 export class TransactionController {
+  async predictCategory(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { text, merchant, vpa, type } = req.body;
+      const predictedCategory = await predictCategoryWithAPI(text || '', { merchant, vpa });
+      sendSuccess(res, { category: predictedCategory, type: type || 'expense' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async predictCategoryBatch(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { items } = req.body;
+      if (!Array.isArray(items)) {
+        sendError(res, 'Items array is required', 400);
+        return;
+      }
+
+      const results = await Promise.all(
+        items.map(async (it: any) => {
+          const text = it.notes || it.text || it.narration || '';
+          const merchant = it.merchant || '';
+          let type = it.type || 'expense';
+          const category = await predictCategoryWithAPI(text, { merchant, vpa: it.vpa });
+          if (category === 'Salary') {
+            type = 'income';
+          }
+          return {
+            id: it.id,
+            category: category !== 'Other' ? category : it.category || 'Other',
+            type,
+          };
+        })
+      );
+
+      sendSuccess(res, { predictions: results });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async create(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.userId;

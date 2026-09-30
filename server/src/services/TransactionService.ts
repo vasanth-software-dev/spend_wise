@@ -1,6 +1,7 @@
 import { transactionRepository, TransactionFilterParams } from '../repositories/TransactionRepository.js';
 import { categoryRepository } from '../repositories/CategoryRepository.js';
 import { duplicateDetectionService } from './DuplicateDetectionService.js';
+import { personService, isIdentifiablePerson } from './PersonService.js';
 import { ITransaction, TransactionType, PaymentMethod, TransactionSource } from '../types/index.js';
 import { roundTo2Decimals } from '../utils/currency.js';
 import { Types } from 'mongoose';
@@ -192,9 +193,9 @@ export class TransactionService {
 
     // Cache categories for user
     const categories = await categoryRepository.findByUserId(userId);
-    const catMap = new Map<string, string>();
+    const catMap = new Map<string, { id: string; type: string }>();
     for (const c of categories) {
-      catMap.set(c.name.toLowerCase(), String(c._id));
+      catMap.set(c.name.toLowerCase(), { id: String(c._id), type: c.type });
     }
 
     for (const row of rows) {
@@ -212,8 +213,29 @@ export class TransactionService {
         }
 
         const merchant = (row.merchant || 'Unknown').trim();
-        const typeStr = (row.type || 'expense').toLowerCase();
-        const type: TransactionType = typeStr === 'income' ? 'income' : typeStr === 'transfer' ? 'transfer' : 'expense';
+        const typeStr = (row.type || '').toLowerCase();
+
+        let categoryId: string | null = null;
+        let categoryType: string | null = null;
+        if (row.category && catMap.has(row.category.toLowerCase())) {
+          const matched = catMap.get(row.category.toLowerCase())!;
+          categoryId = matched.id;
+          categoryType = matched.type;
+        }
+
+        // Auto-select type from category type if not explicitly overridden
+        let type: TransactionType;
+        if (categoryType === 'income' && typeStr !== 'expense') {
+          type = 'income';
+        } else if (categoryType === 'expense' && typeStr !== 'income') {
+          type = 'expense';
+        } else if (typeStr === 'income') {
+          type = 'income';
+        } else if (typeStr === 'transfer') {
+          type = 'transfer';
+        } else {
+          type = 'expense';
+        }
 
         const paymentMethodStr = (row.payment_method || 'upi').toLowerCase();
         const validMethods: PaymentMethod[] = ['upi', 'bank', 'cash', 'card', 'wallet', 'other'];
@@ -237,9 +259,22 @@ export class TransactionService {
           continue;
         }
 
-        let categoryId: string | null = null;
-        if (row.category && catMap.has(row.category.toLowerCase())) {
-          categoryId = catMap.get(row.category.toLowerCase()) || null;
+        // Auto-detect individual person and link to Friends & Family
+        let personId: Types.ObjectId | null = null;
+        if (isIdentifiablePerson(merchant)) {
+          const isSalaryCat = categoryId && catMap.get('salary')?.id === categoryId;
+          const hasExplicitSalary = /\b(salary|payroll|stipend|wages|remuneration|pension|monthly\s*pay)\b/i.test(`${merchant} ${row.notes || ''}`);
+          if ((!categoryId || (isSalaryCat && !hasExplicitSalary)) && catMap.has('friends & family')) {
+            categoryId = catMap.get('friends & family')!.id;
+          }
+          const person = await personService.findOrCreate(
+            userId,
+            { name: merchant },
+            { isManual: false }
+          );
+          if (person) {
+            personId = new Types.ObjectId(person._id);
+          }
         }
 
         const tx = await transactionRepository.create({
@@ -248,6 +283,7 @@ export class TransactionService {
           amount,
           currency: 'INR',
           categoryId: categoryId ? new Types.ObjectId(categoryId) : null,
+          personId: personId || undefined,
           merchant,
           paymentMethod,
           source: 'import',

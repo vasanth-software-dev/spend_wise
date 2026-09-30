@@ -33,7 +33,7 @@ import { EmptyState } from '../components/ui/EmptyState.js';
 import { formatINR, formatDate } from '../utils/format.js';
 import { TransactionModal } from '../features/transactions/TransactionModal.js';
 import { TransactionDrawer } from '../features/transactions/TransactionDrawer.js';
-import { CSVImportModal } from '../features/importExport/CSVImportModal.js';
+import { StatementImportModal } from '../features/importExport/StatementImportModal.js';
 import { Transaction } from '../types/index.js';
 
 export const TransactionsPage: React.FC = () => {
@@ -117,8 +117,9 @@ export const TransactionsPage: React.FC = () => {
             variant="outline"
             leftIcon={<Upload className="w-4 h-4" />}
             onClick={() => setIsImportModalOpen(true)}
+            title="Import bank statements in PDF, Excel (XLSX/XLS), CSV, or TXT"
           >
-            Import CSV
+            Import Statement
           </Button>
 
           <Button
@@ -572,8 +573,8 @@ export const TransactionsPage: React.FC = () => {
         onClose={() => setIsAddModalOpen(false)}
       />
 
-      {/* CSV Import Modal */}
-      <CSVImportModal
+      {/* Statement Import Modal (PDF, Excel, CSV, TXT) */}
+      <StatementImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
       />

@@ -62,17 +62,19 @@ export function isIdentifiablePerson(merchant: string, vpa?: string, email?: str
   }
 
   // 2. Check if merchant is formatted like a person's name with an initial:
-  // e.g., "ABIRAMI P", "Abirami P", "KUMAR S", "PRIYA R", "SATHISH K"
-  const isPersonInitialName = /^[A-Za-z]{2,20}(\s+[A-Za-z]{2,20})*\s+[A-Za-z](\.?)$/i.test(cleanMerchant);
+  // e.g., "ABIRAMI P", "Abirami P", "KUMAR S", "PRIYA R", "SATHISH K", "P ABIRAMI", "M. BOOBAL"
+  const isPersonInitialName =
+    /^[A-Za-z]{2,20}(\s+[A-Za-z]{2,20})*\s+[A-Za-z](\.?)$/i.test(cleanMerchant) ||
+    /^[A-Za-z](\.?)\s+[A-Za-z]{2,20}/i.test(cleanMerchant);
   if (isPersonInitialName) {
     return true;
   }
 
-  // 3. Name with 2 to 3 words, all alphabetic characters (e.g., "Rahul Verma", "Priya Sharma")
-  const words = cleanMerchant.split(/\s+/);
-  if (words.length >= 2 && words.length <= 4) {
+  // 3. Single name or 1 to 4 words, all alphabetic characters (e.g., "BOOBAL", "ABIRAMI", "Rahul Verma", "Priya Sharma")
+  const words = cleanMerchant.split(/\s+/).filter(Boolean);
+  if (words.length >= 1 && words.length <= 4) {
     const allAlphaWords = words.every((w) => /^[A-Za-z.-]+$/.test(w));
-    if (allAlphaWords && cleanMerchant.length <= 40) {
+    if (allAlphaWords && cleanMerchant.length >= 2 && cleanMerchant.length <= 40) {
       return true;
     }
   }
