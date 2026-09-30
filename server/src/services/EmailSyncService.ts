@@ -6,13 +6,26 @@ import { categoryRepository } from '../repositories/CategoryRepository.js';
 import { duplicateDetectionService } from './DuplicateDetectionService.js';
 import { emailParserRegistry } from '../providers/parsers/EmailParserRegistry.js';
 import { predictCategoryName, findMatchingCategoryId } from '../utils/categoryPredictor.js';
+import {
+  mapToExistingCategoryName,
+  transactionClassificationService,
+} from './TransactionClassificationService.js';
 import { GmailProvider } from '../providers/gmail/GmailProvider.js';
 import { MockEmailProvider } from '../providers/email/MockEmailProvider.js';
 import { encrypt } from '../utils/encryption.js';
-import { EmailProvider, IEmailAccount, IDetectedTransaction, EmailMessage, SyncOptions } from '../types/index.js';
+import {
+  EmailProvider,
+  IEmailAccount,
+  IDetectedTransaction,
+  ICategory,
+  EmailMessage,
+  ParsedTransaction,
+  SyncOptions,
+} from '../types/index.js';
 import { Types } from 'mongoose';
 import { randomBytes } from 'crypto';
 import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 import {
   extractForwardingToken,
   extractGmailVerificationCode,
@@ -20,6 +33,45 @@ import {
 } from '../utils/inboundEmailUnwrapper.js';
 
 export class EmailSyncService {
+  private async classifyDetectedTransaction(
+    userId: string,
+    parsed: ParsedTransaction,
+    description: string,
+    fallbackContext: string
+  ): Promise<{ merchant: string; suggestedCategory: string; categoryId: Types.ObjectId | null }> {
+    const fallbackCategory = parsed.categoryHint
+      || predictCategoryName(fallbackContext, { merchant: parsed.merchant });
+    const classification = await transactionClassificationService.classify(
+      {
+        description,
+        amount: parsed.amount,
+        type: parsed.type,
+        date: parsed.transactionDate,
+        merchant: parsed.merchant,
+      },
+      { name: parsed.merchant, category: fallbackCategory }
+    );
+
+    let categories: ICategory[] = [];
+    try {
+      categories = await categoryRepository.findByUserId(userId);
+    } catch (error) {
+      logger.warn('Could not load categories for email transaction classification', {
+        reason: error instanceof Error ? error.message : 'Unknown category lookup error',
+      });
+    }
+
+    const suggestedCategory = mapToExistingCategoryName(categories, classification.category)
+      || classification.category;
+    const matchedId = findMatchingCategoryId(categories, suggestedCategory);
+
+    return {
+      merchant: classification.name,
+      suggestedCategory,
+      categoryId: matchedId ? new Types.ObjectId(matchedId) : null,
+    };
+  }
+
   /**
    * Connect a mock email account for instant local zero-cost testing.
    */
@@ -231,13 +283,12 @@ export class EmailSyncService {
           continue;
         }
 
-        const suggestedCategory = parsed.categoryHint || predictCategoryName(`${parsed.merchant} ${msg.subject}`);
-        let categoryId: Types.ObjectId | null = null;
-        try {
-          const userCategories = await categoryRepository.findByUserId(userId);
-          const matchedId = findMatchingCategoryId(userCategories, suggestedCategory);
-          if (matchedId) categoryId = new Types.ObjectId(matchedId);
-        } catch (_) {}
+        const classification = await this.classifyDetectedTransaction(
+          userId,
+          parsed,
+          `${msg.subject}\n${msg.snippet || ''}\n${msg.bodyText}`,
+          `${parsed.merchant} ${msg.subject}`
+        );
 
         // New transaction detected!
         await detectedTransactionRepository.create({
@@ -246,15 +297,15 @@ export class EmailSyncService {
           emailMessageId: msg.id,
           amount: parsed.amount,
           currency: parsed.currency,
-          merchant: parsed.merchant,
+          merchant: classification.merchant,
           transactionDate: parsed.transactionDate,
           transactionType: parsed.type,
           upiReference: parsed.upiReference,
           bankReference: parsed.bankReference,
           sender: parsed.sender || msg.sender,
           subject: msg.subject,
-          suggestedCategory,
-          categoryId,
+          suggestedCategory: classification.suggestedCategory,
+          categoryId: classification.categoryId,
           rawMetadata: parsed.rawDetails,
           confidenceScore: parsed.confidenceScore,
           status: 'detected',
@@ -501,13 +552,12 @@ export class EmailSyncService {
       };
     }
 
-    const suggestedCategory = parsed.categoryHint || predictCategoryName(`${parsed.merchant} ${unwrapped.subject}`);
-    let categoryId: Types.ObjectId | null = null;
-    try {
-      const userCategories = await categoryRepository.findByUserId(userId);
-      const matchedId = findMatchingCategoryId(userCategories, suggestedCategory);
-      if (matchedId) categoryId = new Types.ObjectId(matchedId);
-    } catch (_) {}
+    const classification = await this.classifyDetectedTransaction(
+      userId,
+      parsed,
+      `${unwrapped.subject}\n${unwrapped.snippet || ''}\n${unwrapped.bodyText}`,
+      `${parsed.merchant} ${unwrapped.subject}`
+    );
 
     // 7. Save new detected transaction
     const newDetected = await detectedTransactionRepository.create({
@@ -516,15 +566,15 @@ export class EmailSyncService {
       emailMessageId: unwrapped.id,
       amount: parsed.amount,
       currency: parsed.currency,
-      merchant: parsed.merchant,
+      merchant: classification.merchant,
       transactionDate: parsed.transactionDate,
       transactionType: parsed.type,
       upiReference: parsed.upiReference,
       bankReference: parsed.bankReference,
       sender: parsed.sender || unwrapped.sender,
       subject: unwrapped.subject,
-      suggestedCategory,
-      categoryId,
+      suggestedCategory: classification.suggestedCategory,
+      categoryId: classification.categoryId,
       rawMetadata: { ...parsed.rawDetails, isForwarded, forwardedBy: fromField },
       confidenceScore: parsed.confidenceScore,
       status: 'detected',
