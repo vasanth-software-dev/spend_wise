@@ -30,14 +30,14 @@ const initialState: DashboardState = {
   topMerchants: [],
   paymentDistribution: [],
   recentTransactions: [],
-  timeRange: '30d',
+  timeRange: 'today',
   loading: false,
   error: null,
 };
 
 export const fetchDashboardThunk = createAsyncThunk(
   'dashboard/fetchData',
-  async (timeRange: DashboardTimeRange = '30d', { rejectWithValue }) => {
+  async (timeRange: DashboardTimeRange = 'today', { rejectWithValue }) => {
     try {
       const res = await api.get(`/transactions/dashboard?timeRange=${timeRange}`);
       return res.data.data;
