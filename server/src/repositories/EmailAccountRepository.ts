@@ -68,6 +68,21 @@ export class EmailAccountRepository {
     await EmailAccountModel.findByIdAndUpdate(id, update);
   }
 
+  async findAccountsDueForSync(defaultFrequencyMinutes = 3): Promise<IEmailAccount[]> {
+    const now = new Date();
+    const accounts = await EmailAccountModel.find({
+      status: 'active',
+      provider: { $in: ['gmail', 'mock'] },
+    }).lean();
+
+    return accounts.filter((acc) => {
+      if (!acc.lastSyncAt) return true;
+      const freq = acc.syncFrequencyMinutes || defaultFrequencyMinutes;
+      const nextDue = new Date(acc.lastSyncAt.getTime() + freq * 60 * 1000);
+      return now >= nextDue;
+    });
+  }
+
   async delete(id: string, userId: string): Promise<boolean> {
     const res = await EmailAccountModel.findOneAndDelete({ _id: id, userId });
     return !!res;

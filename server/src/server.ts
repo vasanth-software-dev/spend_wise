@@ -3,6 +3,7 @@ import { env } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { initRedis } from './config/redis.js';
 import { categoryRepository } from './repositories/CategoryRepository.js';
+import { emailSyncJob } from './jobs/EmailSyncJob.js';
 
 async function bootstrap() {
   try {
@@ -22,9 +23,13 @@ async function bootstrap() {
       console.log(`🔒 Health check at http://localhost:${env.PORT}/api/health`);
     });
 
+    // 5. Start 24/7 Background Email Synchronization Engine
+    emailSyncJob.start();
+
     // Graceful Shutdown
     const shutdown = async (signal: string) => {
       console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+      emailSyncJob.stop();
       server.close(async () => {
         await disconnectDatabase();
         console.log('SpendWise API process terminated cleanly.');
