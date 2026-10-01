@@ -17,6 +17,9 @@ import { RegisterPage } from '../pages/RegisterPage.js';
 import { AuthCallbackPage } from '../pages/AuthCallbackPage.js';
 import { PeoplePage } from '../pages/PeoplePage.js';
 import { DebtsPage } from '../pages/DebtsPage.js';
+import { GoalsPage } from '../pages/GoalsPage.js';
+import { GoalDetailsPage } from '../pages/GoalDetailsPage.js';
+import { CalendarPage } from '../pages/CalendarPage.js';
 import { ToastContainer } from '../components/ui/Toast.js';
 
 export const App: React.FC = () => {
@@ -44,6 +47,9 @@ export const App: React.FC = () => {
         <Route path="people" element={<PeoplePage />} />
         <Route path="people/:id" element={<PeoplePage />} />
         <Route path="budgets" element={<BudgetsPage />} />
+        <Route path="goals" element={<GoalsPage />} />
+        <Route path="goals/:id" element={<GoalDetailsPage />} />
+        <Route path="calendar" element={<CalendarPage />} />
         <Route path="recurring" element={<RecurringPage />} />
         <Route path="email-sync" element={<EmailSyncPage />} />
         <Route path="reports" element={<ReportsPage />} />

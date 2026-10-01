@@ -5,6 +5,7 @@ import { CategoryModel } from './models/Category.js';
 import { TransactionModel } from './models/Transaction.js';
 import { BudgetModel } from './models/Budget.js';
 import { RecurringTransactionModel } from './models/RecurringTransaction.js';
+import { GoalModel, GoalContributionModel } from './models/Goal.js';
 import { EmailAccountModel } from './models/EmailAccount.js';
 import { DetectedTransactionModel } from './models/DetectedTransaction.js';
 import { NotificationModel } from './models/Notification.js';
@@ -29,6 +30,8 @@ async function seed() {
     DetectedTransactionModel.deleteMany({}),
     NotificationModel.deleteMany({}),
     PersonModel.deleteMany({}),
+    GoalModel.deleteMany({}),
+    GoalContributionModel.deleteMany({}),
   ]);
 
   try {
@@ -493,6 +496,101 @@ async function seed() {
       status: 'detected',
     },
   ]);
+
+  // Seed Savings Goals with realistic contribution history.
+  // Contributions are savings allocations only: they never create Transactions,
+  // so expense reports and account balances stay untouched.
+  console.log('🎯 Seeding Savings Goals...');
+  const goalSeeds = [
+    {
+      name: 'New Laptop',
+      description: 'Replacing my 2019 ThinkPad with a M3 MacBook Air.',
+      targetAmount: 150000,
+      targetDate: new Date(now.getFullYear() + 1, 2, 30),
+      monthlyContribution: 12500,
+      icon: 'Laptop',
+      color: '#6366f1',
+      categoryId: catMap.get('Shopping'),
+      contributions: [
+        { amount: 25000, monthsAgo: 2, note: 'Diwali bonus allocation' },
+        { amount: 15000, monthsAgo: 3, note: 'Monthly transfer' },
+        { amount: 15000, monthsAgo: 4, note: 'Monthly transfer' },
+      ],
+    },
+    {
+      name: 'Goa Trip',
+      description: 'Family trip in December, booked early to lock fares.',
+      targetAmount: 80000,
+      targetDate: new Date(now.getFullYear(), 11, 10),
+      monthlyContribution: 10000,
+      icon: 'Plane',
+      color: '#0ea5e9',
+      categoryId: catMap.get('Travel'),
+      contributions: [
+        { amount: 20000, monthsAgo: 1, note: 'Post-bonus top-up' },
+        { amount: 10000, monthsAgo: 2, note: 'Monthly transfer' },
+      ],
+    },
+    {
+      name: 'Emergency Fund',
+      description: 'Six months of expenses parked in a high-yield RD.',
+      targetAmount: 600000,
+      targetDate: new Date(now.getFullYear() + 2, 5, 30),
+      monthlyContribution: 20000,
+      icon: 'ShieldCheck',
+      color: '#10b981',
+      categoryId: catMap.get('Investments'),
+      contributions: [
+        { amount: 50000, monthsAgo: 0, note: 'Freelance payment' },
+        { amount: 20000, monthsAgo: 1, note: 'Monthly transfer' },
+        { amount: 20000, monthsAgo: 2, note: 'Monthly transfer' },
+      ],
+    },
+    {
+      name: 'Wedding Ring',
+      description: 'Completed goal kept for the record.',
+      targetAmount: 90000,
+      targetDate: new Date(now.getFullYear(), 0, 15),
+      monthlyContribution: 15000,
+      icon: 'Gift',
+      color: '#f59e0b',
+      categoryId: catMap.get('Shopping'),
+      contributions: [
+        { amount: 45000, monthsAgo: 4, note: 'Final purchase' },
+        { amount: 45000, monthsAgo: 5, note: 'Final purchase' },
+      ],
+    },
+  ];
+
+  for (const seed of goalSeeds) {
+    const saved = seed.contributions.reduce((sum, c) => sum + c.amount, 0);
+    const created = await GoalModel.create({
+      userId: primaryUser._id,
+      name: seed.name,
+      description: seed.description,
+      targetAmount: seed.targetAmount,
+      currentAmount: saved,
+      targetDate: seed.targetDate,
+      monthlyContribution: seed.monthlyContribution,
+      categoryId: seed.categoryId ?? null,
+      icon: seed.icon,
+      color: seed.color,
+      status: saved >= seed.targetAmount ? 'completed' : 'active',
+    });
+
+    await GoalContributionModel.create(
+      seed.contributions.map((contribution) => ({
+        goalId: created._id,
+        amount: contribution.amount,
+        contributionDate: new Date(
+          now.getFullYear(),
+          now.getMonth() - contribution.monthsAgo,
+          Math.min(now.getDate(), 28)
+        ),
+        note: contribution.note,
+      }))
+    );
+  }
 
   // Seed Notifications (Requirement 33)
   console.log('🔔 Seeding Notifications...');

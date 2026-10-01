@@ -382,6 +382,53 @@ export class TransactionRepository {
     ]);
   }
 
+  /**
+   * Per-day confirmed totals for the calendar grid. Day keys are rendered in
+   * Asia/Kolkata, matching the timezone used by `getSpendingTrend`, so the
+   * month grid and the day panel always agree on which date a transaction
+   * belongs to.
+   */
+  async getCalendarDaySummaries(userId: string, start: Date, end: Date) {
+    return TransactionModel.aggregate([
+      {
+        $match: {
+          userId: new Types.ObjectId(userId),
+          status: 'confirmed',
+          transactionDate: { $gte: start, $lt: end },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$transactionDate',
+              timezone: 'Asia/Kolkata',
+            },
+          },
+          income: { $sum: { $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0] } },
+          expense: { $sum: { $cond: [{ $eq: ['$type', 'expense'] }, '$amount', 0] } },
+          transfer: { $sum: { $cond: [{ $eq: ['$type', 'transfer'] }, '$amount', 0] } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+  }
+
+  /** Confirmed transactions falling on a single calendar day. */
+  async getTransactionsForDay(userId: string, start: Date, end: Date): Promise<ITransaction[]> {
+    return TransactionModel.find({
+      userId: new Types.ObjectId(userId),
+      status: 'confirmed',
+      transactionDate: { $gte: start, $lt: end },
+    })
+      .sort({ transactionDate: 1, createdAt: 1 })
+      .populate('categoryId', 'name icon color type')
+      .populate('sourceAccountId', 'email provider')
+      .lean();
+  }
+
   // Find possible existing transaction for duplicate detection
   async findPotentialDuplicate(
     userId: string,

@@ -10,6 +10,13 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(8080),
   CLIENT_URL: z.string().default('http://localhost:5173'),
+  // Comma-separated extra frontend origins (e.g. ngrok client URL) allowed for CORS.
+  // Example: CLIENT_URLS=https://abc123.ngrok-free.app,https://def456.ngrok-free.app
+  CLIENT_URLS: z.string().optional(),
+  // Public base URL of the backend itself (e.g. https://<backend-ngrok>.ngrok-free.app).
+  // Used to build absolute OAuth redirect_uris when behind ngrok.
+  // If unset, falls back to GOOGLE_*_REDIRECT_URI values.
+  PUBLIC_API_URL: z.string().optional(),
   MONGO_URI: z.string().default('mongodb://localhost:27017/spendwise'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   JWT_ACCESS_SECRET: z.string().default('spendwise_super_secret_access_token_key_change_in_production_min32chars'),
@@ -38,3 +45,18 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+// All allowed frontend origins (primary CLIENT_URL + extras from CLIENT_URLS).
+export function getAllowedClientOrigins(): string[] {
+  const extras = (env.CLIENT_URLS ?? '')
+    .split(',')
+    .map((s) => s.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  return [env.CLIENT_URL.replace(/\/$/, ''), ...extras];
+}
+
+// Resolve the public base URL of the backend (ngrok URL when set).
+export function getPublicApiBase(): string | null {
+  const raw = (env.PUBLIC_API_URL ?? '').trim().replace(/\/$/, '');
+  return raw ? raw : null;
+}

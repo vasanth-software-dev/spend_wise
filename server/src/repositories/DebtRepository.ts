@@ -1,4 +1,5 @@
 import { DebtModel, DebtPaymentModel } from '../models/Debt.js';
+import { DebtCandidateModel } from '../models/DebtCandidate.js';
 import { IDebt, IDebtPayment } from '../types/index.js';
 import { Types } from 'mongoose';
 
@@ -24,12 +25,13 @@ export class DebtRepository {
   }
 
   async findById(id: string, userId: string): Promise<IDebt | null> {
-    return DebtModel.findOne({ _id: id, userId }).populate('categoryId').lean();
+    return DebtModel.findOne({ _id: id, userId }).populate('categoryId').populate('personId').lean();
   }
 
   async findByUserId(userId: string): Promise<IDebt[]> {
     return DebtModel.find({ userId: new Types.ObjectId(userId) })
       .populate('categoryId')
+      .populate('personId')
       .sort({ createdAt: -1 })
       .lean();
   }
@@ -41,7 +43,83 @@ export class DebtRepository {
       { new: true }
     )
       .populate('categoryId')
+      .populate('personId')
       .lean();
+  }
+
+  /**
+   * Open (not fully settled) debts for one person, with remaining balance.
+   * Matching is by personId when available, otherwise by normalized name so a
+   * manually entered name ("Sivashakthi S D O Sa") still resolves.
+   */
+  async findOpenByPerson(
+    userId: string,
+    person: { personId?: string | null; personName: string }
+  ): Promise<DebtWithBalance[]> {
+    const userObjectId = new Types.ObjectId(userId);
+    // Collapse whitespace on both sides so "Sivashakthi  S D" matches
+    // "Sivashakthi S D", which is how the two fields are usually typed.
+    const escapeForName = (value: string) =>
+      value.trim().replace(/\s+/g, ' ').toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const personNamePattern = new RegExp(
+      `^${escapeForName(person.personName).replace(/\s+/g, '\\s+')}$`,
+      'i'
+    );
+
+    const debts = await DebtModel.find({
+      userId: userObjectId,
+      $or: [
+        ...(person.personId ? [{ personId: new Types.ObjectId(person.personId) }] : []),
+        { personName: personNamePattern },
+      ],
+    })
+      .populate('categoryId')
+      .populate('personId')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const results: DebtWithBalance[] = [];
+    for (const debt of debts) {
+      const paymentAgg = await DebtPaymentModel.aggregate([
+        { $match: { debtId: new Types.ObjectId(String(debt._id)) } },
+        { $group: { _id: null, totalPaid: { $sum: '$amount' } } },
+      ]);
+      const totalPaid = paymentAgg[0]?.totalPaid || 0;
+      const { remainingAmount, status, isOverdue } = this.calculateStatus(debt, totalPaid);
+      if (remainingAmount <= 0) continue;
+      results.push({ ...debt, totalPaid, remainingAmount, status, isOverdue });
+    }
+
+    return results;
+  }
+
+  /** Unsettled debts whose due date falls inside the given window. */
+  async findWithDueDateBetween(userId: string, start: Date, end: Date): Promise<DebtWithBalance[]> {
+    const debts = await DebtModel.find({
+      userId: new Types.ObjectId(userId),
+      dueDate: { $ne: null, $gte: start, $lt: end },
+    })
+      .populate('categoryId')
+      .populate('personId')
+      .sort({ dueDate: 1 })
+      .lean();
+
+    if (debts.length === 0) return [];
+
+    const totals = await DebtPaymentModel.aggregate<{ _id: Types.ObjectId; totalPaid: number }>([
+      { $match: { debtId: { $in: debts.map((d) => d._id) } } },
+      { $group: { _id: '$debtId', totalPaid: { $sum: '$amount' } } },
+    ]);
+    const paidByDebt = new Map(totals.map((row) => [String(row._id), row.totalPaid]));
+
+    const results: DebtWithBalance[] = [];
+    for (const debt of debts) {
+      const totalPaid = paidByDebt.get(String(debt._id)) || 0;
+      const { remainingAmount, status, isOverdue } = this.calculateStatus(debt, totalPaid);
+      if (remainingAmount <= 0) continue;
+      results.push({ ...debt, totalPaid, remainingAmount, status, isOverdue });
+    }
+    return results;
   }
 
   async delete(id: string, userId: string): Promise<boolean> {
@@ -49,6 +127,11 @@ export class DebtRepository {
     if (!res) return false;
     // Cascade-delete payment history so no orphan records survive
     await DebtPaymentModel.deleteMany({ debtId: res._id });
+    // Clear suggestions that pointed at this debt so the review queue stays accurate
+    await DebtCandidateModel.updateMany(
+      { suggestedDebtId: res._id },
+      { $set: { suggestedDebtId: null, match: 'NO_MATCH', suggestedDebtRemaining: null } }
+    );
     return true;
   }
 

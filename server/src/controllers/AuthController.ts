@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService, ClientMetadata } from '../services/AuthService.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
-import { REFRESH_COOKIE_NAME, refreshCookieOptions, clearCookieOptions } from '../utils/jwt.js';
+import { REFRESH_COOKIE_NAME, refreshCookieOptions, clearCookieOptions, getRefreshCookieOptions } from '../utils/jwt.js';
 import { AuthenticatedRequest } from '../middleware/authMiddleware.js';
-import { GoogleSocialiteProvider } from '../providers/social/GoogleSocialiteProvider.js';
+import { GoogleSocialiteProvider, resolveAuthRedirectUri } from '../providers/social/GoogleSocialiteProvider.js';
 import { env } from '../config/env.js';
 
 function extractClientMeta(req: Request): ClientMetadata {
@@ -161,11 +161,11 @@ export class AuthController {
         return;
       }
 
-      const redirectUri = (req.query.redirect_uri as string) || env.GOOGLE_AUTH_REDIRECT_URI;
+      const redirectUri = resolveAuthRedirectUri(req.query.redirect_uri as string | undefined);
       const statePayload = {
         flow: 'social_login',
         ts: Date.now(),
-        clientRedirect: req.query.client_redirect || `${env.CLIENT_URL}/dashboard`,
+        clientRedirect: (req.query.client_redirect as string) || `${env.CLIENT_URL}/dashboard`,
       };
       const state = Buffer.from(JSON.stringify(statePayload)).toString('base64');
       const includeGmail = req.query.include_gmail === 'true';
@@ -204,7 +204,9 @@ export class AuthController {
 
       const authResult = await authService.handleGoogleAuth(profile, clientMeta, tokens);
 
-      res.cookie(REFRESH_COOKIE_NAME, authResult.tokens.refreshToken, refreshCookieOptions);
+      // When behind ngrok (https), the refresh cookie must be Secure + SameSite=None
+      // so the cross-site redirect (backend ngrok -> frontend ngrok) can set it.
+      res.cookie(REFRESH_COOKIE_NAME, authResult.tokens.refreshToken, getRefreshCookieOptions(req));
 
       res.redirect(
         `${env.CLIENT_URL}/auth/callback?token=${encodeURIComponent(authResult.tokens.accessToken)}&status=success`

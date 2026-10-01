@@ -2,7 +2,13 @@ import { Types } from 'mongoose';
 
 export type TransactionType = 'expense' | 'income' | 'transfer';
 export type PaymentMethod = 'upi' | 'bank' | 'cash' | 'card' | 'wallet' | 'other';
-export type TransactionSource = 'manual' | 'email' | 'import';
+/**
+ * `receipt_scan` marks a transaction created from the on-device receipt/ticket
+ * scanner. It behaves exactly like `manual` everywhere in the ledger and is
+ * only an attribution label, so scanned expenses flow through the dashboard,
+ * calendar, reports and category totals without any special casing.
+ */
+export type TransactionSource = 'manual' | 'email' | 'import' | 'receipt_scan';
 export type TransactionStatus = 'pending' | 'confirmed' | 'ignored';
 
 export type EmailProviderType = 'gmail' | 'mock' | 'outlook' | 'yahoo' | 'imap' | 'forwarding';
@@ -194,6 +200,108 @@ export interface IRecurringTransaction {
   updatedAt: Date;
 }
 
+export type GoalStatus = 'active' | 'completed';
+
+export interface IGoalContribution {
+  _id: Types.ObjectId | string;
+  goalId: Types.ObjectId | string;
+  amount: number;
+  accountId?: Types.ObjectId | string | null;
+  contributionDate: Date;
+  note?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IGoal {
+  _id: Types.ObjectId | string;
+  userId: Types.ObjectId | string;
+  name: string;
+  description?: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate?: Date | null;
+  monthlyContribution?: number | null;
+  categoryId?: Types.ObjectId | string | null;
+  accountId?: Types.ObjectId | string | null;
+  icon: string;
+  color: string;
+  status: GoalStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Derived goal figures computed by the goal service. Never persisted, so the
+ * stored `currentAmount` stays the single source of truth for progress.
+ */
+export interface GoalComputed {
+  targetAmount: number;
+  currentAmount: number;
+  remainingAmount: number;
+  percentageComplete: number;
+  monthsRemaining: number | null;
+  requiredMonthlyContribution: number | null;
+  expectedCompletionDate: Date | null;
+  isCompleted: boolean;
+  isOverdue: boolean;
+}
+
+export interface GoalWithProgress extends IGoal {
+  contributionCount: number;
+  computed: GoalComputed;
+}
+
+/** One projected occurrence of an existing recurring transaction. */
+export interface UpcomingOccurrence {
+  recurringTransactionId: string;
+  name: string;
+  merchant: string;
+  type: TransactionType;
+  amount: number;
+  categoryId?: unknown;
+  date: string;
+  frequency: RecurringFrequency;
+}
+
+/** Per-day aggregate of confirmed transactions for the calendar grid. */
+export interface CalendarDaySummary {
+  date: string;
+  income: number;
+  expense: number;
+  transfer: number;
+  net: number;
+  count: number;
+}
+
+/** A goal deadline (its `targetDate`) rendered on the calendar. */
+export interface CalendarGoalMarker {
+  id: string;
+  name: string;
+  /** `YYYY-MM-DD` day key. */
+  date: string;
+  targetAmount: number;
+  remainingAmount: number;
+  percentageComplete: number;
+  icon: string;
+  color: string;
+  status: GoalStatus;
+  isOverdue: boolean;
+}
+
+/** A debt due date rendered on the calendar. */
+export interface CalendarDebtMarker {
+  id: string;
+  personName: string;
+  /** `YYYY-MM-DD` day key. */
+  date: string;
+  originalAmount: number;
+  remainingAmount: number;
+  direction: 'I_OWE' | 'OWED_TO_ME';
+  status: 'ACTIVE' | 'PARTIALLY_PAID' | 'OVERDUE' | 'SETTLED';
+  isOverdue: boolean;
+}
+
 export interface INotification {
   _id: Types.ObjectId | string;
   userId: Types.ObjectId | string;
@@ -306,9 +414,50 @@ export interface IDebtPayment {
   updatedAt: Date;
 }
 
+/**
+ * A P2P transaction that *may* represent a debt movement.
+ * Created for every person-to-person UPI/payment detected via email sync or
+ * statement import, never as an automatic debt. The user reviews each one and
+ * decides: add a new debt, match an existing debt as a payment, or ignore.
+ *
+ * Detection is structural (is this P2P at all?) and relational (does an open
+ * debt for this person fit?), never keyword based. Bank UPI alerts contain no
+ * debt wording, so keywords are useless here.
+ */
+export type DebtCandidateStatus = 'PENDING' | 'ACCEPTED' | 'MATCHED' | 'IGNORED';
+export type DebtCandidateMatch = 'EXACT_SETTLEMENT' | 'PARTIAL_PAYMENT' | 'NO_MATCH';
+
+export interface IDebtCandidate {
+  _id: Types.ObjectId | string;
+  userId: Types.ObjectId | string;
+  personId?: Types.ObjectId | string | null;
+  personName: string;
+  vpa?: string | null;
+  amount: number;
+  currency: string;
+  direction: DebtDirection;
+  transactionDate: Date;
+  source: 'email' | 'import';
+  refNo?: string | null;
+  refNoNormalized?: string | null;
+  transactionId?: Types.ObjectId | string | null;
+  sourceAccountId?: Types.ObjectId | string | null;
+  merchant: string;
+  status: DebtCandidateStatus;
+  match: DebtCandidateMatch;
+  suggestedDebtId?: Types.ObjectId | string | null;
+  suggestedDebtRemaining?: number | null;
+  confidence: number;
+  resolvedDebtId?: Types.ObjectId | string | null;
+  resolvedPaymentId?: Types.ObjectId | string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface IDebt {
   _id: Types.ObjectId | string;
   userId: Types.ObjectId | string;
+  personId?: Types.ObjectId | string | null;
   personName: string;
   description?: string;
   originalAmount: number;

@@ -11,7 +11,11 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',
     port: 5173,
+    strictPort: true,
+    // Allow ngrok https host to serve the Vite dev server
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://localhost:8080',

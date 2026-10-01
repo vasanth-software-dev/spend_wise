@@ -5,7 +5,7 @@ import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import path from 'path';
 import fs from 'fs';
-import { env } from './config/env.js';
+import { env, getAllowedClientOrigins } from './config/env.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 
@@ -22,9 +22,15 @@ import reportRoutes from './routes/reportRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import personRoutes from './routes/personRoutes.js';
 import debtRoutes from './routes/debtRoutes.js';
+import debtCandidateRoutes from './routes/debtCandidateRoutes.js';
+import goalRoutes from './routes/goalRoutes.js';
+import calendarRoutes from './routes/calendarRoutes.js';
 
 export function createApp(): Express {
   const app = express();
+
+  // Trust ngrok / reverse proxy so req.secure + x-forwarded-proto work (https cookies)
+  app.set('trust proxy', 1);
 
   // Security Headers
   app.use(helmet({
@@ -33,13 +39,18 @@ export function createApp(): Express {
   }));
 
   // CORS Configuration
+  // Allows localhost + CLIENT_URL + extra ngrok origins from CLIENT_URLS.
+  const allowedOrigins = getAllowedClientOrigins();
   app.use(cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps, curl, or same-origin)
       if (!origin) return callback(null, true);
       if (
+        allowedOrigins.includes(origin) ||
         origin === env.CLIENT_URL ||
         origin.endsWith('.vercel.app') ||
+        origin.endsWith('.ngrok-free.app') ||
+        origin.endsWith('.ngrok.io') ||
         origin.includes('localhost') ||
         origin.includes('127.0.0.1')
       ) {
@@ -87,6 +98,9 @@ export function createApp(): Express {
   app.use('/api/v1/notifications', notificationRoutes);
   app.use('/api/v1/people', personRoutes);
   app.use('/api/v1/debts', debtRoutes);
+  app.use('/api/v1/debt-candidates', debtCandidateRoutes);
+  app.use('/api/v1/goals', goalRoutes);
+  app.use('/api/v1/calendar', calendarRoutes);
 
   // In production, serve the built Vite SPA frontend if available
   const clientDistPaths = [

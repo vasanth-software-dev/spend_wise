@@ -19,6 +19,7 @@ debtPaymentSchema.index({ debtId: 1, paymentDate: -1 });
 const debtSchema = new Schema<IDebt>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    personId: { type: Schema.Types.ObjectId, ref: 'Person', default: null, index: true },
     personName: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
     originalAmount: { type: Number, required: true, min: 0.01 },

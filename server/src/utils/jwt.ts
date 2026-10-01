@@ -41,3 +41,20 @@ export const clearCookieOptions: CookieOptions = {
   sameSite: 'lax',
   path: '/api/v1/auth',
 };
+
+/**
+ * Cookie options aware of ngrok/https.
+ * If the incoming request is https (ngrok sends x-forwarded-proto=https,
+ * or PUBLIC_API_URL is https), use Secure + SameSite=None so the
+ * cross-origin frontend (other ngrok URL) can receive the refresh cookie.
+ * Otherwise fall back to the default Lax cookie for localhost dev.
+ */
+export function getRefreshCookieOptions(req?: { headers?: Record<string, unknown>; secure?: boolean }): CookieOptions {
+  const forwardedProto = String(req?.headers?.['x-forwarded-proto'] ?? '').toLowerCase();
+  const isHttps = forwardedProto.includes('https') || req?.secure === true;
+  const publicIsHttps = (env.PUBLIC_API_URL ?? '').startsWith('https://');
+  if (isHttps || publicIsHttps || env.NODE_ENV === 'production') {
+    return { ...refreshCookieOptions, secure: true, sameSite: 'none' };
+  }
+  return refreshCookieOptions;
+}

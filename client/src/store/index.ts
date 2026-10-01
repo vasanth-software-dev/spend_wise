@@ -11,6 +11,9 @@ import detectedTransactionReducer from './slices/detectedTransactionSlice.js';
 import notificationReducer from './slices/notificationSlice.js';
 import themeReducer from './slices/themeSlice.js';
 import debtReducer from './slices/debtSlice.js';
+import debtCandidateReducer from './slices/debtCandidateSlice.js';
+import goalReducer from './slices/goalSlice.js';
+import calendarReducer from './slices/calendarSlice.js';
 
 export const store = configureStore({
   reducer: {
@@ -25,6 +28,9 @@ export const store = configureStore({
     notifications: notificationReducer,
     theme: themeReducer,
     debts: debtReducer,
+    debtCandidates: debtCandidateReducer,
+    goals: goalReducer,
+    calendar: calendarReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

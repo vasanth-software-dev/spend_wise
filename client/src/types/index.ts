@@ -1,6 +1,12 @@
 export type TransactionType = 'expense' | 'income' | 'transfer';
 export type PaymentMethod = 'upi' | 'bank' | 'cash' | 'card' | 'wallet' | 'other';
-export type TransactionSource = 'manual' | 'email' | 'import';
+/**
+ * `receipt_scan` is an attribution label for expenses created from the on-device
+ * receipt/ticket scanner. It is a normal transaction everywhere else: dashboard,
+ * transactions, calendar, reports, category totals and account balance all treat
+ * it identically to `manual`. No receipt image is ever stored.
+ */
+export type TransactionSource = 'manual' | 'email' | 'import' | 'receipt_scan';
 export type TransactionStatus = 'pending' | 'confirmed' | 'ignored';
 export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
@@ -152,6 +158,124 @@ export interface RecurringTransaction {
   isActive: boolean;
 }
 
+export type GoalStatus = 'active' | 'completed';
+
+export interface GoalContribution {
+  _id: string;
+  goalId: string;
+  amount: number;
+  accountId?: { _id: string; email: string; provider: string } | string | null;
+  contributionDate: string;
+  note?: string;
+  createdAt: string;
+}
+
+export interface GoalComputed {
+  targetAmount: number;
+  currentAmount: number;
+  remainingAmount: number;
+  percentageComplete: number;
+  monthsRemaining: number | null;
+  requiredMonthlyContribution: number | null;
+  expectedCompletionDate: string | null;
+  isCompleted: boolean;
+  isOverdue: boolean;
+}
+
+export interface Goal {
+  _id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate?: string | null;
+  monthlyContribution?: number | null;
+  categoryId?: Category | string | null;
+  accountId?: { _id: string; email: string; provider: string } | string | null;
+  icon: string;
+  color: string;
+  status: GoalStatus;
+  createdAt: string;
+  updatedAt: string;
+  // Computed fields returned by the backend
+  contributionCount?: number;
+  computed?: GoalComputed;
+  contributions?: GoalContribution[];
+}
+
+export interface GoalSummary {
+  totalTargetAmount: number;
+  totalSavedAmount: number;
+  totalRemainingAmount: number;
+  percentageComplete: number;
+  activeCount: number;
+  completedCount: number;
+}
+
+/** Per-day aggregate of confirmed transactions for the calendar grid. */
+export interface CalendarDaySummary {
+  date: string;
+  income: number;
+  expense: number;
+  transfer: number;
+  net: number;
+  count: number;
+}
+
+/** A scheduled (not yet recorded) occurrence of an existing recurring item. */
+export interface UpcomingOccurrence {
+  recurringTransactionId: string;
+  name: string;
+  merchant: string;
+  type: TransactionType;
+  amount: number;
+  categoryId?: Category | null;
+  date: string;
+  frequency: RecurringFrequency;
+}
+
+/** A goal deadline (`targetDate`) rendered as a calendar marker. */
+export interface CalendarGoalMarker {
+  id: string;
+  name: string;
+  date: string;
+  targetAmount: number;
+  remainingAmount: number;
+  percentageComplete: number;
+  icon: string;
+  color: string;
+  status: GoalStatus;
+  isOverdue: boolean;
+}
+
+/** A debt due date rendered as a calendar marker. */
+export interface CalendarDebtMarker {
+  id: string;
+  personName: string;
+  date: string;
+  originalAmount: number;
+  remainingAmount: number;
+  direction: DebtDirection;
+  status: DebtStatus;
+  isOverdue: boolean;
+}
+
+export interface CalendarDayDetail {
+  date: string;
+  transactions: Transaction[];
+  summary: {
+    income: number;
+    expense: number;
+    transfer: number;
+    net: number;
+    count: number;
+  };
+  scheduled: UpcomingOccurrence[];
+  goals: CalendarGoalMarker[];
+  debts: CalendarDebtMarker[];
+}
+
 export interface NotificationItem {
   _id: string;
   userId: string;
@@ -228,6 +352,7 @@ export interface DebtPayment {
 export interface Debt {
   _id: string;
   userId: string;
+  personId?: Person | string | null;
   personName: string;
   description?: string;
   originalAmount: number;
@@ -245,6 +370,31 @@ export interface Debt {
   status?: DebtStatus;
   isOverdue?: boolean;
   payments?: DebtPayment[];
+}
+
+export type DebtCandidateStatus = 'PENDING' | 'ACCEPTED' | 'MATCHED' | 'IGNORED';
+export type DebtCandidateMatch = 'EXACT_SETTLEMENT' | 'PARTIAL_PAYMENT' | 'NO_MATCH';
+
+export interface DebtCandidate {
+  _id: string;
+  userId: string;
+  personId?: Person | string | null;
+  personName: string;
+  vpa?: string | null;
+  amount: number;
+  currency: string;
+  direction: DebtDirection;
+  transactionDate: string;
+  source: 'email' | 'import';
+  refNo?: string | null;
+  transactionId?: string | null;
+  merchant: string;
+  status: DebtCandidateStatus;
+  match: DebtCandidateMatch;
+  suggestedDebtId?: string | Debt | null;
+  suggestedDebtRemaining?: number | null;
+  confidence: number;
+  createdAt: string;
 }
 
 export interface DebtSummary {

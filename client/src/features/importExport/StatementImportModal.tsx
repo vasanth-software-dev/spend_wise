@@ -60,6 +60,7 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
     importedCount: number;
     skippedCount: number;
     skipped?: Array<{ row: unknown; reason: string }>;
+    debtCandidateCount?: number;
   } | null>(null);
 
   const [knownPeople, setKnownPeople] = useState<string[]>([]);
@@ -395,6 +396,15 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
                   ` (${result.skippedCount} duplicates/existing rows skipped automatically).`}
               </p>
             </div>
+
+            {(result.debtCandidateCount ?? 0) > 0 && (
+              <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 rounded-xl text-left text-xs text-amber-800 dark:text-amber-200">
+                <strong>{result.debtCandidateCount}</strong> person-to-person payment
+                {result.debtCandidateCount === 1 ? '' : 's'} flagged as a possible debt
+                repayment. Review them on the Debts page — nothing was recorded as a debt
+                automatically.
+              </div>
+            )}
 
             {result.skipped && result.skipped.length > 0 && (
               <div className="mt-3 p-3 bg-white/80 dark:bg-slate-900/60 rounded-xl text-left border border-slate-200 dark:border-slate-800 max-h-36 overflow-y-auto custom-scrollbar text-[11px]">

@@ -38,6 +38,7 @@ import { Badge } from '../components/ui/Badge.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
 import { formatRelativeDate } from '../utils/format.js';
 import { DetectedTransactionReviewCenter } from '../features/emailSync/DetectedTransactionReviewCenter.js';
+import { DebtCandidatePanel } from '../features/debts/DebtCandidatePanel.js';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../services/api.js';
 
@@ -234,6 +235,11 @@ export const EmailSyncPage: React.FC = () => {
 
       {/* Review Center Banner if any detected transactions pending */}
       <DetectedTransactionReviewCenter />
+
+      {/* Person-to-person payments that may be debt repayments */}
+      <div className="mb-8">
+        <DebtCandidatePanel />
+      </div>
 
       {/* Security & Zero-Password Guarantee Banner (Requirement 6 & 48) */}
       <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/20 border border-emerald-200 dark:border-emerald-800/80 rounded-2xl p-5 sm:p-6">

@@ -21,9 +21,11 @@ const transactionSchema = new Schema<ITransaction>(
       enum: ['upi', 'bank', 'cash', 'card', 'wallet', 'other'],
       default: 'upi',
     },
+    // `receipt_scan` is an attribution label only: no receipt image is ever
+    // persisted. There is deliberately no `receipt_image_url` field.
     source: {
       type: String,
-      enum: ['manual', 'email', 'import'],
+      enum: ['manual', 'email', 'import', 'receipt_scan'],
       default: 'manual',
     },
     sourceAccountId: { type: Schema.Types.ObjectId, ref: 'EmailAccount', default: null },

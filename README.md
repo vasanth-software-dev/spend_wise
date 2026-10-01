@@ -60,7 +60,20 @@ SpendWise is an enterprise-quality, privacy-first personal finance platform buil
 - Live active session inspector: tracks browser, operating system, IP address, and last-active timestamp.
 - Revoke individual sessions or trigger "Logout All Other Devices".
 
-### 10. Design System & Accessibility
+### 10. Zero-Cost Receipt & Ticket Scanner
+- **Scan Receipt / Ticket** is available inside the existing Add Transaction flow, alongside Expense / Income / Transfer.
+- **On-device OCR (Tesseract.js, Apache-2.0)**: the image is decoded, deskewed, downscaled, contrast-stretched and read entirely in the browser. No API key, no per-scan cost, and the bytes never leave the device.
+- **Temporary image only**: the photo exists as an in-memory blob and a revoked-on-discard object URL. It is deleted the moment the expense is created, cancelled, or replaced. There is no `receipt_image_url` and nothing is written to disk, object storage or the database.
+- **Never invents money**: amount, date and merchant are only pre-filled above a per-field confidence threshold. Anything unread is shown as an empty input the user must complete, because a missing value is safer than a wrong one.
+- **Local preprocessing**: EXIF orientation, downscale to 1800px, quarter-turn correction driven by the engine's own rotation hint, and a grayscale contrast stretch tuned for faded thermal print.
+- **Existing categories only**: bus ticket → Transport, movie ticket → Entertainment, restaurant → Food & Dining, grocery → Groceries, fuel → Fuel. A category is never created by the scanner; uncertain reads leave the picker empty.
+- **Cash-first default**: payment method starts at Cash and stays fully editable, since a scanned ticket is not assumed to have been paid in cash.
+- **Duplicate advisory**: before saving, a read-only `POST /api/v1/transactions/check-duplicate` reuses the existing `DuplicateDetectionService` and shows "Possible duplicate expense" with *Review existing* / *Add anyway*. It never blocks the save.
+- **Manual fallback always available**: blurry, damaged, unreadable or unsupported scans show "We couldn't read this ticket clearly." with *Try Again* and *Enter Manually*.
+- **One ledger, not two**: confirmation writes through `createTransactionThunk` → `POST /api/v1/transactions` with `source: 'receipt_scan'`. A scanned expense is a normal transaction in the dashboard, transactions, calendar, reports, category totals and balance.
+- **Provider abstraction**: the UI only depends on `OCRService`, with `LocalOCRService` (shipped), `ServerOCRService` (self-hosted, inert until an endpoint is configured) and `OptionalAIProvider` (deliberately not implemented, opt-in only). The scanner degrades to the on-device engine if any optional provider is absent or fails.
+
+### 11. Design System & Accessibility
 - Clean fintech SaaS aesthetics with soft borders, subtle elevations, and dark/light/system theme modes.
 - Fully responsive across desktop (1440px, 1024px), tablet (768px), and mobile (390px, 360px).
 - Bottom navigation bar and center floating action button optimized for one-handed mobile usage.
@@ -76,6 +89,8 @@ spendwise/
 │   │   ├── app/                 # App routing & root providers
 │   │   ├── components/ui/       # Design system (Button, Card, Modal, Input, Badge, etc.)
 │   │   ├── features/            # Feature modules (transactions, dashboard, emailSync, etc.)
+│   │   │   ├── transactions/     # TransactionModal, ledger drawer
+│   │   │   └── receiptScanner/   # On-device scanner: OCRService, preprocessing, extraction, review
 │   │   ├── layouts/             # MainLayout, Sidebar, Navbar, MobileNavigation
 │   │   ├── pages/               # Top-level view routes
 │   │   ├── services/            # Axios API client with token refresh queue
@@ -180,6 +195,10 @@ npm run dev
 - **Backend API**: [http://localhost:8080](http://localhost:8080)
 - **API Health Check**: [http://localhost:8080/api/health](http://localhost:8080/api/health)
 
+No OCR API key, no image-hosting account and no AI provider are required. The receipt scanner ships with
+on-device OCR and runs at ₹0/month; the Tesseract wasm core and the `eng` language model are fetched once
+and cached by the browser.
+
 ---
 
 ## 🧪 Testing & Verification
@@ -189,6 +208,9 @@ Run the automated test suite across parsing logic, decimal-safe financial calcul
 ```bash
 # Run server test suite
 npm run test:server
+
+# Run client test suite (includes receipt extraction coverage)
+npm run test:client
 ```
 
 ---
@@ -200,6 +222,7 @@ npm run test:server
 3. **AES-256-GCM Encryption**: OAuth tokens are encrypted at rest with AES-256-GCM authenticated cipher before reaching MongoDB.
 4. **Sensitive Data Redaction**: Passwords, tokens, OTPs, and card numbers are scrubbed from logs via `maskSensitiveData()`.
 5. **Cascading Account Deletion**: Deleting an account revokes OAuth access and purges all transactions, categories, budgets, and sessions permanently.
+6. **Receipt Images Never Touch the Server**: the scanner decodes, processes and reads images in the browser. The only server call in the flow is an authenticated, read-only duplicate probe; no image, no OCR text and no temporary file is ever stored, logged or included in analytics.
 
 ---
 

@@ -9,7 +9,7 @@ export const createTransactionSchema = z.object({
     merchant: z.string().min(1, 'Merchant or payee name is required'),
     description: z.string().optional(),
     paymentMethod: z.enum(['upi', 'bank', 'cash', 'card', 'wallet', 'other']).default('upi'),
-    source: z.enum(['manual', 'email', 'import']).default('manual'),
+    source: z.enum(['manual', 'email', 'import', 'receipt_scan']).default('manual'),
     externalTransactionId: z.string().optional(),
     refNo: z.string().optional(),
     transactionDate: z.string().or(z.date()).optional(),

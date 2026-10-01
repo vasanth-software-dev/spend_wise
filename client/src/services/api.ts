@@ -18,6 +18,15 @@ export const api = axios.create({
   },
 });
 
+// Absolute refresh URL: works both for localhost proxy (/api/...) and
+// ngrok (https://<backend>.ngrok-free.app/api/...) setups.
+function refreshUrl(): string {
+  const base = import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL}/api/v1`
+    : '/api/v1';
+  return `${base}/auth/refresh`;
+}
+
 // Request interceptor to attach in-memory access token
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
@@ -78,7 +87,7 @@ api.interceptors.response.use(
 
       try {
         const res = await axios.post(
-          '/api/v1/auth/refresh',
+          refreshUrl(),
           {},
           { withCredentials: true }
         );

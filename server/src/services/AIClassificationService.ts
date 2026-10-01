@@ -472,7 +472,7 @@ class AIClassificationService {
         return null;
       }
       
-      const data: { choices?: Array<{ message?: { content?: string } }> } = await response.json();
+      const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
       const content = data.choices?.[0]?.message?.content;
       
       if (!content) {

@@ -1,8 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import { ZodError, ZodTypeAny } from 'zod';
 import { sendError } from '../utils/apiResponse.js';
 
-export function validate(schema: AnyZodObject) {
+/**
+ * Accepts any Zod schema, including `.refine()`-wrapped ones used for
+ * cross-field rules (e.g. saved amount may not exceed the target).
+ */
+export function validate(schema: ZodTypeAny) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       await schema.parseAsync({

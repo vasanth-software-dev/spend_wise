@@ -34,7 +34,15 @@ export class DebtController {
       const userId = req.user!.userId;
       const debt = await debtService.createDebt(userId, req.body);
       sendSuccess(res, { debt }, 'Debt recorded successfully', 201);
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.message === 'PERSON_NOT_FOUND') {
+        sendError(res, 'Selected person was not found', 404, 'PERSON_NOT_FOUND');
+        return;
+      }
+      if (err?.message === 'PERSON_REQUIRED') {
+        sendError(res, 'Select a person or enter a name manually (e.g. bank loan)', 400, 'PERSON_REQUIRED');
+        return;
+      }
       next(err);
     }
   }
@@ -50,6 +58,14 @@ export class DebtController {
       }
       sendSuccess(res, { debt }, 'Debt updated successfully');
     } catch (err: any) {
+      if (err?.message === 'PERSON_NOT_FOUND') {
+        sendError(res, 'Selected person was not found', 404, 'PERSON_NOT_FOUND');
+        return;
+      }
+      if (err?.message === 'PERSON_REQUIRED') {
+        sendError(res, 'Select a person or enter a name manually (e.g. bank loan)', 400, 'PERSON_REQUIRED');
+        return;
+      }
       if (err?.message === 'AMOUNT_BELOW_PAID') {
         sendError(
           res,

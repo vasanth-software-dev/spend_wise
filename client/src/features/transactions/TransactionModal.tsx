@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ScanLine } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/index.js';
 import { createTransactionThunk, updateTransactionThunk } from '../../store/slices/transactionSlice.js';
 import { fetchDashboardThunk } from '../../store/slices/dashboardSlice.js';
@@ -6,6 +7,7 @@ import { Modal } from '../../components/ui/Modal.js';
 import { Button } from '../../components/ui/Button.js';
 import { Input } from '../../components/ui/Input.js';
 import { CategoryIcon } from '../../components/ui/CategoryIcon.js';
+import { ReceiptScannerModal } from '../receiptScanner/ReceiptScannerModal.js';
 import { TransactionType, PaymentMethod, Transaction } from '../../types/index.js';
 import { toast } from '../..//components/ui/Toast.js';
 
@@ -13,6 +15,8 @@ interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultType?: TransactionType;
+  /** Pre-fills the date field, e.g. when adding from a calendar day. */
+  defaultDate?: string | null;
   transaction?: Transaction | null;
   onSuccess?: (updated: Transaction) => void;
 }
@@ -21,20 +25,23 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   isOpen,
   onClose,
   defaultType = 'expense',
+  defaultDate,
   transaction,
   onSuccess,
 }) => {
   const dispatch = useAppDispatch();
   const categories = useAppSelector((state) => state.categories.categories);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const isEditing = !!transaction;
+  const initialDate = defaultDate || new Date().toISOString().split('T')[0];
 
   const [type, setType] = useState<TransactionType>(defaultType);
   const [amount, setAmount] = useState('');
   const [merchant, setMerchant] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(initialDate);
   const [refNo, setRefNo] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,14 +74,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         setRefNo('');
         setNotes('');
         setError(null);
-        setDate(new Date().toISOString().split('T')[0]);
+        setDate(initialDate);
 
         // Pick default category for type
         const defaultCat = categories.find((c) => c.type === defaultType || c.type === 'both');
         if (defaultCat) setCategoryId(defaultCat._id);
       }
     }
-  }, [isOpen, transaction, defaultType, categories]);
+  }, [isOpen, transaction, defaultType, categories, initialDate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,6 +222,30 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </button>
         </div>
 
+        {/* Scan Receipt / Ticket entry point, available when adding a new expense */}
+        {!isEditing && (
+          <button
+            type="button"
+            onClick={() => setIsScannerOpen(true)}
+            className="w-full flex items-center gap-3 p-3 rounded-2xl border border-brand-500/30 bg-brand-500/[0.06] hover:bg-brand-500/10 transition-colors text-left group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-brand-500/15 text-brand-600 dark:text-brand-400 flex items-center justify-center flex-shrink-0">
+              <ScanLine className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-slate-900 dark:text-white tracking-tight">
+                Scan Receipt / Ticket
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                Photo a bus or movie ticket and read it on your device
+              </p>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400 flex-shrink-0">
+              Scan
+            </span>
+          </button>
+        )}
+
         {/* Tactile Financial Amount Input */}
         <div className="bg-slate-50/60 dark:bg-slate-850/40 p-4 rounded-2xl border border-slate-200/70 dark:border-white/5">
           <div className="flex items-center justify-between mb-1.5">
@@ -352,6 +383,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </Button>
         </div>
       </form>
+
+      {/* Scanner is layered above this form and creates the expense itself once
+          the user confirms, so this modal closes underneath it. */}
+      <ReceiptScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        defaultDate={defaultDate || null}
+      />
     </Modal>
   );
 };

@@ -6,7 +6,6 @@ import {
   PiggyBank,
   Plus,
   RefreshCw,
-  Repeat,
   ChevronRight,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
@@ -14,16 +13,20 @@ import { DashboardTimeRange, fetchDashboardThunk, setTimeRange } from '../store/
 import { fetchPendingDetectedThunk } from '../store/slices/detectedTransactionSlice.js';
 import { fetchUpcomingThunk } from '../store/slices/recurringSlice.js';
 import { fetchCategoriesThunk } from '../store/slices/categorySlice.js';
+import { fetchGoalsThunk } from '../store/slices/goalSlice.js';
+import { fetchCalendarUpcomingThunk } from '../store/slices/calendarSlice.js';
 import { StatCard } from '../components/ui/StatCard.js';
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card.js';
 import { Button } from '../components/ui/Button.js';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/ui/Skeleton.js';
 import { CategoryIcon } from '../components/ui/CategoryIcon.js';
-import { formatINR, formatDate, formatRelativeDate } from '../utils/format.js';
+import { formatINR, formatRelativeDate } from '../utils/format.js';
 import { ExpenseTrendChart } from '../features/dashboard/ExpenseTrendChart.js';
 import { CategoryBreakdownChart } from '../features/dashboard/CategoryBreakdownChart.js';
 import { TopMerchantsChart } from '../features/dashboard/TopMerchantsChart.js';
 import { DetectedTransactionReviewCenter } from '../features/emailSync/DetectedTransactionReviewCenter.js';
+import { GoalsWidget } from '../features/dashboard/GoalsWidget.js';
+import { UpcomingList } from '../features/calendar/UpcomingList.js';
 import { TransactionModal } from '../features/transactions/TransactionModal.js';
 import { TransactionDrawer } from '../features/transactions/TransactionDrawer.js';
 import { Transaction } from '../types/index.js';
@@ -43,6 +46,27 @@ export const DashboardPage: React.FC = () => {
   } = useAppSelector((state) => state.dashboard);
 
   const upcomingBills = useAppSelector((state) => state.recurring.upcomingList);
+  const goals = useAppSelector((state) => state.goals.goals);
+  const goalsLoading = useAppSelector((state) => state.goals.loading);
+  const calendarUpcoming = useAppSelector((state) => state.calendar.upcoming);
+  const upcomingLoading = useAppSelector((state) => state.calendar.upcomingLoading);
+
+  // Prefer the calendar's projected occurrences (they carry real dates and
+  // distinguish scheduled income from scheduled outflows); fall back to the
+  // recurring list so the widget is never empty while data loads.
+  const upcomingItems =
+    calendarUpcoming?.upcoming.length
+      ? calendarUpcoming.upcoming
+      : upcomingBills.map((bill) => ({
+          recurringTransactionId: bill._id,
+          name: bill.name,
+          merchant: bill.merchant,
+          type: bill.type,
+          amount: bill.amount,
+          categoryId: bill.categoryId as never,
+          date: new Date(bill.nextDueDate).toISOString().split('T')[0],
+          frequency: bill.frequency,
+        }));
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
@@ -53,6 +77,8 @@ export const DashboardPage: React.FC = () => {
     dispatch(fetchPendingDetectedThunk());
     dispatch(fetchUpcomingThunk());
     dispatch(fetchCategoriesThunk());
+    dispatch(fetchGoalsThunk());
+    dispatch(fetchCalendarUpcomingThunk(30));
   }, [dispatch, timeRange]);
 
   const handleRangeChange = (range: DashboardTimeRange) => {
@@ -220,67 +246,21 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom Grid: Upcoming Recurring Bills & Recent Transactions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Upcoming Recurring Bills Card (1 col) */}
+      {/* Bottom Section: Goals & Upcoming widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <GoalsWidget goals={goals} loading={goalsLoading} limit={3} />
+
+        <UpcomingList
+          upcoming={upcomingItems}
+          loading={upcomingLoading}
+          limit={4}
+          footerLink={{ to: '/calendar', label: 'View calendar' }}
+        />
+      </div>
+
+      {/* Recent Transactions List */}
+      <div className="grid grid-cols-1 gap-6">
         <Card className="p-5 sm:p-6 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400">
-                  <Repeat className="w-4 h-4" />
-                </div>
-                <CardTitle className="text-sm sm:text-base">Upcoming Bills</CardTitle>
-              </div>
-              <Link
-                to="/recurring"
-                className="text-xs text-brand-600 dark:text-brand-400 hover:underline font-bold"
-              >
-                View all
-              </Link>
-            </div>
-
-            <div className="mt-4 space-y-2.5">
-              {upcomingBills.length === 0 ? (
-                <p className="text-xs text-slate-400 py-6 text-center font-medium">
-                  No upcoming recurring bills scheduled
-                </p>
-              ) : (
-                upcomingBills.slice(0, 4).map((bill) => (
-                  <div
-                    key={bill._id}
-                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50/70 dark:bg-slate-850/50 border border-slate-100 dark:border-slate-800/80 text-xs hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
-                  >
-                    <div>
-                      <p className="font-bold text-slate-800 dark:text-slate-200 tracking-tight">
-                        {bill.name}
-                      </p>
-                      <p className="text-slate-400 text-[11px] mt-0.5 font-medium">
-                        Due {formatDate(bill.nextDueDate, 'dd MMM')}
-                      </p>
-                    </div>
-                    <span className="font-extrabold text-slate-900 dark:text-white tabular-financial font-mono text-xs sm:text-sm">
-                      {formatINR(bill.amount)}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="mt-6 pt-3.5 border-t border-slate-100 dark:border-slate-800 text-center">
-            <Link
-              to="/recurring"
-              className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center justify-center gap-1 transition-colors"
-            >
-              Manage subscriptions & EMI commitments
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </Card>
-
-        {/* Recent Transactions List (2 cols) */}
-        <Card className="lg:col-span-2 p-5 sm:p-6 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800">
               <div>

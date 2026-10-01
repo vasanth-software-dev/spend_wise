@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { env } from '../../config/env.js';
+import { env, getPublicApiBase } from '../../config/env.js';
 
 export interface GoogleProfile {
   id: string;
@@ -9,6 +9,21 @@ export interface GoogleProfile {
   familyName?: string;
   picture?: string;
   verifiedEmail: boolean;
+}
+
+/**
+ * Resolve which redirect URI to use for Google OAuth.
+ * - Explicit `redirectUri` param wins (allows ?redirect_uri= override).
+ * - Else if PUBLIC_API_URL is set (ngrok), build
+ *   `<PUBLIC_API_URL>/api/v1/auth/google/callback` so the exact
+ *   ngrok https URL is sent to Google (must match Google Console entry).
+ * - Else fall back to env GOOGLE_AUTH_REDIRECT_URI.
+ */
+export function resolveAuthRedirectUri(redirectUri?: string): string {
+  if (redirectUri) return redirectUri;
+  const publicBase = getPublicApiBase();
+  if (publicBase) return `${publicBase}/api/v1/auth/google/callback`;
+  return env.GOOGLE_AUTH_REDIRECT_URI || env.GOOGLE_REDIRECT_URI;
 }
 
 export class GoogleSocialiteProvider {
@@ -23,7 +38,7 @@ export class GoogleSocialiteProvider {
    * Get an initialized OAuth2 client.
    */
   private static getOAuth2Client(redirectUri?: string) {
-    const effectiveRedirectUri = redirectUri || env.GOOGLE_AUTH_REDIRECT_URI || env.GOOGLE_REDIRECT_URI;
+    const effectiveRedirectUri = resolveAuthRedirectUri(redirectUri);
     return new google.auth.OAuth2(
       env.GOOGLE_CLIENT_ID,
       env.GOOGLE_CLIENT_SECRET,

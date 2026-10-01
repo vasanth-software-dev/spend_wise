@@ -2,6 +2,7 @@ import { transactionRepository, TransactionFilterParams } from '../repositories/
 import { categoryRepository } from '../repositories/CategoryRepository.js';
 import { duplicateDetectionService } from './DuplicateDetectionService.js';
 import { personService, isIdentifiablePerson } from './PersonService.js';
+import { debtCandidateService } from './DebtCandidateService.js';
 import { ITransaction, TransactionType, PaymentMethod, TransactionSource } from '../types/index.js';
 import { roundTo2Decimals } from '../utils/currency.js';
 import { Types } from 'mongoose';
@@ -119,6 +120,63 @@ export class TransactionService {
     return transactionRepository.delete(id, userId);
   }
 
+  /**
+   * Read-only duplicate probe used by the receipt scanner review screen.
+   *
+   * Nothing is created here. The scanned expense is still created through the
+   * normal `createTransaction` path only after the user explicitly confirms, so
+   * this only informs the "Possible duplicate expense" prompt. Uses the same
+   * `DuplicateDetectionService` as every other write path, so the scanner never
+   * invents a second, divergent notion of duplication.
+   */
+  async checkPossibleDuplicate(
+    userId: string,
+    input: {
+      amount: number;
+      merchant: string;
+      transactionDate: Date;
+      refNo?: string;
+      type?: 'expense' | 'income';
+      paymentMethod?: PaymentMethod;
+    }
+  ) {
+    const merchant = input.merchant.trim();
+    if (!merchant) {
+      // An unidentified merchant cannot be compared reliably; reporting a
+      // duplicate here would be a guess, so treat it as "no match".
+      return { isDuplicate: false as const, matchedTransaction: null };
+    }
+
+    const result = await duplicateDetectionService.checkDuplicate(userId, {
+      amount: roundTo2Decimals(Number(input.amount)),
+      currency: 'INR',
+      type: input.type === 'income' ? 'income' : 'expense',
+      merchant,
+      transactionDate: input.transactionDate,
+      upiReference: input.refNo,
+      bankReference: input.refNo,
+      refNo: input.refNo,
+      paymentMethod: input.paymentMethod || 'other',
+      confidenceScore: 100,
+    });
+
+    if (!result.isDuplicate || !result.matchedTransactionId) {
+      return { isDuplicate: false as const, matchedTransaction: null };
+    }
+
+    const matchedTransaction = await transactionRepository.findById(
+      result.matchedTransactionId,
+      userId
+    );
+
+    return {
+      isDuplicate: true as const,
+      duplicateType: result.duplicateType,
+      reason: result.reason,
+      matchedTransaction,
+    };
+  }
+
   async bulkDelete(ids: string[], userId: string): Promise<number> {
     return transactionRepository.deleteMany(ids, userId);
   }
@@ -198,10 +256,12 @@ export class TransactionService {
       refNo?: string;
       externalTransactionId?: string;
       notes?: string;
+      vpa?: string;
     }>
   ) {
     const created: ITransaction[] = [];
     const skipped: Array<{ row: unknown; reason: string }> = [];
+    const debtCandidateIds: string[] = [];
 
     // Cache categories for user
     const categories = await categoryRepository.findByUserId(userId);
@@ -226,6 +286,14 @@ export class TransactionService {
 
         const merchant = (row.merchant || 'Unknown').trim();
         const typeStr = (row.type || '').toLowerCase();
+
+        // Statement rows may carry the UPI handle (e.g. "sivashakthi@iob") in the
+        // narration or notes; it is the strongest person-matching signal we have.
+        const vpaSource = `${merchant} ${row.notes || ''}`;
+        const vpaMatch = vpaSource.match(
+          /\b([A-Za-z0-9._-]{2,}@[A-Za-z0-9.-]{2,})\b/i
+        );
+        const extractedVpa = (row.vpa || vpaMatch?.[1] || '').trim().toLowerCase() || null;
 
         let categoryId: string | null = null;
         let categoryType: string | null = null;
@@ -286,7 +354,7 @@ export class TransactionService {
           }
           const person = await personService.findOrCreate(
             userId,
-            { name: merchant },
+            { name: merchant, vpa: extractedVpa || undefined },
             { isManual: false }
           );
           if (person) {
@@ -301,6 +369,7 @@ export class TransactionService {
           currency: 'INR',
           categoryId: categoryId ? new Types.ObjectId(categoryId) : null,
           personId: personId || undefined,
+          vpa: extractedVpa,
           merchant,
           paymentMethod,
           source: 'import',
@@ -312,6 +381,28 @@ export class TransactionService {
         });
 
         created.push(tx);
+
+        // Surface person-to-person imports as debt candidates for review only.
+        // No Debt is created automatically.
+        if (personId && (type === 'expense' || type === 'income')) {
+          try {
+            const candidate = await debtCandidateService.detectFromTransaction({
+              userId,
+              amount,
+              direction: type === 'income' ? 'OWED_TO_ME' : 'I_OWE',
+              merchant,
+              vpa: extractedVpa,
+              refNo,
+              transactionDate: date,
+              source: 'import',
+              transactionId: String(tx._id),
+              personId: personId.toString(),
+            });
+            if (candidate) debtCandidateIds.push(String(candidate._id));
+          } catch (_) {
+            // Candidate detection must never block the import
+          }
+        }
       } catch (err) {
         skipped.push({ row, reason: (err as Error).message });
       }
@@ -322,6 +413,8 @@ export class TransactionService {
       skippedCount: skipped.length,
       created,
       skipped,
+      debtCandidateIds,
+      debtCandidateCount: debtCandidateIds.length,
     };
   }
 

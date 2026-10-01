@@ -1,9 +1,11 @@
 import { debtRepository, DebtWithBalance, DebtWithPayments } from '../repositories/DebtRepository.js';
+import { PersonModel } from '../models/Person.js';
 import { IDebt, IDebtPayment } from '../types/index.js';
 import { Types } from 'mongoose';
 
 export interface CreateDebtDTO {
-  personName: string;
+  personId?: string | null;
+  personName?: string;
   direction: 'I_OWE' | 'OWED_TO_ME';
   originalAmount: number;
   description?: string;
@@ -22,10 +24,35 @@ export interface CreatePaymentDTO {
 }
 
 export class DebtService {
+  /** Resolve personId -> personName. Throws PERSON_NOT_FOUND if the id is invalid for this user. */
+  private async resolveDebtPerson(
+    userId: string,
+    data: { personId?: string | null; personName?: string }
+  ): Promise<{ personId: Types.ObjectId | null; personName: string }> {
+    const rawId = typeof data.personId === 'string' ? data.personId.trim() : data.personId;
+    if (rawId) {
+      if (!Types.ObjectId.isValid(rawId)) throw new Error('PERSON_NOT_FOUND');
+      const person = await PersonModel.findOne({
+        _id: rawId,
+        userId: new Types.ObjectId(userId),
+        isDeleted: { $ne: true },
+      }).lean();
+      if (!person) throw new Error('PERSON_NOT_FOUND');
+      return { personId: new Types.ObjectId(person._id), personName: person.name };
+    }
+    const manualName = data.personName?.trim();
+    if (!manualName) throw new Error('PERSON_REQUIRED');
+    // Manual entry (e.g. bank loan like "HDFC Personal Loan") — intentionally NOT
+    // auto-added to People so banks/institutions don't pollute the contacts directory.
+    return { personId: null, personName: manualName };
+  }
+
   async createDebt(userId: string, data: CreateDebtDTO): Promise<IDebt> {
+    const { personId, personName } = await this.resolveDebtPerson(userId, data);
     return debtRepository.create({
       userId: new Types.ObjectId(userId),
-      personName: data.personName.trim(),
+      personId,
+      personName,
       direction: data.direction,
       originalAmount: Number(data.originalAmount),
       description: data.description?.trim() || undefined,
@@ -62,7 +89,20 @@ export class DebtService {
     }
 
     const payload: Partial<IDebt> = {};
-    if (updateData.personName) payload.personName = updateData.personName.trim();
+    if (updateData.personId !== undefined || updateData.personName !== undefined) {
+      const wantsPersonChange =
+        (typeof updateData.personId === 'string' && updateData.personId.trim().length > 0) ||
+        updateData.personId === null ||
+        (typeof updateData.personName === 'string' && updateData.personName.trim().length > 0);
+      if (wantsPersonChange) {
+        const { personId, personName } = await this.resolveDebtPerson(userId, {
+          personId: updateData.personId,
+          personName: updateData.personName,
+        });
+        payload.personId = personId;
+        payload.personName = personName;
+      }
+    }
     if (updateData.direction) payload.direction = updateData.direction;
     if (updateData.originalAmount !== undefined)
       payload.originalAmount = Number(updateData.originalAmount);

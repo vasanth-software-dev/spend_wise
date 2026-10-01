@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { env } from '../../config/env.js';
+import { env, getPublicApiBase } from '../../config/env.js';
 import { decrypt } from '../../utils/encryption.js';
 import { EmailMessage, EmailProvider, SyncOptions } from '../../types/index.js';
 import {
@@ -40,6 +40,16 @@ function findBodyPart(parts: any[] | undefined, mimeType: string): string | unde
   }
 }
 
+/**
+ * Resolve which redirect URI to use for Gmail sync OAuth.
+ * Same priority as login flow: explicit > PUBLIC_API_URL > env.
+ */
+export function resolveGmailRedirectUri(): string {
+  const publicBase = getPublicApiBase();
+  if (publicBase) return `${publicBase}/api/v1/email-accounts/gmail/callback`;
+  return env.GOOGLE_REDIRECT_URI;
+}
+
 export class GmailProvider implements EmailProvider {
   public name = 'GmailProvider';
   private oauth2Client;
@@ -48,7 +58,7 @@ export class GmailProvider implements EmailProvider {
     this.oauth2Client = new google.auth.OAuth2(
       env.GOOGLE_CLIENT_ID,
       env.GOOGLE_CLIENT_SECRET,
-      env.GOOGLE_REDIRECT_URI
+      resolveGmailRedirectUri()
     );
 
     if (encryptedAccessToken) {
@@ -69,7 +79,7 @@ export class GmailProvider implements EmailProvider {
     const oauth2Client = new google.auth.OAuth2(
       env.GOOGLE_CLIENT_ID,
       env.GOOGLE_CLIENT_SECRET,
-      env.GOOGLE_REDIRECT_URI
+      resolveGmailRedirectUri()
     );
 
     const scopes = [
@@ -90,7 +100,7 @@ export class GmailProvider implements EmailProvider {
     const oauth2Client = new google.auth.OAuth2(
       env.GOOGLE_CLIENT_ID,
       env.GOOGLE_CLIENT_SECRET,
-      env.GOOGLE_REDIRECT_URI
+      resolveGmailRedirectUri()
     );
 
     const { tokens } = await oauth2Client.getToken(code);

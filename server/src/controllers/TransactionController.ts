@@ -160,6 +160,36 @@ export class TransactionController {
     }
   }
 
+  /**
+   * Read-only duplicate probe for the receipt scanner. Returns the existing
+   * transaction so the UI can offer "Review existing" / "Add anyway". It never
+   * creates or modifies a transaction.
+   */
+  async checkDuplicate(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const { amount, merchant, transactionDate, refNo, type, paymentMethod } = req.body || {};
+
+      if (!merchant || !String(merchant).trim()) {
+        sendError(res, 'Merchant is required to check for duplicates', 400);
+        return;
+      }
+
+      const result = await transactionService.checkPossibleDuplicate(userId, {
+        amount: Number(amount) || 0,
+        merchant: String(merchant),
+        transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
+        refNo: refNo ? String(refNo).trim() : undefined,
+        type: type === 'income' ? 'income' : 'expense',
+        paymentMethod,
+      });
+
+      sendSuccess(res, result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getById(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.userId;

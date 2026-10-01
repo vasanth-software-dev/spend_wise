@@ -5,6 +5,7 @@ import { IDetectedTransaction, ITransaction } from '../types/index.js';
 import { Types } from 'mongoose';
 import { predictCategoryName, findMatchingCategoryId } from '../utils/categoryPredictor.js';
 import { personService } from './PersonService.js';
+import { debtCandidateService } from './DebtCandidateService.js';
 
 export interface ConfirmDetectedDTO {
   categoryId?: string;
@@ -85,6 +86,26 @@ export class DetectedTransactionService {
 
     // Mark detected transaction status as confirmed
     await detectedTransactionRepository.updateStatus(detectedId, userId, 'confirmed');
+
+    // Every confirmed person-to-person payment becomes a debt candidate for review.
+    // This never writes a Debt on its own: a P2P UPI payment may just be a purchase.
+    try {
+      await debtCandidateService.detectFromTransaction({
+        userId,
+        amount: Number(transaction.amount),
+        direction: transaction.type === 'income' ? 'OWED_TO_ME' : 'I_OWE',
+        merchant: finalMerchant,
+        vpa: parsedVpa || person?.vpa || null,
+        refNo: detected.upiReference || detected.bankReference || null,
+        transactionDate: new Date(transaction.transactionDate),
+        source: 'email',
+        transactionId: String(transaction._id),
+        sourceAccountId: String(detected.emailAccountId),
+        personId: person?._id ? String(person._id) : null,
+      });
+    } catch (_) {
+      // Candidate detection must never block confirming the transaction
+    }
 
     return transaction;
   }

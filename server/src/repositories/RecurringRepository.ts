@@ -31,6 +31,25 @@ export class RecurringRepository {
       .lean();
   }
 
+  /**
+   * Active recurring items whose next due date lands inside the window. Used by
+   * the calendar to project scheduled occurrences; the stored items stay the
+   * single source of truth so no duplicate schedule is introduced.
+   */
+  async findActiveDueBetween(
+    userId: string,
+    start: Date,
+    end: Date
+  ): Promise<IRecurringTransaction[]> {
+    return RecurringTransactionModel.find({
+      userId: new Types.ObjectId(userId),
+      isActive: true,
+      nextDueDate: { $gte: start, $lte: end },
+    })
+      .populate('categoryId', 'name icon color type')
+      .lean();
+  }
+
   async update(id: string, userId: string, updateData: Partial<IRecurringTransaction>): Promise<IRecurringTransaction | null> {
     return RecurringTransactionModel.findOneAndUpdate(
       { _id: id, userId },
