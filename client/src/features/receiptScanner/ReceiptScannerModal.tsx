@@ -1,33 +1,28 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Camera, Image as ImageIcon, Loader2, RotateCw, ShieldCheck, Sparkles } from 'lucide-react';
+import { AlertTriangle, Loader2, ShieldCheck } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal.js';
 import { Button } from '../../components/ui/Button.js';
-import { Input } from '../../components/ui/Input.js';
-import { CategorySelect } from '../../components/ui/CategorySelect.js';
 import { useAppDispatch, useAppSelector } from '../../store/index.js';
 import { createTransactionThunk } from '../../store/slices/transactionSlice.js';
 import { fetchCalendarMonthThunk, fetchCalendarDayThunk } from '../../store/slices/calendarSlice.js';
 import { fetchDashboardThunk } from '../../store/slices/dashboardSlice.js';
 import { api } from '../../services/api.js';
-import { formatINR } from '../../utils/format.js';
 import { toast } from '../../components/ui/Toast.js';
-import type { Category, PaymentMethod, Transaction } from '../../types/index.js';
-import { ACCEPT_ATTRIBUTE, describeScanFailure, validateImageFile } from './imageValidation.js';
+import type { Category, Transaction } from '../../types/index.js';
+import { describeScanFailure, validateImageFile } from './imageValidation.js';
 import { preprocessImage, type PreprocessedImage } from './imagePreprocessing.js';
 import { createOCRProviders, disposeOCRProviders, recognizeWithFallback } from './ocr/index.js';
 import { extractReceiptData } from './receiptExtractionService.js';
+import { extractReceiptBreakdown } from './receiptBreakdown.js';
+import { cropToGuide, perspectiveCorrect } from './imageProcessing.js';
+import type { Point } from './receiptDetection.js';
+import { ScannerModeSelector, type ScannerMode } from './ScannerModeSelector.js';
+import { ReceiptUpload } from './ReceiptUpload.js';
+import { LiveReceiptScanner } from './LiveReceiptScanner.js';
+import { ReceiptReview, type ReviewForm } from './ReceiptReview.js';
 import type { ExtractedReceiptData, OCRService, OCRError } from './types.js';
 
 type ScannerStep = 'capture' | 'processing' | 'review' | 'error';
-
-const PAYMENT_METHODS: Array<{ id: PaymentMethod; label: string }> = [
-  { id: 'cash', label: 'Cash' },
-  { id: 'upi', label: 'UPI (GPay/PhonePe/Paytm)' },
-  { id: 'bank', label: 'Net Banking / IMPS' },
-  { id: 'card', label: 'Debit / Credit Card' },
-  { id: 'wallet', label: 'Mobile Wallet' },
-  { id: 'other', label: 'Other' },
-];
 
 interface ReceiptScannerModalProps {
   isOpen: boolean;
@@ -47,7 +42,8 @@ interface ReceiptScannerModalProps {
 type ApplyExtraction = (
   extraction: ExtractedReceiptData,
   allCategories: Category[],
-  preview: string
+  preview: string,
+  rawText?: string,
 ) => void;
 
 interface ScanSession {
@@ -75,18 +71,16 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   const sessionRef = useRef<ScanSession | null>(null);
   const providersRef = useRef<OCRService[] | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Review form state. Fields the OCR could not read stay empty on purpose.
+  // Unified review form (single source; ReceiptReview edits via onPatch).
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [merchant, setMerchant] = useState('');
-  const [amount, setAmount] = useState('');
-  const [date, setDate] = useState(() => defaultDate || todayISO());
-  const [categoryId, setCategoryId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
-  const [description, setDescription] = useState('');
-  const [ticketNumber, setTicketNumber] = useState('');
+  const [mode, setMode] = useState<ScannerMode>('upload');
+  const emptyForm = (): ReviewForm => ({
+    merchant: '', amount: '', date: defaultDate || todayISO(), time: '',
+    categoryId: '', paymentMethod: 'cash', description: '', ticketNumber: '',
+    subtotal: '', discount: '', cgst: '', sgst: '', igst: '', total: '', items: [],
+  });
+  const [form, setForm] = useState<ReviewForm>(emptyForm);
   const [lowConfidence, setLowConfidence] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -122,14 +116,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   }, []);
 
   const resetForm = useCallback(() => {
-    setMerchant('');
-    setAmount('');
-    setDate(defaultDate || todayISO());
-    setCategoryId('');
-    // Cash is the default for the primary use case, but it stays fully editable.
-    setPaymentMethod('cash');
-    setDescription('');
-    setTicketNumber('');
+    setForm(emptyForm());
     setLowConfidence({});
     setFormError(null);
     setDuplicates([]);
@@ -198,7 +185,8 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
           applyExtractionRef.current(
             extractReceiptData(result, categories),
             categories,
-            preprocessed.previewUrl
+            preprocessed.previewUrl,
+            result.text
           );
           setStep('review');
           return;
@@ -226,34 +214,41 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
 
   /** Fills the review form from an extraction, leaving unread fields empty. */
   const applyExtraction = useCallback<ApplyExtraction>(
-    (extraction, allCategories, preview) => {
+    (extraction, allCategories, preview, rawText) => {
       setPreviewUrl((current) => {
         if (current && current !== preview) URL.revokeObjectURL(current);
         return preview;
       });
 
-      setMerchant(extraction.merchant || '');
-      setAmount(extraction.amount !== null ? String(extraction.amount) : '');
-      setDate(extraction.date || defaultDate || todayISO());
-      setTicketNumber(extraction.ticketNumber || '');
-      setDescription(extraction.description || '');
-
-      if (extraction.paymentMethod) {
-        setPaymentMethod(extraction.paymentMethod);
-      } else {
-        setPaymentMethod('cash');
-      }
-
-      // Resolve the suggested category name to a real category id. A suggestion
-      // with no matching category is ignored rather than inventing one.
+      const breakdown = extractReceiptBreakdown(rawText || '');
+      const num = (v: number | null) => (v === null ? '' : String(v));
+      // Breakdown total wins when the base extractor found nothing.
+      const totalStr =
+        extraction.amount !== null ? String(extraction.amount) : num(breakdown.total);
+      let categoryId = '';
       if (extraction.category) {
         const match = allCategories.find(
-          (category) => category.name.toLowerCase() === extraction.category!.toLowerCase()
+          (c) => c.name.toLowerCase() === extraction.category!.toLowerCase()
         );
-        setCategoryId(match?._id || '');
-      } else {
-        setCategoryId('');
+        categoryId = match?._id || '';
       }
+      setForm({
+        merchant: extraction.merchant || '',
+        amount: totalStr,
+        date: extraction.date || defaultDate || todayISO(),
+        time: extraction.time || '',
+        categoryId,
+        paymentMethod: extraction.paymentMethod || 'cash',
+        description: extraction.description || '',
+        ticketNumber: extraction.ticketNumber || '',
+        subtotal: num(breakdown.subtotal),
+        discount: num(breakdown.discount),
+        cgst: num(breakdown.cgst),
+        sgst: num(breakdown.sgst),
+        igst: num(breakdown.igst),
+        total: totalStr,
+        items: breakdown.items,
+      });
 
       setLowConfidence({
         merchant: extraction.merchant === null,
@@ -284,6 +279,28 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         const validated = validateImageFile(selected);
         setStep('processing');
         await runScan(validated.file);
+      } catch (error) {
+        const ocrError = error as OCRError;
+        setErrorMessage(describeScanFailure(ocrError.code));
+        setStep('error');
+      }
+    },
+    [releaseSession, resetForm, runScan]
+  );
+
+  /** Live capture: perspective-correct / crop, then shared OCR pipeline. */
+  const handleLiveCapture = useCallback(
+    async (captured: File, quad: Point[] | null) => {
+      releaseSession();
+      resetForm();
+      try {
+        const validated = validateImageFile(captured);
+        setStep('processing');
+        let working = validated.file;
+        try {
+          working = quad ? await perspectiveCorrect(working, quad) : await cropToGuide(working);
+        } catch { /* best-effort; fall through with raw capture */ }
+        await runScan(working);
       } catch (error) {
         const ocrError = error as OCRError;
         setErrorMessage(describeScanFailure(ocrError.code));
@@ -333,16 +350,17 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
    */
   const handleConfirm = useCallback(
     async (options: { skipDuplicateCheck?: boolean } = {}) => {
-      const numericAmount = parseFloat(amount);
+      const saveTotal = form.total.trim() || form.amount.trim();
+      const numericAmount = parseFloat(saveTotal);
       if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
         setFormError('Please enter the amount shown on the ticket.');
         return;
       }
-      if (!merchant.trim()) {
+      if (!form.merchant.trim()) {
         setFormError('Please enter who you paid.');
         return;
       }
-      if (!date) {
+      if (!form.date) {
         setFormError('Please choose the date.');
         return;
       }
@@ -358,9 +376,9 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         if (duplicates.length === 0 && !options.skipDuplicateCheck) {
           await checkDuplicates({
             amount: numericAmount,
-            merchant: merchant.trim(),
-            date,
-            refNo: ticketNumber.trim() || undefined,
+            merchant: form.merchant.trim(),
+            date: form.date,
+            refNo: form.ticketNumber.trim() || undefined,
           });
           setIsSubmitting(false);
           return;
@@ -371,13 +389,13 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
             type: 'expense',
             amount: numericAmount,
             currency: 'INR',
-            categoryId: categoryId || undefined,
-            merchant: merchant.trim(),
-            description: description.trim() || undefined,
-            paymentMethod,
-            refNo: ticketNumber.trim() || undefined,
-            externalTransactionId: ticketNumber.trim() || undefined,
-            transactionDate: new Date(date),
+            categoryId: form.categoryId || undefined,
+            merchant: form.merchant.trim(),
+            description: form.description.trim() || undefined,
+            paymentMethod: form.paymentMethod,
+            refNo: form.ticketNumber.trim() || undefined,
+            externalTransactionId: form.ticketNumber.trim() || undefined,
+            transactionDate: new Date(form.time ? `${form.date}T${form.time}` : form.date),
             notes: undefined,
             // Attribution label only: the transaction is otherwise identical to
             // a manually entered one, so it flows through the dashboard,
@@ -390,7 +408,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         // `fetchCalendarMonthThunk` refuses a future month, so the refresh is
         // skipped for a back-dated scan and the calendar picks it up on its next
         // load instead of the request failing.
-        const expenseDate = new Date(date);
+        const expenseDate = new Date(form.date);
         const now = new Date();
         const isCurrentOrPastMonth =
           expenseDate.getFullYear() < now.getFullYear() ||
@@ -405,7 +423,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
               month: expenseDate.getMonth() + 1,
             })
           );
-          dispatch(fetchCalendarDayThunk(date));
+          dispatch(fetchCalendarDayThunk(form.date));
         }
 
         toast.success('Expense added from your receipt');
@@ -424,13 +442,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       }
     },
     [
-      amount,
-      merchant,
-      date,
-      ticketNumber,
-      categoryId,
-      description,
-      paymentMethod,
+      form,
       duplicates.length,
       duplicateAcknowledged,
       checkDuplicates,
@@ -455,6 +467,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         providersRef.current = null;
       });
       setStep('capture');
+      setMode('upload');
     }
   }, [isOpen, releaseSession]);
 
@@ -468,73 +481,39 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       description="Photograph a bus ticket, movie ticket, restaurant bill or grocery receipt. Reading happens on this device and the image is deleted once you save."
       maxWidth="lg"
     >
-      {/* Hidden pickers: one opens the camera, one the gallery. */}
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(event) => {
-          void handleFileSelected(event.target.files?.[0]);
-          event.target.value = '';
-        }}
-      />
-      <input
-        ref={galleryInputRef}
-        type="file"
-        accept={ACCEPT_ATTRIBUTE}
-        className="hidden"
-        onChange={(event) => {
-          void handleFileSelected(event.target.files?.[0]);
-          event.target.value = '';
-        }}
-      />
-
       {step === 'capture' && (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-850/40 p-6 text-center">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center mb-3">
-              <Sparkles className="w-6 h-6" />
-            </div>
-            <p className="text-sm font-bold text-slate-900 dark:text-white">Snap a photo of your ticket</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
-              Fill the frame with the ticket, keep it flat and well lit, then check the amount before saving.
-            </p>
-          </div>
+          <ScannerModeSelector mode={mode} onChange={setMode} />
+          {mode === 'upload' ? (
+            <ReceiptUpload onFile={(f) => void handleFileSelected(f)} busy={false} />
+          ) : (
+            <LiveReceiptScanner
+              busy={false}
+              onPickFromGallery={() => setMode('upload')}
+              onClose={() => setMode('upload')}
+              onCapture={(file, quad) => void handleLiveCapture(file, quad)}
+            />
+          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <Button
-              variant="primary"
-              onClick={() => cameraInputRef.current?.click()}
-              leftIcon={<Camera className="w-4 h-4" />}
-            >
-              Take Photo
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => galleryInputRef.current?.click()}
-              leftIcon={<ImageIcon className="w-4 h-4" />}
-            >
-              Choose Image
-            </Button>
-          </div>
+          {mode === 'upload' && (
+            <>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+              >
+                Enter manually instead
+              </button>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-          >
-            Enter manually instead
-          </button>
-
-          <div className="flex items-start gap-2 pt-1">
-            <ShieldCheck className="w-4 h-4 text-brand-600 dark:text-brand-400 flex-shrink-0 mt-0.5" />
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-              Runs entirely on your device using open-source OCR. Nothing is uploaded, and the photo is
-              discarded after you save.
-            </p>
-          </div>
+              <div className="flex items-start gap-2 pt-1">
+                <ShieldCheck className="w-4 h-4 text-brand-600 dark:text-brand-400 flex-shrink-0 mt-0.5" />
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Runs entirely on your device using open-source OCR. Nothing is uploaded, and the photo is
+                  discarded after you save.
+                </p>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -574,7 +553,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
-            <Button variant="outline" onClick={handleScanAgain} leftIcon={<RotateCw className="w-4 h-4" />}>
+            <Button variant="outline" onClick={handleScanAgain}>
               Try Again
             </Button>
             <Button variant="secondary" onClick={onClose}>
@@ -585,198 +564,22 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       )}
 
       {step === 'review' && (
-        <div className="space-y-4">
-          {previewUrl && (
-            <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-850/40">
-              <img
-                src={previewUrl}
-                alt="Scanned receipt preview"
-                className="w-full max-h-56 object-contain"
-              />
-              <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-slate-950/70 text-[10px] font-semibold text-white">
-                Temporary · deleted after saving
-              </span>
-            </div>
-          )}
-
-          {unreadCount > 0 && (
-            <div className="p-3 rounded-xl border border-amber-500/25 bg-amber-500/10 text-[11px] font-semibold text-amber-700 dark:text-amber-300 leading-relaxed">
-              {unreadCount === 1 ? 'One field could' : `${unreadCount} fields could`} not be read
-              clearly. Please fill {unreadCount === 1 ? 'it in' : 'them in'} before saving.
-            </div>
-          )}
-
-          <div className="flex items-end gap-3">
-            <div className="relative flex-1">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-400 font-mono pointer-events-none">
-                ₹
-              </span>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                inputMode="decimal"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                placeholder={lowConfidence.amount ? 'Enter amount' : '0.00'}
-                className={`w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border rounded-xl text-2xl font-extrabold font-mono tabular-financial text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:font-sans placeholder:text-sm placeholder:font-semibold placeholder:text-slate-400 ${
-                  lowConfidence.amount
-                    ? 'border-amber-400 dark:border-amber-500/60'
-                    : 'border-slate-200 dark:border-slate-700/80 focus:border-brand-500'
-                }`}
-              />
-            </div>
-            {amount && (
-              <span className="pb-2.5 text-sm font-extrabold font-mono tabular-financial text-slate-400">
-                {formatINR(parseFloat(amount) || 0)}
-              </span>
-            )}
-          </div>
-
-          <Input
-            label="Merchant"
-            placeholder={lowConfidence.merchant ? 'Enter merchant' : 'e.g. PVR Cinemas'}
-            value={merchant}
-            onChange={(event) => setMerchant(event.target.value)}
-          />
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-              Category
-            </label>
-            <CategorySelect
-              categories={expenseCategories}
-              value={categoryId}
-              onChange={setCategoryId}
-              valueMode="id"
-              placeholder="Select category..."
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-                Payment Method
-              </label>
-              <select
-                value={paymentMethod}
-                onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
-                className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors font-medium"
-              >
-                {PAYMENT_METHODS.map((method) => (
-                  <option key={method.id} value={method.id}>
-                    {method.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-                Date
-              </label>
-              <input
-                type="date"
-                value={date}
-                onChange={(event) => setDate(event.target.value)}
-                className={`w-full py-2 px-3 bg-white dark:bg-slate-900 border rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors font-medium ${
-                  lowConfidence.date
-                    ? 'border-amber-400 dark:border-amber-500/60'
-                    : 'border-slate-200 dark:border-slate-700 focus:border-brand-500'
-                }`}
-              />
-            </div>
-          </div>
-
-          <Input
-            label="Description (Optional)"
-            placeholder="e.g. Movie ticket"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-
-          <Input
-            label="Ticket / Receipt No. (Optional)"
-            placeholder="e.g. TKT-4821"
-            value={ticketNumber}
-            onChange={(event) => setTicketNumber(event.target.value)}
-          />
-
-          {/* Duplicate prompt. Advisory: the user decides, the app never blocks. */}
-          {duplicates.length > 0 && (
-            <div className="p-3.5 rounded-2xl border border-rose-500/25 bg-rose-500/10">
-              <div className="flex items-start gap-2.5">
-                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 flex-shrink-0 mt-0.5" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-rose-800 dark:text-rose-300">
-                    Possible duplicate expense
-                  </p>
-                  {duplicates.map((existing) => (
-                    <p key={existing._id} className="text-[11px] text-rose-700/90 dark:text-rose-400/90 mt-1">
-                      {existing.merchant} · {formatINR(existing.amount)} ·{' '}
-                      {new Date(existing.transactionDate).toLocaleDateString('en-IN')}
-                    </p>
-                  ))}
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        // Stop here and let the user inspect the existing entry.
-                        onClose();
-                      }}
-                    >
-                      Review Existing
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      isLoading={isSubmitting}
-                      onClick={() => void handleConfirm({ skipDuplicateCheck: true })}
-                    >
-                      Add Anyway
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {formError && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs rounded-xl font-semibold">
-              {formError}
-            </div>
-          )}
-
-          <div className="pt-2 flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleScanAgain}
-                leftIcon={<RotateCw className="w-4 h-4" />}
-              >
-                Scan Again
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={onClose}>
-                Cancel
-              </Button>
-            </div>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              isLoading={isSubmitting}
-              onClick={() => {
-                setDuplicateAcknowledged(false);
-                void handleConfirm();
-              }}
-            >
-              Add Expense
-            </Button>
-          </div>
-        </div>
+        <ReceiptReview
+          previewUrl={previewUrl}
+          form={form}
+          onPatch={(patch) => setForm((f) => ({ ...f, ...patch }))}
+          lowConfidence={lowConfidence}
+          unreadCount={unreadCount}
+          expenseCategories={expenseCategories}
+          duplicates={duplicates}
+          formError={formError}
+          isSubmitting={isSubmitting}
+          onRetake={handleScanAgain}
+          onCancel={onClose}
+          onSave={() => { setDuplicateAcknowledged(false); void handleConfirm(); }}
+          onReviewExisting={onClose}
+          onSaveAnyway={() => void handleConfirm({ skipDuplicateCheck: true })}
+        />
       )}
     </Modal>
   );

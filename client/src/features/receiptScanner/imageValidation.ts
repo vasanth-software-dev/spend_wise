@@ -4,19 +4,16 @@ import { createOCRError, OCRFailureCode } from './types.js';
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 /**
- * Only raster formats a browser can decode are allowed through. Anything else
- * (SVG, PDF, video, archives, executables) is rejected before it reaches the
- * canvas, which also means a polyglot file can never be executed.
+ * Only the supported raster formats are allowed through. Anything else (SVG,
+ * PDF, video, archives, executables) is rejected before it reaches the canvas.
  */
 export const ACCEPTED_IMAGE_TYPES = [
   'image/jpeg',
   'image/png',
   'image/webp',
-  'image/heic',
-  'image/heif',
 ] as const;
 
-export const ACCEPT_ATTRIBUTE = 'image/*';
+export const ACCEPT_ATTRIBUTE = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
 
 export interface ValidatedImage {
   file: File;
@@ -36,13 +33,9 @@ export function validateImageFile(file: unknown): ValidatedImage {
     throw createOCRError('UNSUPPORTED_FILE', 'Please choose an image file (JPG, PNG or WebP).');
   }
 
-  // HEIC is accepted from iPhones but is not decodable by every browser, so it
-  // is allowed through here and handled by the decode step with a clear error.
   const isKnownType =
     (ACCEPTED_IMAGE_TYPES as readonly string[]).includes(type) ||
-    type === 'image/jpg' ||
-    type === 'image/bmp' ||
-    type === 'image/gif';
+    type === 'image/jpg';
 
   if (!isKnownType) {
     throw createOCRError('UNSUPPORTED_FILE', 'This image format is not supported. Use JPG, PNG or WebP.');
