@@ -78,10 +78,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                 to={item.to}
                 onClick={onCloseMobile}
                 className={({ isActive }) =>
-                  `group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-all duration-150 relative ${
-                    isActive
-                      ? 'bg-brand-500/10 text-brand-700 dark:text-brand-300 border border-brand-500/20 shadow-2xs font-bold'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent'
+                  `group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,border-color,color] duration-150 ease-out-expo relative ${isActive
+                    ? 'bg-brand-500/10 text-brand-700 dark:text-brand-300 border border-brand-500/20 shadow-2xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent'
                   }`
                 }
               >
@@ -125,8 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
         <div className="flex items-center justify-between bg-slate-100 dark:bg-slate-850 p-1 rounded-xl border border-slate-200/60 dark:border-white/5">
           <button
             onClick={() => dispatch(setThemeMode('light'))}
-            className={`flex-1 py-1 flex items-center justify-center rounded-lg text-xs font-semibold tracking-tight transition-all ${
-              themeMode === 'light'
+            className={`flex-1 py-1 flex items-center justify-center rounded-lg text-xs font-semibold tracking-tight transition-[background-color,border-color,color] duration-150 ease-out-expo ${themeMode === 'light'
                 ? 'bg-white text-slate-900 shadow-2xs font-bold'
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
@@ -136,8 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
           </button>
           <button
             onClick={() => dispatch(setThemeMode('dark'))}
-            className={`flex-1 py-1 flex items-center justify-center rounded-lg text-xs font-semibold tracking-tight transition-all ${
-              themeMode === 'dark'
+            className={`flex-1 py-1 flex items-center justify-center rounded-lg text-xs font-semibold tracking-tight transition-[background-color,border-color,color] duration-150 ease-out-expo ${themeMode === 'dark'
                 ? 'bg-[#151f34] text-white shadow-2xs font-bold border border-white/10'
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
@@ -147,8 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
           </button>
           <button
             onClick={() => dispatch(setThemeMode('system'))}
-            className={`flex-1 py-1 flex items-center justify-center rounded-lg text-xs font-semibold tracking-tight transition-all ${
-              themeMode === 'system'
+            className={`flex-1 py-1 flex items-center justify-center rounded-lg text-xs font-semibold tracking-tight transition-[background-color,border-color,color] duration-150 ease-out-expo ${themeMode === 'system'
                 ? 'bg-white dark:bg-[#151f34] text-slate-900 dark:text-white shadow-2xs font-bold'
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}

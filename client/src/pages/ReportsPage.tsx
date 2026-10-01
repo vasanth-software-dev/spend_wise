@@ -114,7 +114,7 @@ export const ReportsPage: React.FC = () => {
               <button
                 key={p.id}
                 onClick={() => applyPreset(p.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-[background-color,color] duration-150 ease-out-expo ${
                   activePreset === p.id
                     ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs font-bold'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-surface-elevated/70'
@@ -227,7 +227,7 @@ export const ReportsPage: React.FC = () => {
               <div className="flex items-center gap-2 mt-1.5">
                 <div className="flex-1 h-1.5 bg-slate-100 dark:bg-surface-subtle rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                    className="h-full bg-emerald-500 rounded-full transition-[width] duration-300 ease-out-expo"
                     style={{
                       width: `${Math.min(Math.max(summary.savingsRate || 0, 0), 100)}%`,
                     }}

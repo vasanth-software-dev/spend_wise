@@ -86,7 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search merchant, UPI ID, amount..."
-            className="w-full bg-slate-100/80 dark:bg-slate-850/80 text-xs sm:text-sm pl-10 pr-12 py-2 rounded-xl border border-transparent focus:border-brand-500/50 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500 shadow-2xs"
+            className="w-full bg-slate-100/80 dark:bg-slate-850/80 text-xs sm:text-sm pl-10 pr-12 py-2 rounded-xl border border-transparent focus:border-brand-500/50 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-[border-color,background-color,box-shadow] duration-150 ease-out-expo placeholder:text-slate-400 dark:placeholder:text-slate-500 shadow-2xs"
           />
           <div className="absolute right-3 hidden lg:flex items-center pointer-events-none">
             <kbd className="text-[10px] font-mono font-semibold text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5">
@@ -114,7 +114,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => setIsNotifOpen(!isNotifOpen)}
             aria-label="Open notifications"
-            className="relative p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 border border-transparent hover:border-slate-200 dark:hover:border-white/5 transition-all"
+            className="relative p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 border border-transparent hover:border-slate-200 dark:hover:border-white/5 transition-[background-color,border-color] duration-150 ease-out-expo"
           >
             <Bell className="w-4.5 h-4.5" />
             {unreadCount > 0 && (
@@ -186,7 +186,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
             aria-label="User account menu"
-            className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-850 border border-transparent hover:border-slate-200 dark:hover:border-white/5 transition-all"
+            className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-850 border border-transparent hover:border-slate-200 dark:hover:border-white/5 transition-[background-color,border-color] duration-150 ease-out-expo"
           >
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-600 to-emerald-400 ring-2 ring-brand-500/20 flex items-center justify-center text-white text-xs font-bold uppercase shadow-2xs">
               {user?.name?.[0] || 'U'}

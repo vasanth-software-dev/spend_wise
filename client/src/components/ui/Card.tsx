@@ -20,7 +20,7 @@ export const Card: React.FC<CardProps> = ({
   };
 
   const interactiveStyles = interactive
-    ? 'transition-all duration-200 hover:shadow-fintech-md hover:border-slate-300 dark:hover:border-slate-700 hover:-translate-y-0.5 cursor-pointer'
+    ? 'transition-[transform,box-shadow,border-color] duration-150 ease-out-expo'
     : '';
 
   return (

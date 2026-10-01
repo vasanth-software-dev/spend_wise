@@ -150,13 +150,12 @@ export const BudgetsPage: React.FC = () => {
                   <div className="mt-3.5 space-y-2">
                     <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          b.isExceeded
+                        className={`h-full rounded-full transition-[width] duration-300 ease-out-expo ${b.isExceeded
                             ? 'bg-rose-500'
                             : b.isWarning
                             ? 'bg-amber-500'
                             : 'bg-emerald-500'
-                        }`}
+                          }`}
                         style={{ width: `${percentage}%` }}
                       />
                     </div>

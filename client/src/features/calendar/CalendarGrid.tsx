@@ -86,7 +86,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                 hasGoals ? `, ${cell.goals.length} goal deadlines` : ''
               }${hasDebts ? `, ${cell.debts.length} debts due` : ''}`}
               onClick={() => onSelect(cell.key)}
-              className={`relative flex flex-col items-stretch text-left rounded-xl border px-1 sm:px-1.5 pt-1.5 pb-1 sm:pt-2 sm:pb-1.5 min-h-[52px] sm:min-h-[76px] transition-all duration-150 ${
+              className={`relative flex flex-col items-stretch text-left rounded-xl border px-1 sm:px-1.5 pt-1.5 pb-1 sm:pt-2 sm:pb-1.5 min-h-[52px] sm:min-h-[76px] transition-[border-color,background-color] duration-150 ease-out-expo ${
                 isSelected
                   ? 'border-brand-500 bg-brand-500/10 ring-1 ring-brand-500'
                   : hasActivity || hasScheduled || hasGoals || hasDebts

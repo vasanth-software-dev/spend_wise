@@ -190,7 +190,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <button
             type="button"
             onClick={() => setType('expense')}
-            className={`flex-1 py-2 text-xs font-bold tracking-tight rounded-lg transition-all ${
+            className={`flex-1 py-2 text-xs font-bold tracking-tight rounded-lg transition-[background-color,color] duration-150 ease-out-expo ${
               type === 'expense'
                 ? 'bg-rose-500 text-white shadow-2xs'
                 : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -201,7 +201,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <button
             type="button"
             onClick={() => setType('income')}
-            className={`flex-1 py-2 text-xs font-bold tracking-tight rounded-lg transition-all ${
+            className={`flex-1 py-2 text-xs font-bold tracking-tight rounded-lg transition-[background-color,color] duration-150 ease-out-expo ${
               type === 'income'
                 ? 'bg-emerald-600 text-white shadow-2xs'
                 : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -212,7 +212,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           <button
             type="button"
             onClick={() => setType('transfer')}
-            className={`flex-1 py-2 text-xs font-bold tracking-tight rounded-lg transition-all ${
+            className={`flex-1 py-2 text-xs font-bold tracking-tight rounded-lg transition-[background-color,color] duration-150 ease-out-expo ${
               type === 'transfer'
                 ? 'bg-indigo-600 text-white shadow-2xs'
                 : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -268,7 +268,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
-              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 tabular-financial shadow-2xs"
+              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-[border-color,box-shadow] duration-150 ease-out-expo placeholder:text-slate-300 dark:placeholder:text-slate-600 tabular-financial shadow-2xs"
             />
           </div>
 
@@ -308,7 +308,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 type="button"
                 key={c._id}
                 onClick={() => setCategoryId(c._id)}
-                className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border text-center transition-all ${
+                className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border text-center transition-[border-color,background-color,color] duration-150 ease-out-expo ${
                   categoryId === c._id
                     ? 'border-brand-500 bg-brand-500/10 text-brand-700 dark:text-brand-300 font-bold ring-1 ring-brand-500 shadow-2xs'
                     : 'border-slate-200/70 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300'

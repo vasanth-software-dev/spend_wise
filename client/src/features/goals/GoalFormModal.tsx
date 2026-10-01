@@ -248,7 +248,7 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({ isOpen, onClose, g
               id="goal-deadline"
               value={form.deadlinePreset}
               onChange={(e) => setDeadlinePreset(e.target.value)}
-              className="w-full py-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all shadow-2xs font-medium"
+              className="w-full py-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-[border-color,box-shadow] duration-150 ease-out-expo shadow-2xs font-medium"
             >
               <option value={NO_DEADLINE}>No deadline</option>
               {DEADLINE_PRESETS.map((preset) => (
@@ -273,7 +273,7 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({ isOpen, onClose, g
                 type="date"
                 value={form.targetDate}
                 onChange={(e) => setField('targetDate', e.target.value)}
-                className={`w-full py-2.5 px-3 bg-white dark:bg-slate-900 border rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all shadow-2xs ${
+                className={`w-full py-2.5 px-3 bg-white dark:bg-slate-900 border rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-[border-color,box-shadow] duration-150 ease-out-expo shadow-2xs ${
                   errors.targetDate
                     ? 'border-rose-300 dark:border-rose-700/80 focus:border-rose-500'
                     : 'border-slate-200 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600'
@@ -330,7 +330,7 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({ isOpen, onClose, g
                     aria-label={option.label}
                     aria-pressed={selected}
                     onClick={() => setField('icon', option.name)}
-                    className={`aspect-square rounded-xl border flex items-center justify-center transition-all ${
+                    className={`aspect-square rounded-xl border flex items-center justify-center transition-[border-color,background-color,color] duration-150 ease-out-expo ${
                       selected
                         ? 'border-brand-500 bg-brand-500/10 text-brand-700 dark:text-brand-300 ring-1 ring-brand-500'
                         : 'border-slate-200/70 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60'
@@ -357,9 +357,7 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({ isOpen, onClose, g
                     aria-label={`Use color ${color}`}
                     aria-pressed={selected}
                     onClick={() => setField('color', color)}
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 transition-all ${
-                      selected ? 'border-slate-900 dark:border-white' : 'border-transparent'
-                    }`}
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 transition-[border-color,background-color] duration-150 ease-out-expo ${selected ? 'border-slate-900 dark:border-white' : 'border-transparent'}`}
                     style={{ backgroundColor: color }}
                   >
                     {selected && <Check className="w-4 h-4 text-white stroke-[3]" />}
@@ -383,7 +381,7 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({ isOpen, onClose, g
             value={form.description}
             onChange={(e) => setField('description', e.target.value)}
             placeholder="Why are you saving for this?"
-            className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all shadow-2xs resize-none"
+            className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-[border-color,box-shadow] duration-150 ease-out-expo shadow-2xs resize-none"
           />
         </div>
 

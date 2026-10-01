@@ -29,7 +29,7 @@ export const GoalProgressBar: React.FC<GoalProgressBarProps> = ({
       className={`w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden ${className}`}
     >
       <div
-        className="h-full rounded-full transition-all duration-500"
+        className="h-full rounded-full transition-[width] duration-300 ease-out-expo"
         style={{
           width: `${clamped}%`,
           backgroundColor: color,

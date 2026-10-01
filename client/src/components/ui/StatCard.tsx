@@ -35,7 +35,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   return (
     <Card
       interactive
-      className={`relative overflow-hidden p-5 sm:p-6 transition-all duration-200 group ${
+      className={`relative overflow-hidden p-5 sm:p-6 transition-[transform,box-shadow,border-color] duration-150 ease-out-expo group ${
         isHero
           ? 'bg-gradient-to-b from-white to-slate-50/50 dark:from-slate-900 dark:to-slate-900/80 border-slate-200/90 dark:border-slate-800 ring-1 ring-brand-500/20 shadow-fintech-md'
           : ''
@@ -51,9 +51,7 @@ export const StatCard: React.FC<StatCardProps> = ({
           {title}
         </span>
         {icon && (
-          <div
-            className={`w-9 h-9 rounded-xl flex items-center justify-center border transition-transform duration-200 group-hover:scale-105 ${accentStyles[accentColor]}`}
-          >
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center border transition-transform duration-150 ease-out-expo hover-scale-105 ${accentStyles[accentColor]}`}>
             {icon}
           </div>
         )}

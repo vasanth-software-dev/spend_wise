@@ -130,7 +130,7 @@ export const CalendarPage: React.FC = () => {
             <button
               onClick={() => goToMonth(-1)}
               aria-label="Previous month"
-              className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-2xs"
+              className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-[background-color,border-color] duration-150 ease-out-expo shadow-2xs"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -140,7 +140,7 @@ export const CalendarPage: React.FC = () => {
             <button
               onClick={() => goToMonth(1)}
               aria-label="Next month"
-              className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-2xs"
+              className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-[background-color,border-color] duration-150 ease-out-expo shadow-2xs"
             >
               <ChevronRight className="w-4 h-4" />
             </button>

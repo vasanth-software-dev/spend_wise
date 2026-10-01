@@ -45,13 +45,13 @@ export const Modal: React.FC<ModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       {/* Backdrop with frosted blur */}
       <div
-        className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity duration-200 ease-out-expo"
         onClick={onClose}
       />
 
       {/* Dialog */}
       <div
-        className={`relative w-full ${maxWidths[maxWidth]} bg-white dark:bg-[#0d1322] border border-slate-200/90 dark:border-white/10 rounded-3xl shadow-fintech-lg p-6 sm:p-7 z-10 my-8 max-h-[90vh] flex flex-col transition-all duration-200 animate-in zoom-in-95`}
+        className={`relative w-full ${maxWidths[maxWidth]} bg-white dark:bg-[#0d1322] border border-slate-200/90 dark:border-white/10 rounded-3xl shadow-fintech-lg p-6 sm:p-7 z-10 my-8 max-h-[90vh] flex flex-col transition-[transform,opacity,box-shadow,border-color] duration-200 ease-out-expo transform-origin-center @starting-style:opacity-0 @starting-style:scale-95`}
       >
         <div className="flex items-start justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800/80">
           <div>

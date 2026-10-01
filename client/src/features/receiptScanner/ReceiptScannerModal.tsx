@@ -530,7 +530,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
             <div className="mt-4 mx-auto max-w-[220px]">
               <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                 <div
-                  className="h-full bg-brand-500 transition-all duration-300"
+                  className="h-full bg-brand-500 transition-[width] duration-200 ease-out"
                   style={{ width: `${progress.percent}%` }}
                 />
               </div>

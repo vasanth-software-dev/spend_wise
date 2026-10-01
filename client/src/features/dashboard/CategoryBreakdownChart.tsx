@@ -107,7 +107,7 @@ export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ 
               {/* Subtle Progress Bar */}
               <div className="w-full bg-slate-100 dark:bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
                 <div
-                  className="h-full rounded-full transition-all duration-500"
+                  className="h-full rounded-full transition-[width] duration-300 ease-out-expo"
                   style={{ width: `${percentage}%`, backgroundColor: color }}
                 />
               </div>

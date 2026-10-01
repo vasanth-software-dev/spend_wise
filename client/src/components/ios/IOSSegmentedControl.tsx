@@ -31,7 +31,7 @@ export function IOSSegmentedControl<T extends string | number>({
             key={String(opt.value)}
             type="button"
             onClick={() => onChange(opt.value)}
-            className={`relative rounded-full font-semibold transition-all duration-200 ease-out ios-press ${
+            className={`relative rounded-full font-semibold transition-[background-color,color] duration-150 ease-out-expo ios-press ${
               isSm ? 'px-2.5 py-1 text-[11px]' : 'px-3.5 py-1.5 text-xs'
             } ${
               isSelected

@@ -44,7 +44,7 @@ export const GoogleButton: React.FC<GoogleButtonProps> = ({
       type={type}
       onClick={onClick}
       disabled={disabled || isLoading}
-      className={`relative w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-750 active:scale-[0.99] transition-all duration-150 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed group ${className}`}
+      className={`relative w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-750 active:scale-[0.99] transition-[background-color,border-color,transform] duration-150 ease-out-expo shadow-sm disabled:opacity-60 disabled:cursor-not-allowed group ${className}`}
     >
       {isLoading ? (
         <Loader2 className="w-5 h-5 animate-spin text-slate-500" />

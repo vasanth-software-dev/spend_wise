@@ -36,7 +36,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onAddContribution, onE
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div
-              className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 border transition-transform duration-200 group-hover:scale-105"
+              className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 border transition-transform duration-150 ease-out-expo hover-scale-105"
               style={{
                 backgroundColor: `${goal.color}1f`,
                 borderColor: `${goal.color}33`,

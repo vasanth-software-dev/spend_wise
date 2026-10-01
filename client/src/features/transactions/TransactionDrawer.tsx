@@ -109,12 +109,12 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity duration-200 ease-out-expo"
         onClick={onClose}
       />
 
       {/* Drawer Panel */}
-      <div className="relative w-full max-w-md bg-white dark:bg-[#0c121e] border-l border-slate-200/90 dark:border-white/10 shadow-fintech-lg h-full z-10 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-250">
+      <div className="relative w-full max-w-md bg-white dark:bg-[#0c121e] border-l border-slate-200/90 dark:border-white/10 shadow-fintech-lg h-full z-10 flex flex-col justify-between overflow-y-auto transition-[transform,opacity] duration-250 ease-out-expo transform-origin-right @starting-style:opacity-0 @starting-style:translate-x-full">
         <div className="p-6 sm:p-7">
           {/* Top Bar */}
           <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800/80">

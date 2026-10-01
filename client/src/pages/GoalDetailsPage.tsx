@@ -186,7 +186,7 @@ export const GoalDetailsPage: React.FC = () => {
               onClick={() => setIsEditOpen(true)}
               aria-label="Edit goal"
               title="Edit goal"
-              className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-2xs"
+              className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-[background-color,border-color] duration-150 ease-out-expo shadow-2xs"
             >
               <Pencil className="w-4 h-4" />
             </button>
@@ -194,7 +194,7 @@ export const GoalDetailsPage: React.FC = () => {
               onClick={() => setIsDeleteOpen(true)}
               aria-label="Delete goal"
               title="Delete goal"
-              className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 hover:text-rose-500 hover:border-rose-300 dark:hover:border-rose-800 transition-all shadow-2xs"
+              className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 hover:text-rose-500 hover:border-rose-300 dark:hover:border-rose-800 transition-[background-color,border-color,color] duration-150 ease-out-expo shadow-2xs"
             >
               <Trash2 className="w-4 h-4" />
             </button>

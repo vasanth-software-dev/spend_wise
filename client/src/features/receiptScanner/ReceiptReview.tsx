@@ -39,7 +39,7 @@ const PAYMENT_METHODS: Array<{ id: PaymentMethod; label: string }> = [
 ];
 
 export const moneyCls = (warn: boolean) =>
-  `w-full py-1.5 px-2.5 bg-white dark:bg-slate-900 border rounded-lg text-xs font-mono tabular-financial text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all ${
+  `w-full py-1.5 px-2.5 bg-white dark:bg-slate-900 border rounded-lg text-xs font-mono tabular-financial text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-[border-color,box-shadow] duration-150 ease-out-expo ${
     warn ? 'border-amber-400 dark:border-amber-500/60' : 'border-slate-200 dark:border-slate-700/80 focus:border-brand-500'}`;
 /** Editable review screen part 1: header + core fields. */
 export const ReceiptReview: React.FC<Props> = (p) => {

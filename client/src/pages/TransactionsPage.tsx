@@ -155,7 +155,7 @@ export const TransactionsPage: React.FC = () => {
               value={filters.search}
               onChange={handleSearchChange}
               placeholder="Search merchant, Ref.No, notes, UPI UTR..."
-              className="w-full bg-slate-100/80 dark:bg-slate-800/80 text-xs sm:text-sm pl-10 pr-4 py-2.5 rounded-xl border border-transparent focus:border-brand-500/50 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-400 shadow-2xs"
+              className="w-full bg-slate-100/80 dark:bg-slate-800/80 text-xs sm:text-sm pl-10 pr-4 py-2.5 rounded-xl border border-transparent focus:border-brand-500/50 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-[border-color,background-color,box-shadow] duration-150 ease-out-expo placeholder:text-slate-400 shadow-2xs"
             />
           </div>
 

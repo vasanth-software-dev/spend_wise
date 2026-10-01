@@ -178,7 +178,7 @@ export const SettingsPage: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 py-2 px-3.5 text-xs sm:text-sm font-semibold rounded-xl transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 py-2 px-3.5 text-xs sm:text-sm font-semibold rounded-xl transition-[background-color,border-color,color] duration-150 ease-out-expo whitespace-nowrap ${
                 isActive
                   ? tab.danger
                     ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 font-bold'
@@ -435,11 +435,10 @@ export const SettingsPage: React.FC = () => {
                       type="button"
                       key={iconName}
                       onClick={() => setNewCatIcon(iconName)}
-                      className={`p-2.5 rounded-xl border flex items-center justify-center transition-all ${
-                        newCatIcon === iconName
+                      className={`p-2.5 rounded-xl border flex items-center justify-center transition-[border-color,background-color,color] duration-150 ease-out-expo ${newCatIcon === iconName
                           ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                           : 'border-slate-200 dark:border-white/5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
-                      }`}
+                        }`}
                     >
                       <CategoryIcon name={iconName} className="w-4 h-4" />
                     </button>

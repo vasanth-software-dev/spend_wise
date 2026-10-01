@@ -672,8 +672,7 @@ export const PeoplePage: React.FC = () => {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setSelectedCategory('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  selectedCategory === 'all'
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-[background-color,border-color,color] duration-150 ease-out-expo ${selectedCategory === 'all'
                     ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
                     : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-brand-400'
                 }`}
@@ -686,17 +685,17 @@ export const PeoplePage: React.FC = () => {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(isSelected ? 'all' : cat.id)}
-                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                      isSelected
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-[background-color,border-color,color] duration-150 ease-out-expo ${isSelected
                         ? 'bg-brand-600 text-white shadow-sm'
                         : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-brand-400'
                     }`}
                   >
                     <span>{cat.name}</span>
                     <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                        isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
-                      }`}
+className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected
+                          ? 'bg-white/20 text-white'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
+                        }`}
                     >
                       {formatINR(cat.total)}
                     </span>
@@ -1042,7 +1041,7 @@ export const PeoplePage: React.FC = () => {
               <div
                 key={person._id}
                 onClick={() => navigate(`/people/${person._id}`)}
-                className="group relative bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-brand-400 dark:hover:border-brand-600 rounded-2xl p-5 shadow-xs hover:shadow-premium transition-all duration-200 flex flex-col justify-between cursor-pointer"
+                className="group relative bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-brand-400 dark:hover:border-brand-600 rounded-2xl p-5 shadow-xs hover:shadow-premium transition-[border-color,box-shadow] duration-150 ease-out-expo flex flex-col justify-between cursor-pointer"
               >
                 <div>
                   {/* Card Header: Avatar, Name, VPA */}

@@ -466,7 +466,7 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
               onDragOver={handleDragOver}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 dark:border-slate-700/80 hover:border-brand-500 dark:hover:border-brand-400 rounded-3xl p-8 sm:p-10 text-center bg-slate-50/50 dark:bg-[#121927]/60 cursor-pointer relative transition-all group shadow-sm hover:shadow-md"
+              className="border-2 border-dashed border-slate-300 dark:border-slate-700/80 hover:border-brand-500 dark:hover:border-brand-400 rounded-3xl p-8 sm:p-10 text-center bg-slate-50/50 dark:bg-[#121927]/60 cursor-pointer relative transition-[border-color,box-shadow] duration-150 ease-out-expo group shadow-sm hover:shadow-md"
             >
               <input
                 ref={fileInputRef}

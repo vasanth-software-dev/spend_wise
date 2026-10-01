@@ -16,7 +16,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
       <NavLink
         to="/dashboard"
         className={({ isActive }) =>
-          `flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight transition-all duration-150 ${
+          `flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight transition-[color,transform] duration-150 ease-out-expo ${
             isActive
               ? 'text-brand-600 dark:text-brand-400 scale-105'
               : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -30,7 +30,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
       <NavLink
         to="/transactions"
         className={({ isActive }) =>
-          `flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight transition-all duration-150 ${
+          `flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight transition-[color,transform] duration-150 ease-out-expo ${
             isActive
               ? 'text-brand-600 dark:text-brand-400 scale-105'
               : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -55,7 +55,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
       <NavLink
         to="/budgets"
         className={({ isActive }) =>
-          `flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight transition-all duration-150 ${
+          `flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight transition-[color,transform] duration-150 ease-out-expo ${
             isActive
               ? 'text-brand-600 dark:text-brand-400 scale-105'
               : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'

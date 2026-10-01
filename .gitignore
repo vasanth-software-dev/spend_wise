@@ -12,6 +12,7 @@ yarn-error.log*
 coverage/
 .turbo
 .idea/
+.kilo/
 .vscode/
 *.tsbuildinfo
 

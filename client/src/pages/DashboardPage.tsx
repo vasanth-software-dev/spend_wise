@@ -118,7 +118,7 @@ export const DashboardPage: React.FC = () => {
           {/* Refresh Button */}
           <button
             onClick={() => dispatch(fetchDashboardThunk(timeRange))}
-            className="p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-2xs"
+            className="p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-[background-color,border-color] duration-150 ease-out-expo shadow-2xs"
             title="Refresh analytics"
             aria-label="Refresh analytics"
           >
@@ -211,7 +211,7 @@ export const DashboardPage: React.FC = () => {
                 <button
                   key={r}
                   onClick={() => handleRangeChange(r)}
-                  className={`px-3 py-1 text-xs font-bold tracking-tight rounded-lg transition-all whitespace-nowrap ${
+                  className={`px-3 py-1 text-xs font-bold tracking-tight rounded-lg transition-[background-color,color] duration-150 ease-out-expo whitespace-nowrap ${
                     timeRange === r
                       ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -297,7 +297,7 @@ export const DashboardPage: React.FC = () => {
                     <div
                       key={tx._id}
                       onClick={() => setSelectedTx(tx)}
-                      className="py-3 px-2 flex items-center justify-between hover:bg-slate-50/90 dark:hover:bg-slate-800/40 rounded-xl cursor-pointer transition-all duration-150 group"
+                      className="py-3 px-2 flex items-center justify-between hover:bg-slate-50/90 dark:hover:bg-slate-800/40 rounded-xl cursor-pointer transition-[background-color] duration-150 ease-out-expo group"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div
