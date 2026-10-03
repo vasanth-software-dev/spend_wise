@@ -1,5 +1,10 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { api, setAccessToken } from '../../services/api.js';
+import {
+  authenticateWithPasskey,
+  BiometricError,
+  describeBiometricError,
+} from '../../services/webauthn.js';
 import { User } from '../../types/index.js';
 
 interface AuthState {
@@ -7,6 +12,10 @@ interface AuthState {
   isAuthenticated: boolean;
   isInitializing: boolean;
   loading: boolean;
+  /** True while the native biometric/passkey prompt is on screen. */
+  biometricLoading: boolean;
+  /** Set when a biometric attempt failed; never set for a plain cancellation. */
+  biometricError: string | null;
   error: string | null;
 }
 
@@ -15,6 +24,8 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isInitializing: true,
   loading: false,
+  biometricLoading: false,
+  biometricError: null,
   error: null,
 };
 
@@ -72,6 +83,32 @@ export const googleDevLoginThunk = createAsyncThunk(
   }
 );
 
+/**
+ * Signs in with a device passkey / biometric unlock.
+ *
+ * The server issues the SAME access token (15m) and HttpOnly refresh cookie
+ * (7d) as Google Login, so the existing session and silent-refresh flow is
+ * reused unchanged. Dismissing the native prompt is treated as a no-op, not an
+ * error state.
+ */
+export const biometricLoginThunk = createAsyncThunk(
+  'auth/biometricLogin',
+  async (_, { rejectWithValue }) => {
+    try {
+      const { accessToken, user } = await authenticateWithPasskey();
+      setAccessToken(accessToken);
+      return user as User;
+    } catch (err) {
+      return rejectWithValue({
+        message: describeBiometricError(err),
+        code: err instanceof BiometricError ? err.code : 'WEBAUTHN_UNKNOWN',
+        // A cancelled prompt must not render an error banner.
+        cancelled: err instanceof BiometricError && err.cancelled,
+      });
+    }
+  }
+);
+
 export const logoutThunk = createAsyncThunk('auth/logout', async () => {
   try {
     await api.post('/auth/logout');
@@ -86,6 +123,9 @@ const authSlice = createSlice({
   reducers: {
     clearAuthError: (state) => {
       state.error = null;
+    },
+    clearBiometricError: (state) => {
+      state.biometricError = null;
     },
     setUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
@@ -153,6 +193,24 @@ const authSlice = createSlice({
       state.error = action.payload as string;
     });
 
+    // Biometric / Passkey login
+    builder.addCase(biometricLoginThunk.pending, (state) => {
+      state.biometricLoading = true;
+      state.biometricError = null;
+    });
+    builder.addCase(biometricLoginThunk.fulfilled, (state, action) => {
+      state.user = action.payload;
+      state.isAuthenticated = true;
+      state.biometricLoading = false;
+      state.biometricError = null;
+    });
+    builder.addCase(biometricLoginThunk.rejected, (state, action) => {
+      state.biometricLoading = false;
+      // Keep the login page usable: a dismissed prompt is silent.
+      const payload = action.payload as { message?: string; cancelled?: boolean } | undefined;
+      state.biometricError = payload?.cancelled ? null : (payload?.message ?? 'Biometric sign-in failed');
+    });
+
     // Logout
     builder.addCase(logoutThunk.fulfilled, (state) => {
       state.user = null;
@@ -161,5 +219,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearAuthError, setUser } = authSlice.actions;
+export const { clearAuthError, clearBiometricError, setUser } = authSlice.actions;
 export default authSlice.reducer;

@@ -8,6 +8,7 @@ import { DetectedTransactionModel } from '../models/DetectedTransaction.js';
 import { NotificationModel } from '../models/Notification.js';
 import { SessionModel } from '../models/Session.js';
 import { AuditLogModel } from '../models/AuditLog.js';
+import { WebAuthnCredentialModel } from '../models/WebAuthnCredential.js';
 import { auditLogRepository } from '../repositories/AuditLogRepository.js';
 import { GmailProvider } from '../providers/gmail/GmailProvider.js';
 import { IUser } from '../types/index.js';
@@ -53,6 +54,8 @@ export class UserService {
       DetectedTransactionModel.deleteMany({ userId: userObjId }),
       NotificationModel.deleteMany({ userId: userObjId }),
       SessionModel.deleteMany({ userId: userObjId }),
+      // Passkeys are personal security material; they must not outlive the account.
+      WebAuthnCredentialModel.deleteMany({ userId: userObjId }),
     ]);
 
     await auditLogRepository.log({

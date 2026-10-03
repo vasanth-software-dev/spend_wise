@@ -223,6 +223,54 @@ npm run test:client
 4. **Sensitive Data Redaction**: Passwords, tokens, OTPs, and card numbers are scrubbed from logs via `maskSensitiveData()`.
 5. **Cascading Account Deletion**: Deleting an account revokes OAuth access and purges all transactions, categories, budgets, and sessions permanently.
 6. **Receipt Images Never Touch the Server**: the scanner decodes, processes and reads images in the browser. The only server call in the flow is an authenticated, read-only duplicate probe; no image, no OCR text and no temporary file is ever stored, logged or included in analytics.
+7. **WebAuthn Passkeys (biometric / security-key sign-in)**: an *additional* unlock method layered on top of Google Login. The server stores only the credential ID, credential public key, signature counter and authenticator metadata. Private keys and the biometric check itself stay on the user's device — no fingerprint, face image or biometric template is ever transmitted to or stored by SpendWise. See [docs/WEBAUTHN.md](docs/WEBAUTHN.md).
+
+---
+
+## 🔑 Biometric / Passkey Authentication (WebAuthn)
+
+Google Login remains the primary sign-in method. Passkeys are an extra way to unlock an
+**already-authenticated** account, and they mint the exact same session as Google Login
+(access JWT `15m`, refresh JWT `7d` in the HttpOnly cookie).
+
+**Local development**
+
+```bash
+# 1. Start the app
+npm run dev
+
+# 2. Apply the WebAuthn credential migration (creates collection + indexes)
+cd server && npm run migrate && cd ..
+```
+
+Then: sign in with Google → **Settings → Security** → *Enable Biometric Authentication*. On the
+next visit, **Use Biometric Authentication** appears under the Google button on the login page.
+
+Configuration lives in `.env`:
+
+```env
+WEBAUTHN_RP_NAME=SpendWise
+WEBAUTHN_RP_ID=localhost
+WEBAUTHN_ORIGINS=http://localhost:5173
+WEBAUTHN_CHALLENGE_TTL_SECONDS=300
+```
+
+WebAuthn requires a **secure context**. `localhost` and `127.0.0.1` are treated as secure by
+browsers, so plain HTTP works locally. Any other hostname (including LAN IPs and tunnel domains)
+needs a **trusted HTTPS certificate** that the browser accepts, otherwise
+`navigator.credentials` is unavailable.
+
+**Production**
+
+```env
+WEBAUTHN_RP_NAME=SpendWise
+WEBAUTHN_RP_ID=yourdomain.com
+WEBAUTHN_ORIGINS=https://yourdomain.com
+```
+
+Serve the frontend over HTTPS, apply the migration, and add every deployed origin to
+`WEBAUTHN_ORIGINS` (comma-separated). Full endpoint reference, security notes and deployment
+checklist: **[docs/WEBAUTHN.md](docs/WEBAUTHN.md)**.
 
 ---
 

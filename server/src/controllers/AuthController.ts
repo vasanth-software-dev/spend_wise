@@ -185,6 +185,9 @@ export class AuthController {
    * Socialite Google Login Callback: Handle authorization code from Google.
    */
   async googleCallback(req: Request, res: Response, next: NextFunction): Promise<void> {
+
+    
+    console.log('Google OAuth callback query parameters:', env.CLIENT_URL, req.query);
     try {
       const { code, error } = req.query;
 

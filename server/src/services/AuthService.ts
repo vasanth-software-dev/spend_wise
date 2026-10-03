@@ -264,6 +264,34 @@ export class AuthService {
     return this.sanitizeUser(user);
   }
 
+  /**
+   * Public entry point for non-password sign-in methods (currently WebAuthn
+   * passkeys). It reuses the SAME session creation, token generation (access
+   * 15m / refresh 7d, unchanged expiry configuration) and audit trail as
+   * Google Login, so no second token system is introduced.
+   */
+  async issueSessionForUser(
+    user: IUser,
+    clientMeta: ClientMetadata,
+    method: string
+  ): Promise<{ user: Partial<IUser>; tokens: AuthTokens; sessionId: string }> {
+    const { tokens, session } = await this.createSession(user, clientMeta);
+
+    await auditLogRepository.log({
+      userId: user._id,
+      action: 'LOGIN',
+      ipAddress: clientMeta.ipAddress,
+      userAgent: clientMeta.userAgent,
+      metadata: { method, email: user.email },
+    });
+
+    return {
+      user: this.sanitizeUser(user),
+      tokens,
+      sessionId: String(session._id),
+    };
+  }
+
   private async createSession(
     user: IUser,
     clientMeta: ClientMetadata

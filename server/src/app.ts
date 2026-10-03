@@ -39,11 +39,16 @@ export function createApp(): Express {
   }));
 
   // CORS Configuration
-  // Allows localhost + CLIENT_URL + extra ngrok origins from CLIENT_URLS.
+  // Allows localhost + CLIENT_URL + extra ngrok/Vercel origins from CLIENT_URLS.
+  //
+  // Credentialed requests are reflected only for known origins. Reflecting an
+  // arbitrary Origin while `credentials: true` is set is equivalent in risk to
+  // `Access-Control-Allow-Origin: *` — any site could then drive the app with
+  // the user's HttpOnly refresh cookie. Unknown origins are rejected instead.
   const allowedOrigins = getAllowedClientOrigins();
   app.use(cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or same-origin)
+      // Same-origin, curl and native-app requests carry no Origin header.
       if (!origin) return callback(null, true);
       if (
         allowedOrigins.includes(origin) ||
@@ -56,7 +61,7 @@ export function createApp(): Express {
       ) {
         return callback(null, true);
       }
-      return callback(null, true);
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

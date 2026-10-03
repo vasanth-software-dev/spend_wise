@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authController } from '../controllers/AuthController.js';
+import webauthnRoutes from './webauthnRoutes.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
 import { validate } from '../middleware/validationMiddleware.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
@@ -17,6 +18,11 @@ router.get('/me', requireAuth, (req, res, next) => authController.me(req, res, n
 router.get('/google', (req, res, next) => authController.googleAuth(req, res, next));
 router.get('/google/callback', (req, res, next) => authController.googleCallback(req, res, next));
 router.post('/google/dev-login', (req, res, next) => authController.googleDevLogin(req, res, next));
+
+// WebAuthn / Passkey (biometric) authentication.
+// Additional unlock method layered on top of the existing JWT session; it does
+// not replace Google Login.
+router.use('/webauthn', webauthnRoutes);
 
 // Session Management (Requirement 10)
 router.get('/sessions', requireAuth, (req, res, next) => authController.getSessions(req, res, next));

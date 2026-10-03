@@ -9,6 +9,7 @@ import {
   Shield,
   Tag,
   AlertTriangle,
+  Fingerprint,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import { logoutThunk } from '../store/slices/authSlice.js';
@@ -22,6 +23,7 @@ import { Button } from '../components/ui/Button.js';
 import { Input } from '../components/ui/Input.js';
 import { Modal } from '../components/ui/Modal.js';
 import { Badge } from '../components/ui/Badge.js';
+import { BiometricSettingsCard } from '../components/auth/BiometricSettingsCard.js';
 import { formatRelativeDate } from '../utils/format.js';
 import { CategoryIcon } from '../components/ui/CategoryIcon.js';
 import { CATEGORY_ICON_NAMES } from '../constants/categoryIcons.js';
@@ -32,7 +34,9 @@ export const SettingsPage: React.FC = () => {
   const user = useAppSelector((state) => state.auth.user);
   const categories = useAppSelector((state) => state.categories.categories);
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'sessions' | 'categories' | 'privacy' | 'danger'>('profile');
+  const [activeTab, setActiveTab] = useState<
+    'profile' | 'security' | 'sessions' | 'categories' | 'privacy' | 'danger'
+  >('profile');
 
   // Profile Form state
   const [name, setName] = useState(user?.name || '');
@@ -143,7 +147,7 @@ export const SettingsPage: React.FC = () => {
   const iconOptions = CATEGORY_ICON_NAMES;
 
   interface TabItem {
-    id: 'profile' | 'sessions' | 'categories' | 'privacy' | 'danger';
+    id: 'profile' | 'security' | 'sessions' | 'categories' | 'privacy' | 'danger';
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     danger?: boolean;
@@ -151,6 +155,7 @@ export const SettingsPage: React.FC = () => {
 
   const tabs: TabItem[] = [
     { id: 'profile', label: 'Profile', icon: User },
+    { id: 'security', label: 'Security', icon: Fingerprint },
     { id: 'sessions', label: 'Sessions', icon: Laptop },
     { id: 'categories', label: 'Categories', icon: Tag },
     { id: 'privacy', label: 'Privacy & Security', icon: Shield },
@@ -333,6 +338,33 @@ export const SettingsPage: React.FC = () => {
             })}
           </div>
         </Card>
+      )}
+
+      {/* Tab: Security (Biometric / Passkey) */}
+      {activeTab === 'security' && (
+        <div className="space-y-6">
+          <BiometricSettingsCard />
+
+          <Card variant="elevated" className="p-6 sm:p-7 space-y-3">
+            <CardHeader className="pb-3 border-b border-slate-100 dark:border-white/5">
+              <CardTitle className="text-lg font-bold">Google Account</CardTitle>
+              <CardDescription className="text-xs">
+                Your primary sign-in method. Biometric sign-in is an additional unlock method and never replaces it.
+              </CardDescription>
+            </CardHeader>
+            <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
+              <div>
+                <p className="font-bold text-slate-800 dark:text-slate-200">{user?.email}</p>
+                <p className="text-slate-400 text-[11px] mt-0.5">
+                  Signed in with Google • Status: Connected
+                </p>
+              </div>
+              <Badge variant="emerald" size="sm" dot>
+                CONNECTED
+              </Badge>
+            </div>
+          </Card>
+        </div>
       )}
 
       {/* Tab: Categories */}

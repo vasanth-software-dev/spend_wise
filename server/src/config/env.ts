@@ -35,6 +35,17 @@ OPENAI_API_KEY: z.string().optional(),
   AI_API_URL: z.string().url().default('https://api.openai.com/v1/chat/completions'),
   AI_MODEL: z.string().default('gpt-4o-mini'),
   AI_TIMEOUT_MS: z.coerce.number().int().positive().max(60000).default(8000),
+  // --- WebAuthn / Passkeys (biometric & security-key sign-in) ---
+  // Relying Party identity. RP ID must be the effective domain (or a parent of
+  // it) of WEBAUTHN_ORIGINS. `localhost` / `127.0.0.1` are treated as secure
+  // contexts by browsers, so plain HTTP works for local development.
+  WEBAUTHN_RP_NAME: z.string().default('SpendWise'),
+  WEBAUTHN_RP_ID: z.string().default('localhost'),
+  // Comma-separated list of exact origins the browser may complete a ceremony
+  // from. Always keep the first entry equal to the production frontend origin.
+  WEBAUTHN_ORIGINS: z.string().default('http://localhost:5173'),
+  // Short-lived, single-use challenge lifetime in seconds (max 300).
+  WEBAUTHN_CHALLENGE_TTL_SECONDS: z.coerce.number().int().positive().max(300).default(300),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -59,4 +70,32 @@ export function getAllowedClientOrigins(): string[] {
 export function getPublicApiBase(): string | null {
   const raw = (env.PUBLIC_API_URL ?? '').trim().replace(/\/$/, '');
   return raw ? raw : null;
+}
+
+/**
+ * Exact origins accepted by `verifyRegistrationResponse()` / `verifyAuthenticationResponse()`.
+ * Built from WEBAUTHN_ORIGINS plus the configured frontend origins so local
+ * development and tunnel URLs stay in sync with the CORS allow-list.
+ * Never a wildcard: `@simplewebauthn` requires literal origin strings.
+ */
+export function getWebAuthnOrigins(): string[] {
+  const configured = (env.WEBAUTHN_ORIGINS ?? '')
+    .split(',')
+    .map((s) => s.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
+  const all = [...new Set([...configured, ...getAllowedClientOrigins()])];
+
+  return all.filter((origin) => {
+    try {
+      const { protocol } = new URL(origin);
+      // WebAuthn is a secure-context-only API. Allow http only for loopback
+      // development hosts, which browsers treat as trustworthy.
+      if (protocol === 'https:') return true;
+      const { hostname } = new URL(origin);
+      return protocol === 'http:' && (hostname === 'localhost' || hostname === '127.0.0.1');
+    } catch {
+      return false;
+    }
+  });
 }

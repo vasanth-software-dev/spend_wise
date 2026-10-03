@@ -17,6 +17,8 @@ const auditLogSchema = new Schema<IAuditLog>(
         'SYNC_FAILED',
         'ACCOUNT_DELETED',
         'INBOUND_EMAIL_PROCESSED',
+        'PASSKEY_REGISTERED',
+        'PASSKEY_REMOVED',
       ],
       required: true,
       index: true,

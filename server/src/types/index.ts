@@ -1,5 +1,11 @@
 import { Types } from 'mongoose';
 
+/**
+ * Mongoose's `Binary` wrapper, as returned by `.lean()` for Buffer fields.
+ * Declared structurally so the types file keeps a single mongoose import.
+ */
+export type BinaryLike = { buffer: Uint8Array };
+
 export type TransactionType = 'expense' | 'income' | 'transfer';
 export type PaymentMethod = 'upi' | 'bank' | 'cash' | 'card' | 'wallet' | 'other';
 /**
@@ -33,7 +39,9 @@ export type AuditAction =
   | 'SYNC_COMPLETED' 
   | 'SYNC_FAILED' 
   | 'ACCOUNT_DELETED'
-  | 'INBOUND_EMAIL_PROCESSED';
+  | 'INBOUND_EMAIL_PROCESSED'
+  | 'PASSKEY_REGISTERED'
+  | 'PASSKEY_REMOVED';
 
 export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
@@ -63,6 +71,43 @@ export interface ISession {
   os: string;
   lastActive: Date;
   isValid: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * A WebAuthn / passkey credential owned by a user.
+ *
+ * Only public WebAuthn material is stored here: the credential ID, the
+ * credential public key, the signature counter and authenticator metadata.
+ * No biometric data (fingerprint, face, template) and no private key ever
+ * reaches the server — the private key stays inside the user's authenticator
+ * and the biometric check happens entirely on the device.
+ */
+export interface IWebAuthnCredential {
+  _id: Types.ObjectId | string;
+  userId: Types.ObjectId | string;
+  /** Base64URL-encoded credential ID (unique across all users). */
+  credentialId: string;
+  /**
+   * COSE-encoded credential public key. `Buffer` when hydrated through a
+   * document; Mongoose's `Binary` wrapper is what `.lean()` projections yield,
+   * so both shapes are accepted here and normalised by the repository.
+   */
+  publicKey: Buffer | BinaryLike;
+  /** Authenticator signature counter, used to detect cloned authenticators. */
+  counter: number;
+  credentialType: string;
+  /** 'singleDevice' (phone/laptop-bound) or 'multiDevice' (synced passkey). */
+  deviceType: 'singleDevice' | 'multiDevice';
+  backedUp: boolean;
+  /** Authenticator transport hints (e.g. internal, hybrid, usb, nfc). */
+  transports: string[];
+  /** Authenticator AAGUID, identifies the authenticator model. */
+  aaguid: string;
+  attestationFormat: string;
+  deviceName?: string;
+  lastUsedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

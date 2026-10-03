@@ -2,20 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
-import { loginThunk, googleDevLoginThunk, clearAuthError } from '../store/slices/authSlice.js';
+import {
+  loginThunk,
+  googleDevLoginThunk,
+  biometricLoginThunk,
+  clearAuthError,
+  clearBiometricError,
+} from '../store/slices/authSlice.js';
 import { Button } from '../components/ui/Button.js';
 import { Input } from '../components/ui/Input.js';
 import { GoogleButton } from '../components/ui/GoogleButton.js';
+import { BiometricButton } from '../components/auth/BiometricButton.js';
+import { fetchPasskeyAvailability, isWebAuthnSupported } from '../services/webauthn.js';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const dispatch = useAppDispatch();
-  const { isAuthenticated, loading, error } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, loading, error, biometricLoading, biometricError } = useAppSelector(
+    (state) => state.auth
+  );
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
 
   // Check for error in URL from OAuth redirect
   const oauthError = searchParams.get('error');
@@ -26,8 +37,26 @@ export const LoginPage: React.FC = () => {
     }
     return () => {
       dispatch(clearAuthError());
+      dispatch(clearBiometricError());
     };
   }, [isAuthenticated, navigate, dispatch]);
+
+  // Only offer the passkey option when the browser supports WebAuthn AND at
+  // least one credential exists. Google Login always stays available.
+  useEffect(() => {
+    let cancelled = false;
+    if (!isWebAuthnSupported()) return;
+    fetchPasskeyAvailability().then((available) => {
+      if (!cancelled) setBiometricAvailable(available);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleBiometricLogin = () => {
+    dispatch(biometricLoginThunk());
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,7 +152,30 @@ export const LoginPage: React.FC = () => {
               isLoading={isGoogleLoading}
               text="Continue with Google"
             />
+
+            {biometricAvailable && (
+              <>
+                <div className="relative my-1">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200 dark:border-slate-800" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white dark:bg-[#0d1322] px-3 text-slate-400 font-semibold tracking-wider text-[10px]">
+                      or
+                    </span>
+                  </div>
+                </div>
+
+                <BiometricButton onClick={handleBiometricLogin} isLoading={biometricLoading} />
+              </>
+            )}
           </div>
+
+          {biometricError && (
+            <div className="p-3 mt-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold">
+              {biometricError}
+            </div>
+          )}
 
           {/* Divider */}
           <div className="relative my-6">
