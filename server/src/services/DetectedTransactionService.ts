@@ -164,28 +164,36 @@ export class DetectedTransactionService {
   async confirmAll(
     userId: string,
     items?: Array<{ id: string; categoryId?: string }>
-  ): Promise<{ confirmedCount: number }> {
-    let pending: IDetectedTransaction[];
+  ): Promise<{ confirmedCount: number; failedCount: number }> {
+    let confirmedCount = 0;
+    let failedCount = 0;
+
     if (items && items.length > 0) {
-      const itemMap = new Map(items.map((i) => [i.id, i.categoryId]));
-      const allPending = await detectedTransactionRepository.findPendingByUserId(userId);
-      pending = allPending.filter((d) => itemMap.has(String(d._id)));
-      let count = 0;
-      for (const d of pending) {
-        const catId = itemMap.get(String(d._id));
-        await this.confirm(userId, String(d._id), catId ? { categoryId: catId } : undefined);
-        count++;
+      for (const item of items) {
+        try {
+          await this.confirm(
+            userId,
+            item.id,
+            item.categoryId ? { categoryId: item.categoryId } : undefined
+          );
+          confirmedCount++;
+        } catch {
+          failedCount++;
+        }
       }
-      return { confirmedCount: count };
-    } else {
-      pending = await detectedTransactionRepository.findPendingByUserId(userId);
-      let count = 0;
-      for (const d of pending) {
-        await this.confirm(userId, String(d._id));
-        count++;
-      }
-      return { confirmedCount: count };
+      return { confirmedCount, failedCount };
     }
+
+    const pending = await detectedTransactionRepository.findPendingByUserId(userId);
+    for (const d of pending) {
+      try {
+        await this.confirm(userId, String(d._id));
+        confirmedCount++;
+      } catch {
+        failedCount++;
+      }
+    }
+    return { confirmedCount, failedCount };
   }
 
   async rejectAll(userId: string, ids?: string[]): Promise<number> {
