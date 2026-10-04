@@ -314,6 +314,10 @@ export class DebtCandidateService {
       debt: result.debt,
     };
   }
+
+  async ignoreAll(userId: string, ids?: string[]): Promise<number> {
+    return debtCandidateRepository.ignoreMany(userId, ids);
+  }
 }
 
 export const debtCandidateService = new DebtCandidateService();

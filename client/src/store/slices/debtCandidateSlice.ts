@@ -7,6 +7,7 @@ interface DebtCandidateState {
   loading: boolean;
   error: string | null;
   resolving: Record<string, boolean>;
+  bulkIgnoring: boolean;
 }
 
 const initialState: DebtCandidateState = {
@@ -14,6 +15,7 @@ const initialState: DebtCandidateState = {
   loading: false,
   error: null,
   resolving: {},
+  bulkIgnoring: false,
 };
 
 export const fetchDebtCandidatesThunk = createAsyncThunk(
@@ -59,6 +61,19 @@ export const ignoreDebtCandidateThunk = createAsyncThunk(
   }
 );
 
+export const ignoreAllDebtCandidatesThunk = createAsyncThunk(
+  'debtCandidates/ignoreAll',
+  async (ids: string[] | undefined, { dispatch, rejectWithValue }) => {
+    try {
+      const res = await api.post('/debt-candidates/ignore-all', { ids });
+      dispatch(fetchDebtCandidatesThunk('PENDING'));
+      return res.data;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to dismiss suggestions');
+    }
+  }
+);
+
 const debtCandidateSlice = createSlice({
   name: 'debtCandidates',
   initialState,
@@ -94,6 +109,16 @@ const debtCandidateSlice = createSlice({
       })
       .addCase(ignoreDebtCandidateThunk.rejected, (state, action) => {
         state.resolving[action.meta.arg] = false;
+        state.error = action.payload as string;
+      })
+      .addCase(ignoreAllDebtCandidatesThunk.pending, (state) => {
+        state.bulkIgnoring = true;
+      })
+      .addCase(ignoreAllDebtCandidatesThunk.fulfilled, (state) => {
+        state.bulkIgnoring = false;
+      })
+      .addCase(ignoreAllDebtCandidatesThunk.rejected, (state, action) => {
+        state.bulkIgnoring = false;
         state.error = action.payload as string;
       });
   },

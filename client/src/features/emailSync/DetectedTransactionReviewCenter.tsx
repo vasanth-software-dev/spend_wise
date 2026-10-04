@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, Copy, Mail, Sparkles, Edit2, Tag, Save } from 'lucide-react';
+import { Check, X, Copy, Mail, Sparkles, Edit2, Tag, Save, CheckCheck, Trash2 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/index.js';
 import {
   confirmDetectedThunk,
   rejectDetectedThunk,
   markDuplicateDetectedThunk,
   updateDetectedThunk,
+  confirmAllDetectedThunk,
+  rejectAllDetectedThunk,
 } from '../../store/slices/detectedTransactionSlice.js';
 import { fetchCategoriesThunk } from '../../store/slices/categorySlice.js';
 import { formatINR, formatDate, getConfidenceBadge } from '../../utils/format.js';
@@ -13,16 +15,19 @@ import { Button } from '../../components/ui/Button.js';
 import { Modal } from '../../components/ui/Modal.js';
 import { Input } from '../../components/ui/Input.js';
 import { CategorySelect } from '../../components/ui/CategorySelect.js';
+import { toast } from '../../components/ui/Toast.js';
 import { DetectedTransaction } from '../../types/index.js';
 
 export const DetectedTransactionReviewCenter: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { pendingTransactions, actionLoading } = useAppSelector(
+  const { pendingTransactions, actionLoading, bulkConfirmLoading, bulkRejectLoading } = useAppSelector(
     (state) => state.detectedTransactions
   );
   const categories = useAppSelector((state) => state.categories.categories);
 
   const [editingItem, setEditingItem] = useState<DetectedTransaction | null>(null);
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [editMerchant, setEditMerchant] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editCategory, setEditCategory] = useState('');
@@ -133,13 +138,37 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
     );
   };
 
+  const handleClearAll = async () => {
+    try {
+      await dispatch(rejectAllDetectedThunk(undefined)).unwrap();
+      toast.success('Cleared all detected transactions');
+      setShowClearModal(false);
+    } catch (err: any) {
+      toast.error(typeof err === 'string' ? err : 'Failed to clear transactions');
+    }
+  };
+
+  const handleAcceptAll = async () => {
+    try {
+      const items = pendingTransactions.map((tx) => ({
+        id: tx._id,
+        categoryId: getSelectedCategoryId(tx) || undefined,
+      }));
+      await dispatch(confirmAllDetectedThunk(items)).unwrap();
+      toast.success(`Accepted all ${pendingTransactions.length} transactions`);
+      setShowAcceptModal(false);
+    } catch (err: any) {
+      toast.error(typeof err === 'string' ? err : 'Failed to accept all transactions');
+    }
+  };
+
   if (pendingTransactions.length === 0) {
     return null;
   }
 
   return (
     <div className="bg-gradient-to-r from-brand-900/10 via-emerald-900/5 to-slate-900/10 dark:from-brand-950/40 dark:to-slate-900/40 border border-brand-500/30 rounded-2xl p-5 sm:p-6 mb-8 shadow-sm">
-      <div className="flex items-center justify-between pb-4 border-b border-brand-200/40 dark:border-brand-900/40">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-brand-200/40 dark:border-brand-900/40">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-brand-500 text-white shadow-sm">
             <Sparkles className="w-5 h-5" />
@@ -155,6 +184,30 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
               Transactions auto-discovered from your email inbox. Select category and confirm to add to your ledger.
             </p>
           </div>
+        </div>
+
+        {/* Bulk Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Trash2 className="w-4 h-4 text-rose-500" />}
+            onClick={() => setShowClearModal(true)}
+            disabled={bulkRejectLoading || bulkConfirmLoading}
+            className="hover:text-rose-600 hover:border-rose-300 dark:hover:border-rose-800"
+          >
+            Clear All
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={<CheckCheck className="w-4 h-4" />}
+            onClick={() => setShowAcceptModal(true)}
+            disabled={bulkConfirmLoading || bulkRejectLoading}
+            isLoading={bulkConfirmLoading}
+          >
+            Accept All ({pendingTransactions.length})
+          </Button>
         </div>
       </div>
 
@@ -339,6 +392,72 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      {/* Clear All Confirmation Modal */}
+      <Modal
+        isOpen={showClearModal}
+        onClose={() => setShowClearModal(false)}
+        title="Clear All Detected Transactions"
+        description="Are you sure you want to dismiss all pending transactions? They will be ignored and won't be added to your ledger."
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            This will dismiss <strong>{pendingTransactions.length}</strong> pending transaction{pendingTransactions.length === 1 ? '' : 's'}. You can still sync again later if needed.
+          </p>
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowClearModal(false)}
+              disabled={bulkRejectLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              leftIcon={<Trash2 className="w-4 h-4" />}
+              onClick={handleClearAll}
+              isLoading={bulkRejectLoading}
+            >
+              Clear All ({pendingTransactions.length})
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Accept All Confirmation Modal */}
+      <Modal
+        isOpen={showAcceptModal}
+        onClose={() => setShowAcceptModal(false)}
+        title="Accept All Detected Transactions"
+        description="Confirm and record all pending transactions into your ledger."
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            This will record <strong>{pendingTransactions.length}</strong> transaction{pendingTransactions.length === 1 ? '' : 's'} into your accounts with their currently selected categories.
+          </p>
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAcceptModal(false)}
+              disabled={bulkConfirmLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={<CheckCheck className="w-4 h-4" />}
+              onClick={handleAcceptAll}
+              isLoading={bulkConfirmLoading}
+            >
+              Accept All ({pendingTransactions.length})
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

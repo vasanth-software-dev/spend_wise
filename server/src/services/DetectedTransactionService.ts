@@ -160,6 +160,37 @@ export class DetectedTransactionService {
     const updated = await detectedTransactionRepository.updateStatus(detectedId, userId, 'duplicate');
     return !!updated;
   }
+
+  async confirmAll(
+    userId: string,
+    items?: Array<{ id: string; categoryId?: string }>
+  ): Promise<{ confirmedCount: number }> {
+    let pending: IDetectedTransaction[];
+    if (items && items.length > 0) {
+      const itemMap = new Map(items.map((i) => [i.id, i.categoryId]));
+      const allPending = await detectedTransactionRepository.findPendingByUserId(userId);
+      pending = allPending.filter((d) => itemMap.has(String(d._id)));
+      let count = 0;
+      for (const d of pending) {
+        const catId = itemMap.get(String(d._id));
+        await this.confirm(userId, String(d._id), catId ? { categoryId: catId } : undefined);
+        count++;
+      }
+      return { confirmedCount: count };
+    } else {
+      pending = await detectedTransactionRepository.findPendingByUserId(userId);
+      let count = 0;
+      for (const d of pending) {
+        await this.confirm(userId, String(d._id));
+        count++;
+      }
+      return { confirmedCount: count };
+    }
+  }
+
+  async rejectAll(userId: string, ids?: string[]): Promise<number> {
+    return detectedTransactionRepository.updateManyStatus(userId, 'rejected', ids);
+  }
 }
 
 export const detectedTransactionService = new DetectedTransactionService();

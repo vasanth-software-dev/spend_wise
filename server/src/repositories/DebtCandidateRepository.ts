@@ -106,6 +106,18 @@ export class DebtCandidateRepository {
       status: 'PENDING',
     });
   }
+
+  async ignoreMany(userId: string, ids?: string[]): Promise<number> {
+    const query: Record<string, unknown> = {
+      userId: new Types.ObjectId(userId),
+      status: 'PENDING',
+    };
+    if (ids && ids.length > 0) {
+      query._id = { $in: ids.map((id) => new Types.ObjectId(id)) };
+    }
+    const res = await DebtCandidateModel.updateMany(query, { $set: { status: 'IGNORED' } });
+    return res.modifiedCount;
+  }
 }
 
 export const debtCandidateRepository = new DebtCandidateRepository();

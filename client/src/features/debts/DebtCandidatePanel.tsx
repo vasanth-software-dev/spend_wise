@@ -6,12 +6,14 @@ import {
   Link2,
   PlusCircle,
   X,
+  XCircle,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/index.js';
 import {
   fetchDebtCandidatesThunk,
   resolveDebtCandidateThunk,
   ignoreDebtCandidateThunk,
+  ignoreAllDebtCandidatesThunk,
 } from '../../store/slices/debtCandidateSlice.js';
 import { fetchDebtsThunk, fetchDebtSummaryThunk } from '../../store/slices/debtSlice.js';
 import { Button } from '../../components/ui/Button.js';
@@ -34,12 +36,13 @@ const MATCH_LABELS: Record<DebtCandidate['match'], string> = {
 
 export const DebtCandidatePanel: React.FC<Props> = ({ className = '' }) => {
   const dispatch = useAppDispatch();
-  const { candidates, loading, resolving } = useAppSelector(
+  const { candidates, loading, resolving, bulkIgnoring } = useAppSelector(
     (state) => state.debtCandidates
   );
   const debts = useAppSelector((state) => state.debts.debts);
 
   const [active, setActive] = useState<DebtCandidate | null>(null);
+  const [showDismissAllModal, setShowDismissAllModal] = useState(false);
   const [amount, setAmount] = useState('');
   const [debtDate, setDebtDate] = useState('');
   const [description, setDescription] = useState('');
@@ -152,29 +155,57 @@ export const DebtCandidatePanel: React.FC<Props> = ({ className = '' }) => {
     }
   };
 
+  const handleDismissAll = async () => {
+    try {
+      await dispatch(ignoreAllDebtCandidatesThunk(undefined)).unwrap();
+      toast.success(`Dismissed ${pending.length} debt suggestion${pending.length === 1 ? '' : 's'}`);
+      setShowDismissAllModal(false);
+      if (active) setActive(null);
+    } catch (e: unknown) {
+      toast.error(typeof e === 'string' ? e : 'Failed to dismiss suggestions');
+    }
+  };
+
   const options = active ? openDebtsFor(active) : [];
 
   return (
     <div className={className}>
       <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-slate-900/10 border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-sm">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-amber-500 text-white shadow-sm">
-            <Link2 className="w-5 h-5" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-amber-200/40 dark:border-amber-900/40">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-amber-500 text-white shadow-sm">
+              <Link2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                Possible Debt Payments
+                {pending.length > 0 && (
+                  <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    {pending.length} to review
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Person-to-person payments from email sync and statement import. Nothing is
+                recorded as a debt until you confirm it.
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              Possible Debt Payments
-              {pending.length > 0 && (
-                <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                  {pending.length} to review
-                </span>
-              )}
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Person-to-person payments from email sync and statement import. Nothing is
-              recorded as a debt until you confirm it.
-            </p>
-          </div>
+
+          {pending.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<XCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
+                onClick={() => setShowDismissAllModal(true)}
+                disabled={bulkIgnoring}
+                className="hover:text-rose-600 hover:border-rose-300 dark:hover:border-rose-800"
+              >
+                Dismiss All ({pending.length})
+              </Button>
+            </div>
+          )}
         </div>
 
         {pending.length === 0 ? (
@@ -372,6 +403,39 @@ export const DebtCandidatePanel: React.FC<Props> = ({ className = '' }) => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Dismiss All Confirmation Modal */}
+      <Modal
+        isOpen={showDismissAllModal}
+        onClose={() => setShowDismissAllModal(false)}
+        title="Dismiss All Debt Suggestions"
+        description="Are you sure you want to dismiss all pending debt suggestions?"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            This will dismiss <strong>{pending.length}</strong> debt suggestion{pending.length === 1 ? '' : 's'}. Existing debts and balances in your ledger will not be affected.
+          </p>
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDismissAllModal(false)}
+              disabled={bulkIgnoring}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              leftIcon={<XCircle className="w-4 h-4" />}
+              onClick={handleDismissAll}
+              isLoading={bulkIgnoring}
+            >
+              Dismiss All ({pending.length})
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

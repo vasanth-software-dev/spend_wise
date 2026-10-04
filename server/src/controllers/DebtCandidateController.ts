@@ -95,6 +95,17 @@ export class DebtCandidateController {
       handleError(err, res, next);
     }
   }
+
+  async ignoreAll(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const ids = req.body?.ids as string[] | undefined;
+      const count = await debtCandidateService.ignoreAll(userId, ids);
+      sendSuccess(res, { count }, `Dismissed ${count} debt suggestion${count === 1 ? '' : 's'}`);
+    } catch (err: any) {
+      handleError(err, res, next);
+    }
+  }
 }
 
 export const debtCandidateController = new DebtCandidateController();
