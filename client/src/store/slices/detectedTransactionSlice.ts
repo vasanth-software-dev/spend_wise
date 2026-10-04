@@ -9,6 +9,8 @@ interface DetectedState {
   pendingTransactions: DetectedTransaction[];
   loading: boolean;
   actionLoading: Record<string, boolean>;
+  bulkConfirmLoading: boolean;
+  bulkRejectLoading: boolean;
   error: string | null;
 }
 
@@ -16,6 +18,8 @@ const initialState: DetectedState = {
   pendingTransactions: [],
   loading: false,
   actionLoading: {},
+  bulkConfirmLoading: false,
+  bulkRejectLoading: false,
   error: null,
 };
 
@@ -60,6 +64,39 @@ export const rejectDetectedThunk = createAsyncThunk(
       return id;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Failed to reject transaction');
+    }
+  }
+);
+
+export const confirmAllDetectedThunk = createAsyncThunk(
+  'detected/confirmAll',
+  async (
+    items: Array<{ id: string; categoryId?: string }> | undefined,
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      const res = await api.post('/detected-transactions/confirm-all', { items });
+      dispatch(fetchPendingDetectedThunk());
+      dispatch(fetchTransactionsThunk(undefined));
+      dispatch(fetchDashboardThunk('30d'));
+      dispatch(fetchNotificationsThunk());
+      return res.data.data;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to confirm all transactions');
+    }
+  }
+);
+
+export const rejectAllDetectedThunk = createAsyncThunk(
+  'detected/rejectAll',
+  async (ids: string[] | undefined, { dispatch, rejectWithValue }) => {
+    try {
+      const res = await api.post('/detected-transactions/reject-all', { ids });
+      dispatch(fetchPendingDetectedThunk());
+      dispatch(fetchNotificationsThunk());
+      return res.data.data;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to clear detected transactions');
     }
   }
 );
@@ -117,6 +154,28 @@ const detectedTransactionSlice = createSlice({
     });
     builder.addCase(confirmDetectedThunk.rejected, (state, action) => {
       state.actionLoading[action.meta.arg.id] = false;
+    });
+
+    builder.addCase(confirmAllDetectedThunk.pending, (state) => {
+      state.bulkConfirmLoading = true;
+    });
+    builder.addCase(confirmAllDetectedThunk.fulfilled, (state) => {
+      state.bulkConfirmLoading = false;
+    });
+    builder.addCase(confirmAllDetectedThunk.rejected, (state, action) => {
+      state.bulkConfirmLoading = false;
+      state.error = action.payload as string;
+    });
+
+    builder.addCase(rejectAllDetectedThunk.pending, (state) => {
+      state.bulkRejectLoading = true;
+    });
+    builder.addCase(rejectAllDetectedThunk.fulfilled, (state) => {
+      state.bulkRejectLoading = false;
+    });
+    builder.addCase(rejectAllDetectedThunk.rejected, (state, action) => {
+      state.bulkRejectLoading = false;
+      state.error = action.payload as string;
     });
 
     builder.addCase(updateDetectedThunk.fulfilled, (state, action) => {

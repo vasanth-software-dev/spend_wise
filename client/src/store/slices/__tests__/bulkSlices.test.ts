@@ -1,0 +1,60 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import detectedReducer, {
+  confirmAllDetectedThunk,
+  rejectAllDetectedThunk,
+} from '../detectedTransactionSlice.js';
+import debtCandidateReducer, {
+  ignoreAllDebtCandidatesThunk,
+} from '../debtCandidateSlice.js';
+
+describe('Bulk Slices Reducers & Thunks', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('detectedTransactionSlice bulk actions', () => {
+    it('sets bulkConfirmLoading to true on confirmAll pending, false on fulfilled', () => {
+      let state = detectedReducer(undefined, { type: 'unknown' });
+      expect(state.bulkConfirmLoading).toBe(false);
+
+      state = detectedReducer(state, { type: confirmAllDetectedThunk.pending.type });
+      expect(state.bulkConfirmLoading).toBe(true);
+
+      state = detectedReducer(state, {
+        type: confirmAllDetectedThunk.fulfilled.type,
+        payload: { confirmedCount: 5 },
+      });
+      expect(state.bulkConfirmLoading).toBe(false);
+    });
+
+    it('sets bulkRejectLoading to true on rejectAll pending, false on fulfilled', () => {
+      let state = detectedReducer(undefined, { type: 'unknown' });
+      expect(state.bulkRejectLoading).toBe(false);
+
+      state = detectedReducer(state, { type: rejectAllDetectedThunk.pending.type });
+      expect(state.bulkRejectLoading).toBe(true);
+
+      state = detectedReducer(state, {
+        type: rejectAllDetectedThunk.fulfilled.type,
+        payload: { count: 5 },
+      });
+      expect(state.bulkRejectLoading).toBe(false);
+    });
+  });
+
+  describe('debtCandidateSlice bulk actions', () => {
+    it('sets bulkIgnoring to true on ignoreAll pending, false on fulfilled', () => {
+      let state = debtCandidateReducer(undefined, { type: 'unknown' });
+      expect(state.bulkIgnoring).toBe(false);
+
+      state = debtCandidateReducer(state, { type: ignoreAllDebtCandidatesThunk.pending.type });
+      expect(state.bulkIgnoring).toBe(true);
+
+      state = debtCandidateReducer(state, {
+        type: ignoreAllDebtCandidatesThunk.fulfilled.type,
+        payload: { count: 3 },
+      });
+      expect(state.bulkIgnoring).toBe(false);
+    });
+  });
+});

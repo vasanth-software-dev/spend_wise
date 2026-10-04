@@ -8,6 +8,8 @@ router.use(requireAuth);
 
 router.get('/pending', (req, res, next) => detectedTransactionController.getPending(req, res, next));
 router.get('/', (req, res, next) => detectedTransactionController.getAll(req, res, next));
+router.post('/confirm-all', (req, res, next) => detectedTransactionController.confirmAll(req, res, next));
+router.post('/reject-all', (req, res, next) => detectedTransactionController.rejectAll(req, res, next));
 router.post('/:id/confirm', (req, res, next) => detectedTransactionController.confirm(req, res, next));
 router.patch('/:id', (req, res, next) => detectedTransactionController.update(req, res, next));
 router.post('/:id/reject', (req, res, next) => detectedTransactionController.reject(req, res, next));

@@ -47,6 +47,23 @@ export class DetectedTransactionRepository {
     ).lean();
   }
 
+  async updateManyStatus(
+    userId: string,
+    status: 'detected' | 'confirmed' | 'rejected' | 'duplicate',
+    ids?: string[]
+  ): Promise<number> {
+    const query: Record<string, unknown> = {
+      userId: new Types.ObjectId(userId),
+    };
+    if (ids && ids.length > 0) {
+      query._id = { $in: ids.map((id) => new Types.ObjectId(id)) };
+    } else {
+      query.status = 'detected';
+    }
+    const res = await DetectedTransactionModel.updateMany(query, { $set: { status } });
+    return res.modifiedCount;
+  }
+
   async update(
     id: string,
     userId: string,

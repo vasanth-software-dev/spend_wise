@@ -48,6 +48,33 @@ export class DetectedTransactionController {
     }
   }
 
+  async confirmAll(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const items = req.body?.items as Array<{ id: string; categoryId?: string }> | undefined;
+      const result = await detectedTransactionService.confirmAll(userId, items);
+      sendSuccess(
+        res,
+        result,
+        `Confirmed and added ${result.confirmedCount} transaction${result.confirmedCount === 1 ? '' : 's'} to your ledger`,
+        200
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async rejectAll(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const ids = req.body?.ids as string[] | undefined;
+      const count = await detectedTransactionService.rejectAll(userId, ids);
+      sendSuccess(res, { count }, `Cleared ${count} detected transaction${count === 1 ? '' : 's'}`);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async markDuplicate(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.userId;

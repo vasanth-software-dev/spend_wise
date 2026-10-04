@@ -87,4 +87,15 @@ describe('Email-Sync Auto Detect Category Selection (Matching Import Transaction
     const upiPayeeResult = predictCategoryAndType('UPI/Althaf Briyani/426899120943', 'expense', undefined, knownPeople);
     expect(upiPayeeResult.category).toBe('Food & Dining');
   });
+
+  it('correctly auto-detects "Sri Ambal Chettinadu Ho" as Food & Dining and NEVER as Friends & Family', () => {
+    // Exact user test case: "Sri Ambal Chettinadu Ho" (truncated hotel in Indian bank statement)
+    const ambalResult = predictCategoryAndType('Sri Ambal Chettinadu Ho', 'expense', undefined, knownPeople);
+    expect(ambalResult.category).toBe('Food & Dining');
+    expect(ambalResult.type).toBe('expense');
+
+    // Bank alert narration variation
+    const upiAmbal = predictCategoryAndType('UPI/SRI AMBAL CHETTINADU HO/69246301@ubin/Ref152213179673', 'expense', undefined, knownPeople);
+    expect(upiAmbal.category).toBe('Food & Dining');
+  });
 });
