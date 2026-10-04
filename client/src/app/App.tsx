@@ -54,6 +54,7 @@ export const App: React.FC = () => {
         <Route path="email-sync" element={<EmailSyncPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="debts" element={<DebtsPage />} />
+        <Route path="categories" element={<SettingsPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 

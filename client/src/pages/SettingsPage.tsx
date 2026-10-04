@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Laptop,
   Trash2,
@@ -30,13 +30,33 @@ import { CATEGORY_ICON_NAMES } from '../constants/categoryIcons.js';
 
 export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const categories = useAppSelector((state) => state.categories.categories);
 
-  const [activeTab, setActiveTab] = useState<
-    'profile' | 'security' | 'sessions' | 'categories' | 'privacy' | 'danger'
-  >('profile');
+  const getInitialTab = (): 'profile' | 'security' | 'sessions' | 'categories' | 'privacy' | 'danger' => {
+    if (location.pathname.includes('/categories')) return 'categories';
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['profile', 'security', 'sessions', 'categories', 'privacy', 'danger'].includes(tabParam)) {
+      return tabParam as any;
+    }
+    return 'profile';
+  };
+
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'sessions' | 'categories' | 'privacy' | 'danger'>(getInitialTab);
+
+  useEffect(() => {
+    if (location.pathname.includes('/categories')) {
+      setActiveTab('categories');
+    } else {
+      const tabParam = searchParams.get('tab');
+      if (tabParam && ['profile', 'security', 'sessions', 'categories', 'privacy', 'danger'].includes(tabParam)) {
+        setActiveTab(tabParam as any);
+      }
+    }
+  }, [location.pathname, searchParams]);
 
   // Profile Form state
   const [name, setName] = useState(user?.name || '');
@@ -182,7 +202,16 @@ export const SettingsPage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                if (location.pathname.includes('/categories')) {
+                  if (tab.id !== 'categories') {
+                    navigate(`/settings?tab=${tab.id}`);
+                  }
+                } else {
+                  setSearchParams({ tab: tab.id });
+                }
+              }}
               className={`flex items-center gap-2 py-2 px-3.5 text-xs sm:text-sm font-semibold rounded-xl transition-[background-color,border-color,color] duration-150 ease-out-expo whitespace-nowrap ${
                 isActive
                   ? tab.danger

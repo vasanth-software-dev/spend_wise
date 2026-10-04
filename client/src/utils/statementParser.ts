@@ -49,7 +49,7 @@ const CATEGORY_RULES: Record<string, string[]> = {
   'Food & Dining': [
     'swiggy', 'zomato', 'mcdonald', 'kfc', 'starbucks', 'burger king', 'domino',
     'pizza', 'subway', 'chai', 'cafe', 'restaurant', 'dhaba', 'bakery', 'bakeries', 'bistro', 'food', 'foods',
-    'dining', 'eats', 'hotel', 'hotels', 'canteen', 'tiffin', 'mess', 'biryani', 'biryan', 'biriyani', 'asda biryan', 'kitchen', 'sweet', 'sweets',
+    'dining', 'eats', 'hotel', 'hotels', 'canteen', 'tiffin', 'mess', 'biryani', 'biryan', 'biriyani', 'briyani', 'chettinad', 'chettinadu', 'asda biryan', 'kitchen', 'sweet', 'sweets',
     'mithai', 'juice', 'tea stall', 'tea', 'coffee', 'snack', 'snacks', 'bar', 'pub', 'brewery', 'chutney',
     'idli', 'dosa', 'dosai', 's d o sa', 'chat stall', 'chaat stall', 'food stall', 'stall', 'stalls', 'chat', 'chaat',
     'shawarma', 'bbq', 'barbeque', 'haldiram', 'saravana bhavan', 'a2b',

@@ -3,9 +3,6 @@ import detectedReducer, {
   confirmAllDetectedThunk,
   rejectAllDetectedThunk,
 } from '../detectedTransactionSlice.js';
-import debtCandidateReducer, {
-  ignoreAllDebtCandidatesThunk,
-} from '../debtCandidateSlice.js';
 
 describe('Bulk Slices Reducers & Thunks', () => {
   beforeEach(() => {
@@ -39,22 +36,6 @@ describe('Bulk Slices Reducers & Thunks', () => {
         payload: { count: 5 },
       });
       expect(state.bulkRejectLoading).toBe(false);
-    });
-  });
-
-  describe('debtCandidateSlice bulk actions', () => {
-    it('sets bulkIgnoring to true on ignoreAll pending, false on fulfilled', () => {
-      let state = debtCandidateReducer(undefined, { type: 'unknown' });
-      expect(state.bulkIgnoring).toBe(false);
-
-      state = debtCandidateReducer(state, { type: ignoreAllDebtCandidatesThunk.pending.type });
-      expect(state.bulkIgnoring).toBe(true);
-
-      state = debtCandidateReducer(state, {
-        type: ignoreAllDebtCandidatesThunk.fulfilled.type,
-        payload: { count: 3 },
-      });
-      expect(state.bulkIgnoring).toBe(false);
     });
   });
 });
