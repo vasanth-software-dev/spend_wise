@@ -1251,6 +1251,7 @@ export async function parsePDFFile(
 
       // Check if currentLine starts with a date
       const dateMatch = lineText.match(/\b(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})\b/) ||
+                        lineText.match(/\b(\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})\b/) ||
                         lineText.match(/\b(\d{1,2}[\s\-](?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s\-]\d{2,4})\b/i);
 
       if (!dateMatch) continue;

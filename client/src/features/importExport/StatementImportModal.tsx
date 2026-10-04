@@ -34,6 +34,7 @@ import {
   isTransferCategoryName,
 } from '../../constants/categories.js';
 import { CategorySelect } from '../../components/ui/CategorySelect.js';
+import { ExampleFormatCards } from './ExampleFormatCards.js';
 
 interface StatementImportModalProps {
   isOpen: boolean;
@@ -499,9 +500,14 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
                       Supports PDF bank statements, Excel workbooks, CSV tables, and plain text
                     </p>
                   </div>
-                  <div className="pt-2 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Auto-categorizes Swiggy, Zomato, Salary, Fuel, Bills & more</span>
+                  <div className="pt-2 flex flex-col items-center justify-center gap-1 text-[11px] text-slate-400">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Auto-categorizes Swiggy, Zomato, Salary, Fuel, Bills & more</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400">
+                      Need a sample or template? Try pre-formatted PDF, Excel, CSV, or TXT below
+                    </span>
                   </div>
                 </div>
               )}
@@ -534,13 +540,19 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Example Statements & Format Templates Cards */}
+            <ExampleFormatCards
+              onSelectExample={(sampleFile: File) => processFile(sampleFile)}
+              isLoading={isParsing}
+            />
           </div>
         ) : (
           /* Preview and Selection Table */
           <div className="space-y-4">
             {/* Header info bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-white/5">
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2.5">
                 {getFormatBadge(fileType)}
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[200px] sm:max-w-xs">
                   {file?.name}
@@ -548,6 +560,11 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
                 <span className="text-xs text-slate-400">
                   ({parsedTransactions.length} records found)
                 </span>
+                {file?.name?.startsWith('example_statement.') && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-500" /> Sample Preview
+                  </span>
+                )}
               </div>
 
               {/* Summary Stats */}
@@ -563,6 +580,25 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
                 </span>
               </div>
             </div>
+
+            {/* Example Statement Banner */}
+            {file?.name?.startsWith('example_statement.') && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 flex-shrink-0 text-amber-500" />
+                  <span>
+                    <strong>Sample Statement Mode:</strong> You are previewing pre-built <strong>{fileType.toUpperCase()}</strong> transactions. You can adjust categories, toggle transaction types, or import to test your ledger.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetState}
+                  className="font-semibold text-amber-700 dark:text-amber-300 hover:underline whitespace-nowrap self-start sm:self-auto"
+                >
+                  Upload your own statement
+                </button>
+              </div>
+            )}
 
             {/* Smart Auto Type & Person Detection Banner */}
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-brand-500/10 border border-brand-500/20 text-[11px] text-brand-700 dark:text-brand-300">
