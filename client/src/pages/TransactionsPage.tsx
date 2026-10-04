@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Search,
@@ -97,6 +97,17 @@ export const TransactionsPage: React.FC = () => {
     }
   };
 
+  const bulkTypeFilter = useMemo(() => {
+    const selectedTxs = transactions.filter((t) => selectedIds.includes(t._id));
+    if (selectedTxs.length === 0) return 'all';
+    const firstType = selectedTxs[0].type;
+    const allSame = selectedTxs.every((t) => t.type === firstType);
+    if (allSame && (firstType === 'expense' || firstType === 'income' || firstType === 'transfer')) {
+      return firstType;
+    }
+    return 'all';
+  }, [transactions, selectedIds]);
+
   const isAllSelected =
     transactions.length > 0 && selectedIds.length === transactions.length;
 
@@ -172,18 +183,39 @@ export const TransactionsPage: React.FC = () => {
               placeholder="All Categories"
               grouped
               size="sm"
-              className="min-w-[200px]"
-              triggerClassName="w-full py-2 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl border border-slate-200/60 dark:border-white/5 focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 text-slate-700 dark:text-slate-200 font-semibold shadow-2xs"
+              className="min-w-[190px] flex-shrink-0"
+              typeFilter={
+                filters.type === 'expense'
+                  ? 'expense'
+                  : filters.type === 'income'
+                  ? 'income'
+                  : filters.type === 'transfer'
+                  ? 'transfer'
+                  : 'all'
+              }
+              triggerClassName="w-full px-3 py-2 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl border border-slate-200/60 dark:border-white/5 focus-visible:ring-2 focus-visible:ring-brand-500/20 focus-visible:border-brand-500 text-slate-700 dark:text-slate-200 font-semibold shadow-2xs"
             />
 
             {/* Type Filter */}
             <select
               value={filters.type || ''}
               onChange={(e) => {
-                dispatch(setFilters({ type: e.target.value }));
-                dispatch(fetchTransactionsThunk({ type: e.target.value, page: 1 }));
+                const nextType = e.target.value;
+                const currentCat = categories.find((c) => c._id === filters.categoryId);
+                const isMismatch =
+                  Boolean(nextType) &&
+                  Boolean(currentCat) &&
+                  currentCat?.type !== nextType &&
+                  currentCat?.type !== 'both';
+
+                const newFilters: Record<string, string> = { type: nextType };
+                if (isMismatch) {
+                  newFilters.categoryId = '';
+                }
+                dispatch(setFilters(newFilters));
+                dispatch(fetchTransactionsThunk({ ...newFilters, page: 1 }));
               }}
-              className="text-xs py-2 px-3 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl border border-slate-200/60 dark:border-white/5 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-700 dark:text-slate-200 font-semibold shadow-2xs"
+              className="text-xs py-2 px-3 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl border border-slate-200/60 dark:border-white/5 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-700 dark:text-slate-200 font-semibold shadow-2xs flex-shrink-0"
             >
               <option value="">All Types</option>
               <option value="expense">Expense</option>
@@ -569,6 +601,7 @@ export const TransactionsPage: React.FC = () => {
               onChange={setSelectedBulkCategory}
               placeholder="Select Category..."
               grouped
+              typeFilter={bulkTypeFilter}
             />
             <div className="flex justify-end gap-2">
               <Button

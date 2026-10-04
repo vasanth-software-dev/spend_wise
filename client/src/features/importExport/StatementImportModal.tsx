@@ -655,7 +655,7 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
                       </td>
 
                       {/* Category selector with auto-type indicator */}
-                      <td className="p-3">
+                      <td className="p-3 min-w-[180px]">
                         <CategorySelect
                           categories={categories}
                           value={tx.category || 'Other'}
@@ -663,7 +663,8 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
                           valueMode="name"
                           grouped
                           size="sm"
-                          triggerClassName="w-full px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 hover:border-brand-400 focus-visible:ring-1 focus-visible:ring-brand-500"
+                          typeFilter={tx.type}
+                          triggerClassName="w-full px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 hover:border-brand-400 focus-visible:ring-1 focus-visible:ring-brand-500 shadow-2xs"
                           title="Map this statement row to a category"
                         />
                       </td>

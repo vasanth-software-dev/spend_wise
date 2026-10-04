@@ -228,6 +228,7 @@ export const BudgetsPage: React.FC = () => {
               onChange={setCategoryId}
               placeholder="All Spending (Overall Monthly)"
               grouped
+              typeFilter="expense"
             />
           </div>
 

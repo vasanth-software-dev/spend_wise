@@ -79,8 +79,14 @@ export const ReceiptReview: React.FC<Props> = (p) => {
       </div>
       <div>
         <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Category</label>
-        <CategorySelect categories={p.expenseCategories} value={p.form.categoryId}
-          onChange={(v) => p.onPatch({ categoryId: v })} valueMode="id" placeholder="Select category..." />
+        <CategorySelect
+          categories={p.expenseCategories}
+          value={p.form.categoryId}
+          onChange={(v) => p.onPatch({ categoryId: v })}
+          valueMode="id"
+          typeFilter="expense"
+          placeholder="Select category..."
+        />
       </div>
       <ReviewTotals p={p} />
       <ReviewItems p={p} setItem={setItem} num={num} />

@@ -202,9 +202,10 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
                     onChange={(value) => handleInlineCategoryChange(tx, value)}
                     grouped
                     placeholder="Uncategorized / Other"
-                    className="flex-1"
+                    className="flex-1 min-w-0"
                     size="sm"
-                    triggerClassName="w-full py-1 px-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 hover:border-brand-400 focus-visible:ring-1 focus-visible:ring-brand-500 transition-colors"
+                    typeFilter={tx.transactionType === 'income' ? 'income' : 'expense'}
+                    triggerClassName="w-full py-1.5 px-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 hover:border-brand-400 focus-visible:ring-1 focus-visible:ring-brand-500 transition-colors shadow-2xs"
                     title="Change category for this transaction"
                   />
                 </div>
@@ -303,6 +304,7 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
                 onChange={setEditCategory}
                 placeholder="Select Category..."
                 grouped
+                typeFilter={editingItem.transactionType === 'income' ? 'income' : 'expense'}
               />
             </div>
             <Input

@@ -166,6 +166,15 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     (c) => c.type === type || c.type === 'both'
   );
 
+  const handleTypeChange = (nextType: TransactionType) => {
+    setType(nextType);
+    const relevantCats = categories.filter((c) => c.type === nextType || c.type === 'both');
+    const isCurrentStillValid = relevantCats.some((c) => c._id === categoryId);
+    if (!isCurrentStillValid && relevantCats.length > 0) {
+      setCategoryId(relevantCats[0]._id);
+    }
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -189,7 +198,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/60 dark:border-white/5">
           <button
             type="button"
-            onClick={() => setType('expense')}
+            onClick={() => handleTypeChange('expense')}
             className={`flex-1 py-2 text-xs font-bold tracking-tight rounded-lg transition-[background-color,color] duration-150 ease-out-expo ${
               type === 'expense'
                 ? 'bg-rose-500 text-white shadow-2xs'
@@ -200,7 +209,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setType('income')}
+            onClick={() => handleTypeChange('income')}
             className={`flex-1 py-2 text-xs font-bold tracking-tight rounded-lg transition-[background-color,color] duration-150 ease-out-expo ${
               type === 'income'
                 ? 'bg-emerald-600 text-white shadow-2xs'
@@ -211,7 +220,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setType('transfer')}
+            onClick={() => handleTypeChange('transfer')}
             className={`flex-1 py-2 text-xs font-bold tracking-tight rounded-lg transition-[background-color,color] duration-150 ease-out-expo ${
               type === 'transfer'
                 ? 'bg-indigo-600 text-white shadow-2xs'

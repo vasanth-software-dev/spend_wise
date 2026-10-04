@@ -65,11 +65,19 @@ return (<Modal isOpen={isOpen} onClose={onClose} title={editing ? 'Edit Debt' : 
 <div>
 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Direction *</label>
 <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Debt direction">
-<button type="button" role="radio" aria-checked={direction === 'I_OWE'} onClick={() => setDirection('I_OWE')} className={`text-left p-3 rounded-xl border ${direction === 'I_OWE' ? 'border-rose-500 bg-rose-500/10 ring-1 ring-rose-500' : 'border-slate-200 dark:border-slate-700'}`}>
+<button type="button" role="radio" aria-checked={direction === 'I_OWE'} onClick={() => {
+  setDirection('I_OWE');
+  const cat = categories.find((c) => c._id === categoryId);
+  if (cat && cat.type === 'income') setCategoryId('');
+}} className={`text-left p-3 rounded-xl border ${direction === 'I_OWE' ? 'border-rose-500 bg-rose-500/10 ring-1 ring-rose-500' : 'border-slate-200 dark:border-slate-700'}`}>
 <span className="block text-xs font-bold">I owe this person</span>
 <span className="block text-[11px] text-slate-500 mt-0.5">Repayment sends money out</span>
 </button>
-<button type="button" role="radio" aria-checked={direction === 'OWED_TO_ME'} onClick={() => setDirection('OWED_TO_ME')} className={`text-left p-3 rounded-xl border ${direction === 'OWED_TO_ME' ? 'border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500' : 'border-slate-200 dark:border-slate-700'}`}>
+<button type="button" role="radio" aria-checked={direction === 'OWED_TO_ME'} onClick={() => {
+  setDirection('OWED_TO_ME');
+  const cat = categories.find((c) => c._id === categoryId);
+  if (cat && cat.type === 'expense') setCategoryId('');
+}} className={`text-left p-3 rounded-xl border ${direction === 'OWED_TO_ME' ? 'border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500' : 'border-slate-200 dark:border-slate-700'}`}>
 <span className="block text-xs font-bold">Owes me</span>
 <span className="block text-[11px] text-slate-500 mt-0.5">Repayment brings money in</span>
 </button>
@@ -81,7 +89,7 @@ return (<Modal isOpen={isOpen} onClose={onClose} title={editing ? 'Edit Debt' : 
 <div><label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Debt Date *</label><input type="date" value={debtDate} onChange={(e) => setDebtDate(e.target.value)} required className={inp} /></div>
 <div><label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Due Date</label><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inp} /></div>
 </div>
-<div><label className="block text-xs font-semibold text-slate-500 mb-1">Category</label><CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} placeholder="No category" grouped /></div>
+<div><label className="block text-xs font-semibold text-slate-500 mb-1">Category</label><CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} placeholder="No category" grouped typeFilter={direction === 'OWED_TO_ME' ? 'income' : 'expense'} /></div>
 <div><label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Notes</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Extra context" className={`${inp} resize-none`} /></div>
 {error && <p role="alert" className="text-xs font-medium text-rose-600 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{error}</p>}
 <div className="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800"><Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" size="sm" isLoading={busy}>{editing ? 'Save Changes' : 'Add Debt'}</Button></div>

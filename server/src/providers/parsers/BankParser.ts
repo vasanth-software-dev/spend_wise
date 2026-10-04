@@ -192,6 +192,12 @@ export class BankParser implements TransactionEmailParser {
       // Fallback to existing prediction
     }
 
+    if (/\b(briyani|biryani|briyan|biriyani|canteen|tiffin|mess|bhavan|dhaba|bakery)\b/i.test(`${aiMerchantName} ${merchant} ${content}`)) {
+      if (categoryHint === 'Friends & Family' || categoryHint === 'Person-to-Person') {
+        categoryHint = 'Food & Dining';
+      }
+    }
+
     return {
       amount,
       currency: 'INR',

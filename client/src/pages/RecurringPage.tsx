@@ -243,7 +243,14 @@ export const RecurringPage: React.FC = () => {
               </label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value as TransactionType)}
+                onChange={(e) => {
+                  const newType = e.target.value as TransactionType;
+                  setType(newType);
+                  const currentCat = categories.find((c) => c._id === categoryId);
+                  if (currentCat && currentCat.type !== newType && currentCat.type !== 'both') {
+                    setCategoryId('');
+                  }
+                }}
                 className="w-full py-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm"
               >
                 <option value="expense">Expense</option>
@@ -279,6 +286,7 @@ export const RecurringPage: React.FC = () => {
                 onChange={setCategoryId}
                 placeholder="Select Category..."
                 grouped
+                typeFilter={type === 'income' ? 'income' : 'expense'}
               />
             </div>
 
