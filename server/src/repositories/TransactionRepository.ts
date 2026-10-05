@@ -83,7 +83,7 @@ export class TransactionRepository {
     totalPages: number;
   }> {
     const page = Math.max(1, params.page || 1);
-    const limit = Math.min(100, Math.max(1, params.limit || 20));
+    const limit = Math.min(params.limit && params.limit > 100 ? 50000 : 100, Math.max(1, params.limit || 20));
     const skip = (page - 1) * limit;
 
     const query: Record<string, unknown> = {

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -43,6 +44,8 @@ import { Transaction } from '../types/index.js';
 import { AgGridTable } from '../components/ui/AgGridTable.js';
 import type { ColDef } from 'ag-grid-community';
 import type { CustomCellRendererProps } from 'ag-grid-react';
+import { api } from '../services/api.js';
+import { toast } from '../components/ui/Toast.js';
 
 export const TransactionsPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -56,6 +59,15 @@ export const TransactionsPage: React.FC = () => {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isCategorizeModalOpen, setIsCategorizeModalOpen] = useState(false);
   const [selectedBulkCategory, setSelectedBulkCategory] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('import') === 'true') {
+      setIsImportModalOpen(true);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     dispatch(fetchTransactionsThunk(undefined));
@@ -74,12 +86,35 @@ export const TransactionsPage: React.FC = () => {
     }
   };
 
-  const handleExportCSV = () => {
-    const params = new URLSearchParams();
-    if (filters.search) params.append('search', filters.search);
-    if (filters.categoryId) params.append('categoryId', filters.categoryId);
-    if (filters.type) params.append('type', filters.type);
-    window.open(`/api/v1/transactions/export?${params.toString()}`, '_blank');
+  const handleExportCSV = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.search) params.append('search', filters.search);
+      if (filters.categoryId) params.append('categoryId', filters.categoryId);
+      if (filters.type) params.append('type', filters.type);
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+
+      const res = await api.get(`/transactions/export?${params.toString()}`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `spendwise-transactions-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success('Transactions CSV exported successfully');
+    } catch (err: any) {
+      console.error('Export CSV error:', err);
+      toast.error(err?.response?.data?.message || 'Failed to export transactions CSV');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleBulkDelete = () => {
@@ -387,6 +422,7 @@ export const TransactionsPage: React.FC = () => {
             variant="outline"
             leftIcon={<Download className="w-4 h-4" />}
             onClick={handleExportCSV}
+            isLoading={isExporting}
           >
             Export CSV
           </Button>

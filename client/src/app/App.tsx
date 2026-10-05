@@ -20,6 +20,7 @@ import { DebtsPage } from '../pages/DebtsPage.js';
 import { GoalsPage } from '../pages/GoalsPage.js';
 import { GoalDetailsPage } from '../pages/GoalDetailsPage.js';
 import { CalendarPage } from '../pages/CalendarPage.js';
+import { ExportPage } from '../pages/ExportPage.js';
 import { ToastContainer } from '../components/ui/Toast.js';
 
 export const App: React.FC = () => {
@@ -53,6 +54,13 @@ export const App: React.FC = () => {
         <Route path="recurring" element={<RecurringPage />} />
         <Route path="email-sync" element={<EmailSyncPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="export" element={<ExportPage />} />
+        <Route path="export/pdf" element={<ExportPage initialFormat="pdf" />} />
+        <Route path="export/excel" element={<ExportPage initialFormat="excel" />} />
+        <Route path="export/csv" element={<ExportPage initialFormat="csv" />} />
+        <Route path="tools/pdf/export/trial" element={<ExportPage initialFormat="pdf" />} />
+        <Route path="tools/pdf/export" element={<ExportPage initialFormat="pdf" />} />
+        <Route path="tools/csv/export" element={<ExportPage initialFormat="csv" />} />
         <Route path="debts" element={<DebtsPage />} />
         <Route path="categories" element={<SettingsPage />} />
         <Route path="settings" element={<SettingsPage />} />

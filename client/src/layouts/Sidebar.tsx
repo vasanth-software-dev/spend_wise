@@ -19,6 +19,9 @@ import {
   Coins,
   ChevronDown,
   ChevronRight,
+  FileText,
+  FileSpreadsheet,
+  UploadCloud,
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../store/index.js';
 import { setThemeMode } from '../store/slices/themeSlice.js';
@@ -129,6 +132,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
             badgeVariant: 'brand',
           },
           { label: 'Reports', to: '/reports', icon: BarChart3, color: '#a855f7' },
+        ],
+      },
+      {
+        id: 'import_export',
+        title: 'Import / Export',
+        accentColor: '#06b6d4',
+        items: [
+          { label: 'Export PDF file', to: '/export/pdf', icon: FileText, color: '#f43f5e' },
+          { label: 'Export Excel/CSV file', to: '/export/excel', icon: FileSpreadsheet, color: '#10b981' },
+          { label: 'Import CSV/XLS file', to: '/transactions?import=true', icon: UploadCloud, color: '#06b6d4' },
         ],
       },
       {

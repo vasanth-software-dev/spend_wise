@@ -1,10 +1,28 @@
-import React, { useEffect, useState } from 'react';
-import { Download, Calendar, ArrowUpRight, ArrowDownLeft, PiggyBank, Filter } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Download,
+  Calendar,
+  ArrowUpRight,
+  ArrowDownLeft,
+  PiggyBank,
+  Filter,
+  FileText,
+  FileSpreadsheet,
+  ChevronDown,
+  Loader2,
+} from 'lucide-react';
 import { api } from '../services/api.js';
+import { useAppSelector } from '../store/index.js';
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card.js';
 import { Button } from '../components/ui/Button.js';
 import { Badge } from '../components/ui/Badge.js';
+import { toast } from '../components/ui/Toast.js';
 import { formatINR } from '../utils/format.js';
+import {
+  exportReportToPDF,
+  exportReportToExcel,
+  downloadTransactionsCSV,
+} from '../utils/reportExport.js';
 import { CategoryBreakdownChart } from '../features/dashboard/CategoryBreakdownChart.js';
 import { TopMerchantsChart } from '../features/dashboard/TopMerchantsChart.js';
 import { ExpenseTrendChart } from '../features/dashboard/ExpenseTrendChart.js';
@@ -19,6 +37,21 @@ export const ReportsPage: React.FC = () => {
   const [activePreset, setActivePreset] = useState<string>('last_30_days');
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<'pdf' | 'excel' | 'csv' | null>(null);
+
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+  const user = useAppSelector((state) => state.auth.user);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setIsExportMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const applyPreset = (preset: string) => {
     const now = new Date();
@@ -57,8 +90,52 @@ export const ReportsPage: React.FC = () => {
     fetchReport();
   }, [startDate, endDate]);
 
-  const handleExportCSV = () => {
-    window.open(`/api/v1/transactions/export?startDate=${startDate}&endDate=${endDate}`, '_blank');
+  const handleExport = async (format: 'pdf' | 'excel' | 'csv') => {
+    setIsExportMenuOpen(false);
+    setExportingFormat(format);
+    try {
+      let transactions: any[] = [];
+      try {
+        const txRes = await api.get('/transactions', {
+          params: {
+            startDate,
+            endDate,
+            limit: 5000,
+          },
+        });
+        transactions = txRes.data?.data?.transactions || [];
+      } catch (e) {
+        console.warn('Could not fetch itemized transactions for report export:', e);
+      }
+
+      if (format === 'pdf') {
+        exportReportToPDF({
+          startDate,
+          endDate,
+          reportData,
+          transactions,
+          userName: user?.name,
+        });
+        toast.success('PDF statement report generated successfully');
+      } else if (format === 'excel') {
+        exportReportToExcel({
+          startDate,
+          endDate,
+          reportData,
+          transactions,
+          userName: user?.name,
+        });
+        toast.success('Excel report generated (.xlsx)');
+      } else if (format === 'csv') {
+        await downloadTransactionsCSV(startDate, endDate, transactions);
+        toast.success('Transactions CSV statement downloaded');
+      }
+    } catch (err: any) {
+      console.error('Export error:', err);
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to export report');
+    } finally {
+      setExportingFormat(null);
+    }
   };
 
   const summary = reportData?.summary;
@@ -82,16 +159,111 @@ export const ReportsPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        {/* Export Dropdown Toolbar */}
+        <div className="flex items-center gap-2.5 relative" ref={exportMenuRef}>
           <Button
             size="sm"
             variant="outline"
-            leftIcon={<Download className="w-4 h-4 text-slate-400" />}
-            onClick={handleExportCSV}
-            className="shadow-2xs"
+            leftIcon={
+              exportingFormat ? (
+                <Loader2 className="w-4 h-4 text-brand-500 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+              )
+            }
+            rightIcon={
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                  isExportMenuOpen ? 'rotate-180' : ''
+                }`}
+              />
+            }
+            onClick={() => setIsExportMenuOpen((prev) => !prev)}
+            disabled={loading || !!exportingFormat}
+            className="shadow-2xs font-medium"
           >
-            Export Statement CSV
+            {exportingFormat ? `Generating ${exportingFormat.toUpperCase()}...` : 'Export Report'}
           </Button>
+
+          {isExportMenuOpen && (
+            <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-surface-elevated rounded-xl shadow-xl border border-slate-200/80 dark:border-white/10 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+              <div className="px-3.5 py-2 border-b border-slate-100 dark:border-white/5">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Export Statement & Analytics
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
+                  {startDate} to {endDate}
+                </p>
+              </div>
+
+              {/* PDF Option */}
+              <button
+                type="button"
+                onClick={() => handleExport('pdf')}
+                className="w-full text-left px-3.5 py-2.5 flex items-start gap-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group"
+              >
+                <div className="p-2 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/40 mt-0.5">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400">
+                      PDF Document (.pdf)
+                    </span>
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                      Statement
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                    Executive summary, KPI cards, category breakdown & itemized ledger
+                  </p>
+                </div>
+              </button>
+
+              {/* Excel Option */}
+              <button
+                type="button"
+                onClick={() => handleExport('excel')}
+                className="w-full text-left px-3.5 py-2.5 flex items-start gap-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group"
+              >
+                <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 mt-0.5">
+                  <FileSpreadsheet className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                      Excel Spreadsheet (.xlsx)
+                    </span>
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                      Multi-Sheet
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                    Separate sheets for summary metrics and full transaction records
+                  </p>
+                </div>
+              </button>
+
+              {/* CSV Option */}
+              <button
+                type="button"
+                onClick={() => handleExport('csv')}
+                className="w-full text-left px-3.5 py-2.5 flex items-start gap-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group"
+              >
+                <div className="p-2 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40 mt-0.5">
+                  <Download className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                    CSV Statement (.csv)
+                  </span>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                    Raw tabular data compatible with accounting tools & Google Sheets
+                  </p>
+                </div>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
