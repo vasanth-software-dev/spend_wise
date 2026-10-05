@@ -37,6 +37,9 @@ import { TransactionModal } from '../features/transactions/TransactionModal.js';
 import { TransactionDrawer } from '../features/transactions/TransactionDrawer.js';
 import { StatementImportModal } from '../features/importExport/StatementImportModal.js';
 import { Transaction } from '../types/index.js';
+import { AgGridTable } from '../components/ui/AgGridTable.js';
+import type { ColDef } from 'ag-grid-community';
+import type { CustomCellRendererProps } from 'ag-grid-react';
 
 export const TransactionsPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -110,6 +113,213 @@ export const TransactionsPage: React.FC = () => {
 
   const isAllSelected =
     transactions.length > 0 && selectedIds.length === transactions.length;
+
+  const rowClassRules = useMemo(
+    () => ({
+      'bg-brand-500/10 dark:bg-brand-950/20 font-medium': (params: any) =>
+        Boolean(params.data && selectedIds.includes(params.data._id)),
+    }),
+    [selectedIds]
+  );
+
+  const columnDefs = useMemo<ColDef<Transaction>[]>(() => {
+    return [
+      {
+        field: '_id',
+        headerName: '',
+        width: 48,
+        minWidth: 48,
+        maxWidth: 48,
+        sortable: false,
+        resizable: false,
+        suppressMovable: true,
+        headerComponent: () => (
+          <div className="flex items-center justify-center">
+            <input
+              type="checkbox"
+              checked={isAllSelected}
+              onChange={(e) => dispatch(selectAllIds(e.target.checked))}
+              className="rounded border-slate-300 dark:border-slate-600 text-brand-600 focus:ring-brand-500 cursor-pointer"
+              aria-label="Select all transactions"
+            />
+          </div>
+        ),
+        cellRenderer: (params: CustomCellRendererProps<Transaction>) => {
+          const tx = params.data;
+          if (!tx) return null;
+          const isSelected = selectedIds.includes(tx._id);
+          return (
+            <div
+              className="flex items-center justify-center w-full h-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                dispatch(toggleSelectId(tx._id));
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => {}}
+                className="rounded border-slate-300 dark:border-slate-600 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                aria-label={`Select transaction ${tx.merchant}`}
+              />
+            </div>
+          );
+        },
+      },
+      {
+        field: 'merchant',
+        headerName: 'Merchant / Description',
+        flex: 2.2,
+        minWidth: 260,
+        comparator: (a, b) => (a || '').localeCompare(b || ''),
+        cellRenderer: (params: CustomCellRendererProps<Transaction>) => {
+          const tx = params.data;
+          if (!tx) return null;
+          const isExpense = tx.type === 'expense';
+          const cat =
+            typeof tx.categoryId === 'object' && tx.categoryId !== null
+              ? tx.categoryId
+              : null;
+
+          return (
+            <div className="flex items-center gap-3 py-1 min-w-0 h-full">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  isExpense
+                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                }`}
+              >
+                <CategoryIcon name={cat?.icon || 'Tag'} className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 leading-tight">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block truncate tracking-tight text-xs sm:text-sm">
+                    {tx.merchant}
+                  </span>
+                  {tx.personId && typeof tx.personId === 'object' && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-600 dark:text-brand-400 bg-brand-500/10 px-1.5 py-0.5 rounded border border-brand-500/20">
+                      <UserRound className="w-2.5 h-2.5" />
+                      {tx.personId.name}
+                    </span>
+                  )}
+                </div>
+                {tx.vpa && (
+                  <span className="text-[11px] font-mono text-slate-400 truncate block mt-0.5">
+                    VPA: {tx.vpa}
+                  </span>
+                )}
+                {tx.notes && tx.notes !== tx.merchant && (
+                  <span className="text-[11px] text-slate-400 truncate block mt-0.5 font-normal">
+                    {tx.notes}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: 'Category',
+        valueGetter: (params) => {
+          const cat = params.data?.categoryId;
+          return typeof cat === 'object' && cat !== null ? cat.name : 'Uncategorized';
+        },
+        flex: 1.2,
+        minWidth: 150,
+        cellRenderer: (params: CustomCellRendererProps<Transaction>) => {
+          const cat =
+            typeof params.data?.categoryId === 'object' && params.data?.categoryId !== null
+              ? params.data.categoryId
+              : null;
+          return (
+            <div className="flex items-center h-full w-full">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700/50">
+                {cat?.name || 'Uncategorized'}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: 'Ref.No',
+        field: 'refNo',
+        valueGetter: (params) => params.data?.refNo || params.data?.externalTransactionId || '',
+        flex: 1.1,
+        minWidth: 140,
+        cellRenderer: (params: CustomCellRendererProps<Transaction>) => {
+          const ref = params.data?.refNo || params.data?.externalTransactionId;
+          if (!ref) {
+            return (
+              <div className="flex items-center h-full w-full">
+                <span className="text-slate-300 dark:text-slate-600 text-xs font-mono">-</span>
+              </div>
+            );
+          }
+          return (
+            <div className="flex items-center h-full w-full">
+              <span
+                className="inline-flex items-center gap-1 font-mono text-xs text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/90 px-2 py-0.5 rounded-lg border border-slate-200/70 dark:border-slate-700/70 hover:border-brand-500/40 transition-colors"
+                title={`Reference: ${ref}`}
+              >
+                <Hash className="w-3 h-3 text-brand-500 flex-shrink-0" />
+                <span className="truncate max-w-[130px]">{ref}</span>
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: 'Method & Date',
+        field: 'transactionDate',
+        flex: 1.3,
+        minWidth: 150,
+        comparator: (a, b) => new Date(a || 0).getTime() - new Date(b || 0).getTime(),
+        cellRenderer: (params: CustomCellRendererProps<Transaction>) => {
+          const tx = params.data;
+          if (!tx) return null;
+          return (
+            <div className="flex flex-col justify-center leading-tight h-full">
+              <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[11px]">
+                <span>{tx.paymentMethod}</span>
+                {tx.source === 'email' && (
+                  <span title="Synced from Email" className="text-brand-600 dark:text-brand-400">
+                    <Mail className="w-3.5 h-3.5 inline" />
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] text-slate-400 block mt-0.5 font-medium">
+                {formatDate(tx.transactionDate, 'dd MMM yyyy')}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        field: 'amount',
+        headerName: 'Amount',
+        width: 140,
+        minWidth: 130,
+        comparator: (a, b) => (Number(a) || 0) - (Number(b) || 0),
+        cellClass: 'ag-cell-right',
+        headerClass: 'ag-right-aligned-header',
+        cellRenderer: (params: CustomCellRendererProps<Transaction>) => {
+          const tx = params.data;
+          if (!tx) return null;
+          const isExpense = tx.type === 'expense';
+          return (
+            <div className="flex items-center justify-end w-full h-full font-extrabold text-sm sm:text-base font-mono tabular-financial">
+              <span className={isExpense ? 'text-slate-900 dark:text-white' : 'text-emerald-600 dark:text-emerald-400'}>
+                {isExpense ? '-' : '+'}
+                {formatINR(tx.amount)}
+              </span>
+            </div>
+          );
+        },
+      },
+    ];
+  }, [dispatch, isAllSelected, selectedIds]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
@@ -319,152 +529,17 @@ export const TransactionsPage: React.FC = () => {
           />
         ) : (
           <>
-            {/* Desktop Table View (hidden on mobile) */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs sm:text-sm text-slate-700 dark:text-slate-300">
-                <thead className="bg-slate-50/80 dark:bg-slate-850/80 border-b border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] sm:text-[11px] tracking-wider">
-                  <tr>
-                    <th className="py-3 px-4 w-10">
-                      <input
-                        type="checkbox"
-                        checked={isAllSelected}
-                        onChange={(e) => dispatch(selectAllIds(e.target.checked))}
-                        className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                        aria-label="Select all transactions"
-                      />
-                    </th>
-                    <th className="py-3 px-4">Merchant / Description</th>
-                    <th className="py-3 px-4">Category</th>
-                    <th className="py-3 px-4">Ref.No</th>
-                    <th className="py-3 px-4">Method & Date</th>
-                    <th className="py-3 px-4 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {transactions.map((tx) => {
-                    const isExpense = tx.type === 'expense';
-                    const cat =
-                      typeof tx.categoryId === 'object' && tx.categoryId !== null
-                        ? tx.categoryId
-                        : null;
-                    const isSelected = selectedIds.includes(tx._id);
-
-                    return (
-                      <tr
-                        key={tx._id}
-                        onClick={() => setSelectedTx(tx)}
-                        className={`hover:bg-slate-50/90 dark:hover:bg-slate-800/40 cursor-pointer transition-colors ${
-                          isSelected ? 'bg-brand-500/10 dark:bg-brand-950/20' : ''
-                        }`}
-                      >
-                        <td
-                          className="py-3.5 px-4"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            dispatch(toggleSelectId(tx._id));
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => {}}
-                            className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                            aria-label={`Select transaction ${tx.merchant}`}
-                          />
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                                isExpense
-                                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                              }`}
-                            >
-                              <CategoryIcon name={cat?.icon || 'Tag'} className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-800 dark:text-slate-200 block truncate tracking-tight">
-                                  {tx.merchant}
-                                </span>
-                                {tx.personId && typeof tx.personId === 'object' && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-600 dark:text-brand-400 bg-brand-500/10 px-1.5 py-0.5 rounded border border-brand-500/20">
-                                    <UserRound className="w-2.5 h-2.5" />
-                                    {tx.personId.name}
-                                  </span>
-                                )}
-                              </div>
-                              {tx.vpa && (
-                                <span className="text-[11px] font-mono text-slate-400 truncate block mt-0.5">
-                                  VPA: {tx.vpa}
-                                </span>
-                              )}
-                              {tx.notes && (
-                                <span className="text-[11px] text-slate-400 truncate block mt-0.5 font-normal">
-                                  {tx.notes}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700/50">
-                            {cat?.name || 'Uncategorized'}
-                          </span>
-                        </td>
-
-                        {/* Ref.No Column */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {tx.refNo || tx.externalTransactionId ? (
-                            <span
-                              className="inline-flex items-center gap-1 font-mono text-xs text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/90 px-2 py-0.5 rounded-lg border border-slate-200/70 dark:border-slate-700/70 hover:border-brand-500/40 transition-colors"
-                              title={`Reference: ${tx.refNo || tx.externalTransactionId}`}
-                            >
-                              <Hash className="w-3 h-3 text-brand-500 flex-shrink-0" />
-                              <span className="truncate max-w-[140px]">{tx.refNo || tx.externalTransactionId}</span>
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 dark:text-slate-600 text-xs font-mono">-</span>
-                          )}
-                        </td>
-
-                        <td className="py-3.5 px-4 whitespace-nowrap text-xs">
-                          <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[11px]">
-                            <span>{tx.paymentMethod}</span>
-                            {tx.source === 'email' && (
-                              <span
-                                title="Synced from Email"
-                                className="text-brand-600 dark:text-brand-400"
-                              >
-                                <Mail className="w-3.5 h-3.5 inline" />
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[11px] text-slate-400 block mt-0.5 font-medium">
-                            {formatDate(tx.transactionDate, 'dd MMM yyyy')}
-                          </span>
-                        </td>
-
-                        <td className="py-3.5 px-4 text-right whitespace-nowrap font-extrabold text-sm sm:text-base font-mono tabular-financial">
-                          <span
-                            className={
-                              isExpense
-                                ? 'text-slate-900 dark:text-white'
-                                : 'text-emerald-600 dark:text-emerald-400'
-                            }
-                          >
-                            {isExpense ? '-' : '+'}
-                            {formatINR(tx.amount)}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            {/* Desktop Table View powered by AgGridTable */}
+            <div className="hidden md:block">
+              <AgGridTable<Transaction>
+                rowData={transactions}
+                columnDefs={columnDefs}
+                domLayout="autoHeight"
+                onRowClicked={(event) => {
+                  if (event.data) setSelectedTx(event.data);
+                }}
+                rowClassRules={rowClassRules}
+              />
             </div>
 
             {/* Mobile Stacked Card View (transformed for mobile, no horizontal scrolling!) */}

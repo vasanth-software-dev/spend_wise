@@ -13,20 +13,21 @@ export interface AgGridTableProps<TData = any> extends AgGridReactProps<TData> {
 export const defaultTableColDef: ColDef = {
   sortable: true,
   resizable: true,
-  suppressMovable: true,
+  suppressMovable: false,
+  unSortIcon: true,
 };
 
-export const AgGridTable = forwardRef<AgGridReact, AgGridTableProps>(function AgGridTable(
+export const AgGridTable = forwardRef(function AgGridTable<TData = any>(
   {
     height,
     className = '',
     containerClassName = '',
     theme,
     defaultColDef,
-    domLayout,
+    domLayout = 'autoHeight',
     ...props
-  },
-  ref
+  }: AgGridTableProps<TData>,
+  ref: React.ForwardedRef<AgGridReact<TData>>
 ) {
   const isDark = useAppSelector((state) => state.theme.isDark);
 
@@ -35,11 +36,12 @@ export const AgGridTable = forwardRef<AgGridReact, AgGridTableProps>(function Ag
     return isDark ? spendwiseDarkTheme : spendwiseLightTheme;
   }, [theme, isDark]);
 
-  const mergedDefaultColDef = useMemo(
-    () => ({
-      ...defaultTableColDef,
-      ...defaultColDef,
-    }),
+  const mergedDefaultColDef = useMemo<ColDef<TData>>(
+    () =>
+      ({
+        ...defaultTableColDef,
+        ...defaultColDef,
+      } as ColDef<TData>),
     [defaultColDef]
   );
 
@@ -59,7 +61,7 @@ export const AgGridTable = forwardRef<AgGridReact, AgGridTableProps>(function Ag
       className={`w-full overflow-hidden transition-colors ${containerClassName}`}
       style={containerStyle}
     >
-      <AgGridReact
+      <AgGridReact<TData>
         ref={ref}
         theme={activeTheme}
         defaultColDef={mergedDefaultColDef}
@@ -69,4 +71,6 @@ export const AgGridTable = forwardRef<AgGridReact, AgGridTableProps>(function Ag
       />
     </div>
   );
-});
+}) as <TData = any>(
+  props: AgGridTableProps<TData> & { ref?: React.Ref<AgGridReact<TData>> }
+) => React.ReactElement;

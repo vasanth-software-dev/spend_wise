@@ -12,18 +12,22 @@
     width: 6px;
     height: 6px;
   }
+
   ::-webkit-scrollbar-track {
     background: transparent;
   }
+
   ::-webkit-scrollbar-thumb {
     @apply bg-slate-300 dark:bg-slate-700 rounded-full;
   }
+
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-slate-400 dark:bg-slate-600;
   }
 }
 
 @layer components {
+
   /* Glassmorphism and Card utilities */
   .glass-panel {
     @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80;
@@ -35,7 +39,7 @@
   }
 
   .card-hover {
-    @apply transition-[transform,box-shadow,border-color] duration-150 ease-out;
+    @apply transition-[transform, box-shadow, border-color] duration-150 ease-out;
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -70,6 +74,7 @@
 
 /* Reduced motion - keep opacity/color, drop transform/filter */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -85,6 +90,7 @@
   .hover-lift:hover {
     transform: translateY(-2px);
   }
+
   .hover-scale-105:hover {
     transform: scale(1.05);
   }
@@ -200,8 +206,90 @@
   transition: opacity 0.15s ease, transform 0.15s ease !important;
   align-self: center !important;
 }
+
 .Toastify__close-button:hover {
   opacity: 1 !important;
   transform: scale(1.1) !important;
 }
 
+/* =========================================================================
+   AG Grid Fintech Styling Customizations
+   ========================================================================= */
+
+.ag-theme-quartz,
+.ag-theme-quartz-dark {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  --ag-font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+}
+
+/* Ensure cell content aligns vertically in center */
+.ag-theme-quartz .ag-cell,
+.ag-theme-quartz-dark .ag-cell,
+.ag-cell {
+  display: flex !important;
+  align-items: center !important;
+  outline: none !important;
+}
+
+.ag-theme-quartz .ag-cell-wrapper,
+.ag-theme-quartz-dark .ag-cell-wrapper,
+.ag-cell-wrapper,
+.ag-theme-quartz .ag-cell-value,
+.ag-theme-quartz-dark .ag-cell-value {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+  width: 100%;
+}
+
+/* Cell alignment utility for amount/numeric columns */
+.ag-theme-quartz .ag-cell.ag-cell-right,
+.ag-theme-quartz-dark .ag-cell.ag-cell-right,
+.ag-theme-quartz .ag-right-aligned-cell,
+.ag-theme-quartz-dark .ag-right-aligned-cell {
+  justify-content: flex-end;
+}
+
+/* Header typography and uppercase fintech styling */
+.ag-theme-quartz .ag-header-cell-label,
+.ag-theme-quartz-dark .ag-header-cell-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+/* Ensure right aligned headers align flex-end */
+.ag-theme-quartz .ag-right-aligned-header .ag-header-cell-label,
+.ag-theme-quartz-dark .ag-right-aligned-header .ag-header-cell-label {
+  justify-content: flex-end;
+}
+
+/* Row interaction and pointer */
+.ag-theme-quartz .ag-row,
+.ag-theme-quartz-dark .ag-row {
+  cursor: pointer;
+  transition: background-color 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* AG Grid custom scrollbar */
+.ag-theme-quartz .ag-body-viewport::-webkit-scrollbar,
+.ag-theme-quartz-dark .ag-body-viewport::-webkit-scrollbar,
+.ag-theme-quartz .ag-body-horizontal-scroll-viewport::-webkit-scrollbar,
+.ag-theme-quartz-dark .ag-body-horizontal-scroll-viewport::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.ag-theme-quartz .ag-body-viewport::-webkit-scrollbar-thumb,
+.ag-theme-quartz-dark .ag-body-viewport::-webkit-scrollbar-thumb,
+.ag-theme-quartz .ag-body-horizontal-scroll-viewport::-webkit-scrollbar-thumb,
+.ag-theme-quartz-dark .ag-body-horizontal-scroll-viewport::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+
+.ag-theme-quartz .ag-body-viewport::-webkit-scrollbar-thumb:hover,
+.ag-theme-quartz-dark .ag-body-viewport::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.6);
+}
