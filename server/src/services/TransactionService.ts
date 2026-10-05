@@ -93,6 +93,7 @@ export class TransactionService {
 
     if (updateData.amount !== undefined) payload.amount = roundTo2Decimals(Number(updateData.amount));
     if (updateData.type) payload.type = updateData.type;
+    if (updateData.currency) payload.currency = updateData.currency;
     if (updateData.merchant) payload.merchant = updateData.merchant.trim();
     if (updateData.description !== undefined) payload.description = updateData.description?.trim();
     if (updateData.notes !== undefined) payload.notes = updateData.notes?.trim();

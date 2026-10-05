@@ -31,7 +31,8 @@ interface SidebarProps {
 interface NavItem {
   label: string;
   to: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; color?: string }>;
+  color: string;
   badge?: number | string;
   badgeVariant?: 'brand' | 'neutral';
 }
@@ -39,6 +40,7 @@ interface NavItem {
 interface NavSection {
   id: string;
   title: string;
+  accentColor: string;
   items: NavItem[];
 }
 
@@ -87,55 +89,62 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
       {
         id: 'overview',
         title: 'Overview',
+        accentColor: '#4f46e5',
         items: [
-          { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
+          { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard, color: '#4f46e5' },
         ],
       },
       {
         id: 'finances',
         title: 'Finances',
+        accentColor: '#f43f5e',
         items: [
-          { label: 'Transactions', to: '/transactions', icon: Receipt },
-          { label: 'Recurring Bills', to: '/recurring', icon: Repeat },
-          { label: 'Debts & Loans', to: '/debts', icon: Coins },
-          { label: 'People & Splits', to: '/people', icon: Users },
+          { label: 'Transactions', to: '/transactions', icon: Receipt, color: '#f43f5e' },
+          { label: 'Recurring Bills', to: '/recurring', icon: Repeat, color: '#8b5cf6' },
+          { label: 'Debts & Loans', to: '/debts', icon: Coins, color: '#f59e0b' },
+          { label: 'People & Splits', to: '/people', icon: Users, color: '#ec4899' },
         ],
       },
       {
         id: 'planning',
         title: 'Planning & Budgets',
+        accentColor: '#10b981',
         items: [
-          { label: 'Budgets', to: '/budgets', icon: PiggyBank },
-          { label: 'Financial Goals', to: '/goals', icon: Target },
-          { label: 'Calendar', to: '/calendar', icon: CalendarDays },
+          { label: 'Budgets', to: '/budgets', icon: PiggyBank, color: '#10b981' },
+          { label: 'Financial Goals', to: '/goals', icon: Target, color: '#14b8a6' },
+          { label: 'Calendar', to: '/calendar', icon: CalendarDays, color: '#0ea5e9' },
         ],
       },
       {
         id: 'intelligence',
         title: 'Intelligence & Reports',
+        accentColor: '#3b82f6',
         items: [
           {
             label: 'Email Sync',
             to: '/email-sync',
             icon: MailCheck,
+            color: '#3b82f6',
             badge: pendingCount > 0 ? pendingCount : undefined,
             badgeVariant: 'brand',
           },
-          { label: 'Reports', to: '/reports', icon: BarChart3 },
+          { label: 'Reports', to: '/reports', icon: BarChart3, color: '#a855f7' },
         ],
       },
       {
         id: 'settings',
         title: 'Settings & Config',
+        accentColor: '#f97316',
         items: [
           {
             label: 'Categories',
             to: '/categories',
             icon: Tags,
+            color: '#f97316',
             badge: categories.length > 0 ? categories.length : undefined,
             badgeVariant: 'neutral',
           },
-          { label: 'Settings', to: '/settings', icon: Settings },
+          { label: 'Settings', to: '/settings', icon: Settings, color: '#6366f1' },
         ],
       },
     ],
@@ -206,9 +215,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                 className="w-full flex items-center justify-between px-2.5 py-1 rounded-lg text-left group hover:bg-slate-100/60 dark:hover:bg-slate-800/40 transition-colors focus:outline-none"
                 aria-expanded={!isCollapsed}
               >
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
-                  {section.title}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: section.accentColor }}
+                  />
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
+                    {section.title}
+                  </span>
+                </div>
 
                 <div className="flex items-center gap-1.5">
                   {/* Collapsed Pill Badge Indicator */}
@@ -242,39 +257,70 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                         to={item.to}
                         onClick={onCloseMobile}
                         className={({ isActive }) =>
-                          `group flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,border-color,color] duration-150 ease-out-expo relative ${
+                          `group flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,border-color,color] duration-150 ease-out-expo relative border ${
                             isActive
-                              ? 'bg-brand-500/10 text-brand-700 dark:text-brand-300 border border-brand-500/20 shadow-2xs font-bold'
-                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent'
+                              ? 'shadow-2xs font-bold'
+                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-100 border-transparent'
                           }`
+                        }
+                        style={({ isActive }) =>
+                          isActive
+                            ? {
+                                backgroundColor: `${item.color}15`,
+                                borderColor: `${item.color}35`,
+                                color: item.color,
+                              }
+                            : undefined
                         }
                       >
                         {({ isActive }) => (
                           <>
                             {isActive && (
-                              <span className="absolute left-0 top-2 bottom-2 w-1 bg-brand-500 dark:bg-brand-400 rounded-r-full" />
-                            )}
-                            <div className="flex items-center gap-2.5">
-                              <Icon
-                                className={`w-4 h-4 transition-colors ${
-                                  isActive
-                                    ? 'text-brand-600 dark:text-brand-400'
-                                    : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300'
-                                }`}
-                              />
-                              <span>{item.label}</span>
-                            </div>
-                            {item.badge !== undefined && (
                               <span
-                                className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
-                                  item.badgeVariant === 'brand' || !item.badgeVariant
-                                    ? 'bg-brand-500/20 text-brand-700 dark:text-brand-300 border border-brand-500/30'
-                                    : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300/50 dark:border-white/5'
-                                }`}
-                              >
-                                {item.badge}
-                              </span>
+                                className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full"
+                                style={{ backgroundColor: item.color }}
+                              />
                             )}
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div
+                                className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105 border"
+                                style={{
+                                  backgroundColor: isActive ? `${item.color}22` : `${item.color}10`,
+                                  borderColor: isActive ? `${item.color}45` : `${item.color}20`,
+                                  color: item.color,
+                                }}
+                              >
+                                <Icon className="w-3.5 h-3.5" color={item.color} />
+                              </div>
+                              <span className="truncate">{item.label}</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              {item.to === '/categories' && categories.length > 0 && (
+                                <div className="flex items-center -space-x-1 mr-0.5">
+                                  {categories.slice(0, 4).map((c, i) => (
+                                    <span
+                                      key={c._id || i}
+                                      className="w-2 h-2 rounded-full border border-white dark:border-[#0b101d]"
+                                      style={{ backgroundColor: c.color || '#f97316' }}
+                                      title={c.name}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+
+                              {item.badge !== undefined && (
+                                <span
+                                  className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                                    item.badgeVariant === 'brand' || !item.badgeVariant
+                                      ? 'bg-brand-500/20 text-brand-700 dark:text-brand-300 border border-brand-500/30'
+                                      : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300/50 dark:border-white/5'
+                                  }`}
+                                >
+                                  {item.badge}
+                                </span>
+                              )}
+                            </div>
                           </>
                         )}
                       </NavLink>

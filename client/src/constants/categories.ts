@@ -93,10 +93,11 @@ export function buildCategoryOptions(categories?: CategoryLike[] | null): Groupe
     if (seen.has(key)) continue;
     seen.add(key);
 
+    const fallback = FALLBACK_CATEGORIES.find((f) => f.name.toLowerCase() === key);
     const option: CategoryOption = {
       name,
-      icon: category.icon,
-      color: category.color,
+      icon: category.icon || fallback?.icon || 'Tag',
+      color: category.color || fallback?.color || '#64748b',
       _id: category._id,
       type: 'both',
     };
@@ -129,4 +130,129 @@ export function buildCategoryOptions(categories?: CategoryLike[] | null): Groupe
   }
 
   return { income, expense, transfer, general };
+}
+
+export interface ResolvedCategoryMeta {
+  name: string;
+  icon: string;
+  color: string;
+  bg: string;
+  border: string;
+}
+
+export function getCategoryColorStyle(rawColor?: string): {
+  color: string;
+  bg: string;
+  border: string;
+} {
+  const color = (rawColor || '#64748b').trim();
+  let hex = color;
+  if (!hex.startsWith('#') && /^[0-9a-fA-F]{3,8}$/.test(hex)) {
+    hex = `#${hex}`;
+  }
+
+  if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+    return {
+      color: hex,
+      bg: `${hex}1f`,
+      border: `${hex}33`,
+    };
+  }
+
+  if (/^#[0-9a-fA-F]{3}$/.test(hex)) {
+    const fullHex = `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`;
+    return {
+      color: fullHex,
+      bg: `${fullHex}1f`,
+      border: `${fullHex}33`,
+    };
+  }
+
+  if (/^#[0-9a-fA-F]{8}$/.test(hex)) {
+    const baseHex = hex.slice(0, 7);
+    return {
+      color: baseHex,
+      bg: `${baseHex}1f`,
+      border: `${baseHex}33`,
+    };
+  }
+
+  return {
+    color,
+    bg: `${color}1f`,
+    border: `${color}33`,
+  };
+}
+
+export function resolveCategoryMeta(
+  catRef?: CategoryLike | string | null,
+  availableCategories?: CategoryLike[]
+): ResolvedCategoryMeta {
+  let name = 'Uncategorized';
+  let icon = 'Tag';
+  let color = '';
+
+  if (catRef && typeof catRef === 'object') {
+    name = catRef.name || 'Uncategorized';
+    icon = catRef.icon || 'Tag';
+    color = catRef.color || '';
+
+    if (!color || icon === 'Tag') {
+      const match =
+        availableCategories?.find(
+          (c) =>
+            (catRef._id && c._id === catRef._id) ||
+            (c.name && c.name.toLowerCase() === name.toLowerCase())
+        ) ||
+        FALLBACK_CATEGORIES.find(
+          (f) => f.name.toLowerCase() === name.toLowerCase()
+        );
+
+      if (match) {
+        if (!color && match.color) color = match.color;
+        if (icon === 'Tag' && match.icon) icon = match.icon;
+      }
+    }
+  } else if (typeof catRef === 'string' && catRef.trim()) {
+    const trimmed = catRef.trim();
+    const match =
+      availableCategories?.find(
+        (c) =>
+          c._id === trimmed ||
+          (c.name && c.name.toLowerCase() === trimmed.toLowerCase())
+      ) ||
+      FALLBACK_CATEGORIES.find(
+        (f) =>
+          f._id === trimmed ||
+          f.name.toLowerCase() === trimmed.toLowerCase()
+      );
+
+    if (match) {
+      name = match.name;
+      icon = match.icon || 'Tag';
+      color = match.color || '';
+    } else {
+      name = trimmed;
+    }
+  }
+
+  if (!color) {
+    const fallback = FALLBACK_CATEGORIES.find(
+      (f) => f.name.toLowerCase() === name.toLowerCase()
+    );
+    color = fallback?.color || '#64748b';
+    if (icon === 'Tag' && fallback?.icon) {
+      icon = fallback.icon;
+    }
+  }
+
+  const styles = getCategoryColorStyle(color);
+
+  return {
+    name,
+    icon,
+    color: styles.color,
+    bg: styles.bg,
+    border: styles.border,
+  };
 }

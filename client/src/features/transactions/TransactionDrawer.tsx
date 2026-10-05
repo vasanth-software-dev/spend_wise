@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { X, Calendar, Tag, CreditCard, Mail, Trash2, Edit3, ShieldCheck, UserRound, ExternalLink } from 'lucide-react';
 import { Person, Transaction } from '../../types/index.js';
 import { formatINR, formatDate, getConfidenceBadge } from '../../utils/format.js';
 import { Badge } from '../../components/ui/Badge.js';
-import { CategoryIcon } from '../../components/ui/CategoryIcon.js';
+import { CategoryBadge } from '../../components/ui/CategoryBadge.js';
+import { CategoryIconBox } from '../../components/ui/CategoryIconBox.js';
+import { useAppSelector } from '../../store/index.js';
 import { api } from '../../services/api.js';
 import { toast } from '../../components/ui/Toast.js';
 import { TransactionModal } from './TransactionModal.js';
@@ -24,6 +27,7 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
   onDelete,
   onEdit,
 }) => {
+  const categories = useAppSelector((state) => state.categories.categories);
   const [localTx, setLocalTx] = useState<Transaction | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
@@ -84,10 +88,6 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
 
   const displayedTx = localTx || transaction;
   const isExpense = displayedTx.type === 'expense';
-  const category =
-    typeof displayedTx.categoryId === 'object' && displayedTx.categoryId !== null
-      ? displayedTx.categoryId
-      : null;
 
   const sourceAccount =
     typeof displayedTx.sourceAccountId === 'object' && displayedTx.sourceAccountId !== null
@@ -105,7 +105,7 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop */}
       <div
@@ -142,15 +142,12 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
 
           {/* Amount and Merchant Header */}
           <div className="mt-7 text-center">
-            <div
-              className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3.5 shadow-2xs ${
-                isExpense
-                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-              }`}
-            >
-              <CategoryIcon name={category?.icon || 'Tag'} className="w-7 h-7" />
-            </div>
+            <CategoryIconBox
+              category={displayedTx.categoryId}
+              categories={categories}
+              size="xl"
+              className="mx-auto mb-3.5"
+            />
 
             <h3 className="text-3xl sm:text-4xl font-extrabold font-mono tracking-tight text-slate-900 dark:text-white tabular-financial">
               {isExpense ? '-' : '+'}
@@ -194,9 +191,7 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
                 <Tag className="w-4 h-4" />
                 <span>Category</span>
               </div>
-              <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                {category?.name || 'Uncategorized'}
-              </span>
+              <CategoryBadge category={displayedTx.categoryId} categories={categories} size="md" />
             </div>
 
             <div className="flex items-center justify-between text-xs sm:text-sm">
@@ -389,6 +384,7 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
           }}
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 };

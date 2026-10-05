@@ -14,6 +14,8 @@ import { Input } from '../components/ui/Input.js';
 import { Badge } from '../components/ui/Badge.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
 import { CategorySelect } from '../components/ui/CategorySelect.js';
+import { CategoryBadge } from '../components/ui/CategoryBadge.js';
+import { CategoryIconBox } from '../components/ui/CategoryIconBox.js';
 import { formatINR, formatDate } from '../utils/format.js';
 import { RecurringFrequency, PaymentMethod, TransactionType } from '../types/index.js';
 
@@ -131,22 +133,25 @@ export const RecurringPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {recurringList.map((item) => {
             const isExpense = item.type === 'expense';
-            const cat =
-              typeof item.categoryId === 'object' && item.categoryId !== null
-                ? item.categoryId
-                : null;
 
             return (
               <Card key={item._id} interactive className="p-5 sm:p-6 flex flex-col justify-between group">
                 <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                        {item.name}
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-0.5 font-medium">
-                        {item.merchant} • {cat?.name || 'Uncategorized'}
-                      </p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <CategoryIconBox category={item.categoryId} categories={categories} size="lg" />
+                      <div className="min-w-0">
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight truncate">
+                          {item.name}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
+                            {item.merchant}
+                          </span>
+                          <span className="text-slate-300 dark:text-slate-600">•</span>
+                          <CategoryBadge category={item.categoryId} categories={categories} size="xs" />
+                        </div>
+                      </div>
                     </div>
 
                     <Badge variant={isExpense ? 'rose' : 'emerald'} dot>

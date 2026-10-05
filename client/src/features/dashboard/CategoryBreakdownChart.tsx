@@ -8,6 +8,8 @@ import {
 } from 'recharts';
 import { CategoryBreakdownItem } from '../../types/index.js';
 import { formatINR } from '../../utils/format.js';
+import { useAppSelector } from '../../store/index.js';
+import { resolveCategoryMeta } from '../../constants/categories.js';
 
 interface CategoryBreakdownChartProps {
   data: CategoryBreakdownItem[];
@@ -18,6 +20,16 @@ const DEFAULT_COLORS = [
 ];
 
 export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ data }) => {
+  const categories = useAppSelector((state) => state.categories?.categories);
+
+  const getEntryColor = (entry: CategoryBreakdownItem, index: number) => {
+    if (entry.categoryColor && entry.categoryColor !== '#64748b') {
+      return entry.categoryColor;
+    }
+    const meta = resolveCategoryMeta(entry.categoryName, categories);
+    return meta.color || DEFAULT_COLORS[index % DEFAULT_COLORS.length];
+  };
+
   if (!data || data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-xs text-slate-400 font-medium">
@@ -64,7 +76,7 @@ export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ 
               {data.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={entry.categoryColor || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
+                  fill={getEntryColor(entry, index)}
                 />
               ))}
             </Pie>
@@ -85,7 +97,7 @@ export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ 
       <div className="w-full sm:w-1/2 max-h-60 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
         {data.slice(0, 6).map((item, index) => {
           const percentage = total > 0 ? Math.round((item.totalAmount / total) * 100) : 0;
-          const color = item.categoryColor || DEFAULT_COLORS[index % DEFAULT_COLORS.length];
+          const color = getEntryColor(item, index);
           return (
             <div key={item._id || index} className="space-y-1 group">
               <div className="flex items-center justify-between text-xs">

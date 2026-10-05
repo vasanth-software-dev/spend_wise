@@ -31,6 +31,8 @@ import { Modal } from '../components/ui/Modal.js';
 import { TransactionDrawer } from '../features/transactions/TransactionDrawer.js';
 import { TransactionModal } from '../features/transactions/TransactionModal.js';
 import { toast } from '../components/ui/Toast.js';
+import { CategoryBadge } from '../components/ui/CategoryBadge.js';
+import { CategoryIconBox } from '../components/ui/CategoryIconBox.js';
 
 interface CategoryStat {
   id: string;
@@ -768,7 +770,6 @@ className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected
           <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
             {transactions.map((tx) => {
               const isExpense = tx.type === 'expense';
-              const cat = typeof tx.categoryId === 'object' && tx.categoryId !== null ? tx.categoryId : null;
 
               return (
                 <div
@@ -777,15 +778,7 @@ className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected
                   className="py-3.5 px-2 -mx-2 rounded-xl flex items-center justify-between gap-4 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                        isExpense
-                          ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400'
-                          : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
-                      }`}
-                    >
-                      {isExpense ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
-                    </div>
+                    <CategoryIconBox category={tx.categoryId} size="lg" />
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -809,9 +802,7 @@ className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected
                           {formatDate(tx.transactionDate, 'dd MMM yyyy, h:mm a')}
                         </span>
                         <span>·</span>
-                        <span className="font-medium text-slate-600 dark:text-slate-300">
-                          {cat?.name || 'Uncategorized'}
-                        </span>
+                        <CategoryBadge category={tx.categoryId} size="xs" />
                         {tx.externalTransactionId && (
                           <>
                             <span>·</span>

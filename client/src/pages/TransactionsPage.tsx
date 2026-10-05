@@ -12,6 +12,7 @@ import {
   Mail,
   UserRound,
   Hash,
+  Edit3,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import {
@@ -28,7 +29,9 @@ import { fetchCategoriesThunk } from '../store/slices/categorySlice.js';
 import { Button } from '../components/ui/Button.js';
 import { Card } from '../components/ui/Card.js';
 import { Modal } from '../components/ui/Modal.js';
-import { CategoryIcon } from '../components/ui/CategoryIcon.js';
+import { CategoryBadge } from '../components/ui/CategoryBadge.js';
+import { CategoryIconBox } from '../components/ui/CategoryIconBox.js';
+import { resolveCategoryMeta } from '../constants/categories.js';
 import { CategorySelect } from '../components/ui/CategorySelect.js';
 import { TableRowSkeleton } from '../components/ui/Skeleton.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
@@ -125,6 +128,7 @@ export const TransactionsPage: React.FC = () => {
   const columnDefs = useMemo<ColDef<Transaction>[]>(() => {
     return [
       {
+        colId: 'select',
         field: '_id',
         headerName: '',
         width: 48,
@@ -150,7 +154,7 @@ export const TransactionsPage: React.FC = () => {
           const isSelected = selectedIds.includes(tx._id);
           return (
             <div
-              className="flex items-center justify-center w-full h-full"
+              className="flex items-center justify-center w-full h-full cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 dispatch(toggleSelectId(tx._id));
@@ -159,7 +163,13 @@ export const TransactionsPage: React.FC = () => {
               <input
                 type="checkbox"
                 checked={isSelected}
-                onChange={() => {}}
+                onChange={(e) => {
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dispatch(toggleSelectId(tx._id));
+                }}
                 className="rounded border-slate-300 dark:border-slate-600 text-brand-600 focus:ring-brand-500 cursor-pointer"
                 aria-label={`Select transaction ${tx.merchant}`}
               />
@@ -176,23 +186,10 @@ export const TransactionsPage: React.FC = () => {
         cellRenderer: (params: CustomCellRendererProps<Transaction>) => {
           const tx = params.data;
           if (!tx) return null;
-          const isExpense = tx.type === 'expense';
-          const cat =
-            typeof tx.categoryId === 'object' && tx.categoryId !== null
-              ? tx.categoryId
-              : null;
 
           return (
             <div className="flex items-center gap-3 py-1 min-w-0 h-full">
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  isExpense
-                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                }`}
-              >
-                <CategoryIcon name={cat?.icon || 'Tag'} className="w-4 h-4" />
-              </div>
+              <CategoryIconBox category={tx.categoryId} categories={categories} size="md" />
               <div className="min-w-0 leading-tight">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-slate-800 dark:text-slate-200 block truncate tracking-tight text-xs sm:text-sm">
@@ -223,21 +220,16 @@ export const TransactionsPage: React.FC = () => {
       {
         headerName: 'Category',
         valueGetter: (params) => {
-          const cat = params.data?.categoryId;
-          return typeof cat === 'object' && cat !== null ? cat.name : 'Uncategorized';
+          const catMeta = resolveCategoryMeta(params.data?.categoryId, categories);
+          return catMeta.name;
         },
         flex: 1.2,
         minWidth: 150,
         cellRenderer: (params: CustomCellRendererProps<Transaction>) => {
-          const cat =
-            typeof params.data?.categoryId === 'object' && params.data?.categoryId !== null
-              ? params.data.categoryId
-              : null;
+          if (!params.data) return null;
           return (
             <div className="flex items-center h-full w-full">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700/50">
-                {cat?.name || 'Uncategorized'}
-              </span>
+              <CategoryBadge category={params.data.categoryId} categories={categories} size="sm" />
             </div>
           );
         },
@@ -314,6 +306,51 @@ export const TransactionsPage: React.FC = () => {
                 {isExpense ? '-' : '+'}
                 {formatINR(tx.amount)}
               </span>
+            </div>
+          );
+        },
+      },
+      {
+        colId: 'actions',
+        headerName: 'Actions',
+        field: '_id' as any,
+        width: 100,
+        minWidth: 90,
+        maxWidth: 110,
+        sortable: false,
+        resizable: false,
+        suppressMovable: true,
+        cellClass: 'ag-cell-center',
+        headerClass: 'ag-center-aligned-header',
+        cellRenderer: (params: CustomCellRendererProps<Transaction>) => {
+          const tx = params.data;
+          if (!tx) return null;
+          return (
+            <div className="flex items-center justify-center gap-1.5 w-full h-full">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingTx(tx);
+                }}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-brand-500/10 dark:text-slate-400 dark:hover:text-brand-400 dark:hover:bg-brand-500/20 transition-colors"
+                title="Edit Transaction"
+                aria-label={`Edit ${tx.merchant}`}
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteSingle(tx._id);
+                }}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-500/10 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-500/20 transition-colors"
+                title="Delete Transaction"
+                aria-label={`Delete ${tx.merchant}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
           );
         },
@@ -535,7 +572,15 @@ export const TransactionsPage: React.FC = () => {
                 rowData={transactions}
                 columnDefs={columnDefs}
                 domLayout="autoHeight"
-                onRowClicked={(event) => {
+                onCellClicked={(event) => {
+                  const colId = event.column?.getColId();
+                  if (colId === 'select' || colId === 'actions' || colId === '_id') {
+                    return;
+                  }
+                  const target = event.event?.target as HTMLElement | null;
+                  if (target?.closest('input, button, a')) {
+                    return;
+                  }
                   if (event.data) setSelectedTx(event.data);
                 }}
                 rowClassRules={rowClassRules}
@@ -546,16 +591,16 @@ export const TransactionsPage: React.FC = () => {
             <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
               {transactions.map((tx) => {
                 const isExpense = tx.type === 'expense';
-                const cat =
-                  typeof tx.categoryId === 'object' && tx.categoryId !== null
-                    ? tx.categoryId
-                    : null;
                 const isSelected = selectedIds.includes(tx._id);
 
                 return (
                   <div
                     key={tx._id}
-                    onClick={() => setSelectedTx(tx)}
+                    onClick={(e) => {
+                      const target = e.target as HTMLElement | null;
+                      if (target?.closest('input, button, a')) return;
+                      setSelectedTx(tx);
+                    }}
                     className={`p-4 flex items-center justify-between gap-3 active:bg-slate-50 dark:active:bg-slate-800/60 transition-colors ${
                       isSelected ? 'bg-brand-500/10 dark:bg-brand-950/20' : ''
                     }`}
@@ -566,34 +611,32 @@ export const TransactionsPage: React.FC = () => {
                           e.stopPropagation();
                           dispatch(toggleSelectId(tx._id));
                         }}
-                        className="pr-1"
+                        className="pr-1 cursor-pointer"
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => {}}
-                          className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                          onChange={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            dispatch(toggleSelectId(tx._id));
+                          }}
+                          className="rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
                         />
                       </div>
 
-                      <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                          isExpense
-                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                        }`}
-                      >
-                        <CategoryIcon name={cat?.icon || 'Tag'} className="w-4 h-4" />
-                      </div>
+                      <CategoryIconBox category={tx.categoryId} categories={categories} size="lg" />
 
                       <div className="min-w-0">
                         <p className="font-bold text-slate-900 dark:text-white truncate text-xs sm:text-sm tracking-tight">
                           {tx.merchant}
                         </p>
-                        <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-400">
+                        <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-400 flex-wrap">
                           <span>{formatDate(tx.transactionDate, 'dd MMM')}</span>
                           <span>•</span>
-                          <span className="truncate">{cat?.name || 'Uncategorized'}</span>
+                          <CategoryBadge category={tx.categoryId} categories={categories} size="xs" />
                           {(tx.refNo || tx.externalTransactionId) && (
                             <>
                               <span>•</span>
@@ -611,20 +654,34 @@ export const TransactionsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="text-right flex-shrink-0">
-                      <span
-                        className={`text-sm font-extrabold font-mono tabular-financial block ${
-                          isExpense
-                            ? 'text-slate-900 dark:text-white'
-                            : 'text-emerald-600 dark:text-emerald-400'
-                        }`}
+                    <div className="flex items-center gap-2.5 flex-shrink-0">
+                      <div className="text-right">
+                        <span
+                          className={`text-sm font-extrabold font-mono tabular-financial block ${
+                            isExpense
+                              ? 'text-slate-900 dark:text-white'
+                              : 'text-emerald-600 dark:text-emerald-400'
+                          }`}
+                        >
+                          {isExpense ? '-' : '+'}
+                          {formatINR(tx.amount)}
+                        </span>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 mt-0.5 block">
+                          {tx.paymentMethod}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTx(tx);
+                        }}
+                        className="p-2 rounded-xl text-slate-400 hover:text-brand-600 hover:bg-brand-500/10 dark:hover:text-brand-400 dark:hover:bg-brand-500/20 transition-colors border border-slate-200/60 dark:border-slate-800"
+                        title="Edit Transaction"
+                        aria-label={`Edit ${tx.merchant}`}
                       >
-                        {isExpense ? '-' : '+'}
-                        {formatINR(tx.amount)}
-                      </span>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 mt-0.5 block">
-                        {tx.paymentMethod}
-                      </span>
+                        <Edit3 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 );

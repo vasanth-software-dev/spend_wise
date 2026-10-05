@@ -52,7 +52,7 @@ const CATEGORY_RULES: Record<string, string[]> = {
     'dining', 'eats', 'hotel', 'hotels', 'canteen', 'tiffin', 'mess', 'biryani', 'biryan', 'biriyani', 'briyani', 'chettinad', 'chettinadu', 'asda biryan', 'kitchen', 'sweet', 'sweets',
     'mithai', 'juice', 'tea stall', 'tea', 'coffee', 'snack', 'snacks', 'bar', 'pub', 'brewery', 'chutney',
     'idli', 'dosa', 'dosai', 's d o sa', 'chat stall', 'chaat stall', 'food stall', 'stall', 'stalls', 'chat', 'chaat',
-    'shawarma', 'bbq', 'barbeque', 'haldiram', 'saravana bhavan', 'a2b',
+    'shawarma', 'bbq', 'barbeque', 'haldiram', 'saravana bhavan', 'a2b', 'ambal', 'bhavanam', 'vilas',
     'ananda bhavan', 'taco', 'krispy kreme', 'dunkin', 'baskin', 'ice cream', 'dessert', 'desserts',
     'grill', 'bhatura', 'roll', 'rolls', 'momos', 'chinese', 'punjabi', 'udupi', 'south indian', 'north indian',
     'meals', 'curry', 'thali', 'paratha', 'fast food', 'treat', 'darshini', 'bites', 'caterer', 'caterers'
@@ -163,7 +163,7 @@ export function getCategoryType(categoryName?: string): 'expense' | 'income' | '
   return 'both';
 }
 
-export const BUSINESS_KEYWORDS_REGEX = /\b(pvt|ltd|limited|inc|corp|corporation|store|stores|shop|shops|mart|marts|bazaar|foods?|pharmacy|pharmacies|fuel|hospital|hospitals|hotel|hotels|bakery|bakeries|restaurant|restaurants|cafe|cafes|sweets?|supermarket|supermarkets|cinema|cinemas|theatre|theatres|theater|theaters|multiplex|screen|screens|stall|stalls|broadband|telecom|technologies|solutions|bank|petrol|pump|bunk|bunks|hpcl|bpcl|iocl|shell|airtel|jio|vodafone|swiggy|zomato|amazon|flipkart|uber|ola|abhibus|redbus|travels|bus|blinkit|zepto|netflix|spotify|pvr|irctc|makemytrip|myntra|nykaa|paytm|phonepe|google|apple|starbucks|fastag|recharge|bill|agency|agencies|enterprises?|innovations|godaddy|salon|salons|look|looks|spa|electrical|electricals|hardware|appliances)\b/i;
+export const BUSINESS_KEYWORDS_REGEX = /\b(pvt|ltd|limited|inc|corp|corporation|store|stores|shop|shops|mart|marts|bazaar|foods?|food|pharmacy|pharmacies|fuel|hospital|hospitals|hotel|hotels|bakery|bakeries|restaurant|restaurants|cafe|cafes|sweets?|supermarket|supermarkets|cinema|cinemas|theatre|theatres|theater|theaters|multiplex|screen|screens|stall|stalls|broadband|telecom|technologies|solutions|bank|petrol|pump|bunk|bunks|hpcl|bpcl|iocl|shell|airtel|jio|vodafone|swiggy|zomato|amazon|flipkart|uber|ola|abhibus|redbus|travels|bus|blinkit|zepto|netflix|spotify|pvr|irctc|makemytrip|myntra|nykaa|paytm|phonepe|google|apple|starbucks|fastag|recharge|bill|agency|agencies|enterprises?|innovations|godaddy|salon|salons|look|looks|spa|electrical|electricals|hardware|appliances|chettinad|chettinadu|bhavan|bhavanam|vilas|mess|caterer|caterers|kitchen|dining|tiffin|darshini|biryani|biriyani|dhaba|bites|ambal|saravana)\b/i;
 
 /**
  * Detects category by checking whole text, multi-word phrases, and EVERY individual word / token
@@ -628,6 +628,9 @@ export function cleanMerchantName(narration: string): string {
   for (const { pattern, fix } of BUSINESS_ROOT_NORMALIZERS) {
     clean = clean.replace(pattern, (_match, p1) => fix || (p1 ? p1.toUpperCase() : ''));
   }
+
+  // Normalize " HO" abbreviation for "HOTEL" when preceded by food/hospitality/brand terms
+  clean = clean.replace(/\b(CHETTINAD|CHETTINADU|BHAVAN|BHAVANAM|VILAS|MESS|RESTAURANT|REST|AMBAL|SARAVANA)\s+HO\b/gi, '$1 Hotel');
 
   // Normalize multiple spaces
   clean = clean.replace(/\s+/g, ' ').trim();

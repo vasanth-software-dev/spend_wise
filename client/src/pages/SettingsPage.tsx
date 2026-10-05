@@ -26,7 +26,17 @@ import { Badge } from '../components/ui/Badge.js';
 import { BiometricSettingsCard } from '../components/auth/BiometricSettingsCard.js';
 import { formatRelativeDate } from '../utils/format.js';
 import { CategoryIcon } from '../components/ui/CategoryIcon.js';
+import { CategoryBadge } from '../components/ui/CategoryBadge.js';
+import { CategoryIconBox } from '../components/ui/CategoryIconBox.js';
+import { resolveCategoryMeta } from '../constants/categories.js';
 import { CATEGORY_ICON_NAMES } from '../constants/categoryIcons.js';
+
+const PRESET_COLORS = [
+  '#f97316', '#10b981', '#ec4899', '#3b82f6',
+  '#ef4444', '#eab308', '#8b5cf6', '#a855f7',
+  '#14b8a6', '#6366f1', '#06b6d4', '#f43f5e',
+  '#d946ef', '#059669', '#0284c7', '#84cc16',
+];
 
 export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -76,6 +86,7 @@ export const SettingsPage: React.FC = () => {
   const [newCatIcon, setNewCatIcon] = useState('Tag');
   const [newCatColor, setNewCatColor] = useState('#10b981');
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'expense' | 'income' | 'both'>('all');
 
   // Danger Zone
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -169,17 +180,18 @@ export const SettingsPage: React.FC = () => {
   interface TabItem {
     id: 'profile' | 'security' | 'sessions' | 'categories' | 'privacy' | 'danger';
     label: string;
-    icon: React.ComponentType<{ className?: string }>;
+    icon: React.ComponentType<{ className?: string; color?: string }>;
+    color: string;
     danger?: boolean;
   }
 
   const tabs: TabItem[] = [
-    { id: 'profile', label: 'Profile', icon: User },
-    { id: 'security', label: 'Security', icon: Fingerprint },
-    { id: 'sessions', label: 'Sessions', icon: Laptop },
-    { id: 'categories', label: 'Categories', icon: Tag },
-    { id: 'privacy', label: 'Privacy & Security', icon: Shield },
-    { id: 'danger', label: 'Danger Zone', icon: AlertTriangle, danger: true },
+    { id: 'profile', label: 'Profile', icon: User, color: '#3b82f6' },
+    { id: 'security', label: 'Security & Passkeys', icon: Fingerprint, color: '#10b981' },
+    { id: 'sessions', label: 'Sessions', icon: Laptop, color: '#6366f1' },
+    { id: 'categories', label: 'Categories', icon: Tag, color: '#f97316' },
+    { id: 'privacy', label: 'Privacy & Security', icon: Shield, color: '#14b8a6' },
+    { id: 'danger', label: 'Danger Zone', icon: AlertTriangle, color: '#ef4444', danger: true },
   ];
 
   return (
@@ -195,7 +207,7 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Segmented Fintech Tab Bar */}
-      <div className="flex bg-slate-100 dark:bg-surface-elevated/90 p-1.5 rounded-2xl border border-slate-200/60 dark:border-white/5 overflow-x-auto scrollbar-none">
+      <div className="flex bg-slate-100 dark:bg-surface-elevated/90 p-1.5 rounded-2xl border border-slate-200/60 dark:border-white/5 overflow-x-auto scrollbar-none gap-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -212,18 +224,42 @@ export const SettingsPage: React.FC = () => {
                   setSearchParams({ tab: tab.id });
                 }
               }}
-              className={`flex items-center gap-2 py-2 px-3.5 text-xs sm:text-sm font-semibold rounded-xl transition-[background-color,border-color,color] duration-150 ease-out-expo whitespace-nowrap ${
+              style={
                 isActive
-                  ? tab.danger
-                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 font-bold'
-                    : 'bg-white dark:bg-surface text-slate-900 dark:text-white shadow-xs border border-slate-200/80 dark:border-white/10 font-bold'
-                  : tab.danger
-                  ? 'text-rose-500/80 hover:text-rose-600 hover:bg-rose-50/40 dark:hover:bg-rose-950/20'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? {
+                      backgroundColor: `${tab.color}18`,
+                      borderColor: `${tab.color}35`,
+                      color: tab.color,
+                    }
+                  : undefined
+              }
+              className={`flex items-center gap-2 py-2 px-3.5 text-xs sm:text-sm font-semibold rounded-xl transition-[background-color,border-color,color] duration-150 ease-out-expo whitespace-nowrap border ${
+                isActive
+                  ? 'shadow-2xs font-bold'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/60'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <div
+                className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-colors"
+                style={{
+                  backgroundColor: isActive ? `${tab.color}25` : `${tab.color}15`,
+                  color: tab.color,
+                }}
+              >
+                <Icon className="w-3 h-3" color={tab.color} />
+              </div>
               <span>{tab.label}</span>
+              {tab.id === 'categories' && categories.length > 0 && (
+                <span
+                  className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: `${tab.color}22`,
+                    color: tab.color,
+                  }}
+                >
+                  {categories.length}
+                </span>
+              )}
             </button>
           );
         })}
@@ -400,11 +436,16 @@ export const SettingsPage: React.FC = () => {
       {activeTab === 'categories' && (
         <Card variant="elevated" className="p-6 sm:p-7">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-slate-100 dark:border-white/5 gap-3">
-            <div>
-              <CardTitle className="text-lg font-bold">Spending & Income Taxonomy</CardTitle>
-              <CardDescription className="text-xs">
-                System default ledgers and your personalized classification categories.
-              </CardDescription>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/25 text-orange-600 dark:text-orange-400 flex items-center justify-center shadow-2xs">
+                <Tag className="w-5 h-5" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold">Spending & Income Taxonomy</CardTitle>
+                <CardDescription className="text-xs">
+                  System default ledgers and your personalized classification categories.
+                </CardDescription>
+              </div>
             </div>
             <Button
               size="sm"
@@ -417,28 +458,116 @@ export const SettingsPage: React.FC = () => {
             </Button>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {categories.map((c) => (
-              <div
-                key={c._id}
-                className="p-3.5 rounded-xl border border-slate-200/80 dark:border-white/5 flex items-center gap-3 bg-white dark:bg-surface-elevated/60 hover:border-slate-300 dark:hover:border-white/10 transition-colors"
-              >
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${c.color}20` }}
+          {/* Flow Category Filter Pills */}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            {[
+              { id: 'all', label: 'All Categories', count: categories.length, color: '#f97316' },
+              {
+                id: 'expense',
+                label: 'Expenses Only',
+                count: categories.filter((c) => c.type === 'expense').length,
+                color: '#ef4444',
+              },
+              {
+                id: 'income',
+                label: 'Income Only',
+                count: categories.filter((c) => c.type === 'income').length,
+                color: '#10b981',
+              },
+              {
+                id: 'both',
+                label: 'Bi-directional / Both',
+                count: categories.filter((c) => c.type === 'both' || (c as any).type === 'transfer').length,
+                color: '#8b5cf6',
+              },
+            ].map((f) => {
+              const isSelected = categoryFilter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => setCategoryFilter(f.id as any)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-150 ${
+                    isSelected
+                      ? 'shadow-2xs font-bold'
+                      : 'border-slate-200/80 dark:border-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  }`}
+                  style={
+                    isSelected
+                      ? {
+                          backgroundColor: `${f.color}18`,
+                          borderColor: `${f.color}40`,
+                          color: f.color,
+                        }
+                      : undefined
+                  }
                 >
-                  <CategoryIcon name={c.icon} className="w-4 h-4" color={c.color} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
-                    {c.name}
-                  </p>
-                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mt-0.5">
-                    {c.isDefault ? 'Default' : 'Custom'}
+                  <span>{f.label}</span>
+                  <span
+                    className="text-[10px] font-bold px-1.5 py-0.2 rounded-full"
+                    style={{
+                      backgroundColor: isSelected ? `${f.color}25` : 'currentColor',
+                      opacity: isSelected ? 1 : 0.15,
+                    }}
+                  >
+                    {f.count}
                   </span>
-                </div>
-              </div>
-            ))}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+            {categories
+              .filter((c) => {
+                if (categoryFilter === 'all') return true;
+                if (categoryFilter === 'expense') return c.type === 'expense';
+                if (categoryFilter === 'income') return c.type === 'income';
+                if (categoryFilter === 'both') return c.type === 'both' || (c as any).type === 'transfer';
+                return true;
+              })
+              .map((c) => {
+                const meta = resolveCategoryMeta(c, categories);
+                return (
+                  <div
+                    key={c._id}
+                    className="p-3.5 rounded-2xl border transition-all duration-200 flex items-center gap-3.5 group hover:scale-[1.02] shadow-2xs relative overflow-hidden"
+                    style={{
+                      backgroundColor: `${meta.color}0a`,
+                      borderColor: `${meta.color}25`,
+                    }}
+                  >
+                    <div
+                      className="absolute top-0 right-0 w-16 h-16 rounded-full blur-xl pointer-events-none opacity-20"
+                      style={{ backgroundColor: meta.color }}
+                    />
+                    <CategoryIconBox category={c} categories={categories} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate tracking-tight">
+                          {c.name}
+                        </p>
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-xs border border-white dark:border-[#0b101d]"
+                          style={{ backgroundColor: meta.color }}
+                          title={`Color: ${meta.color}`}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span
+                          className="text-[10px] font-mono font-semibold"
+                          style={{ color: meta.color }}
+                        >
+                          {meta.color}
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-600">•</span>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">
+                          {c.type === 'both' ? 'Both' : c.type}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
 
           {/* Add Category Modal */}
@@ -449,6 +578,47 @@ export const SettingsPage: React.FC = () => {
             description="Add a personalized category with tailored iconography and color accents."
           >
             <form onSubmit={handleCreateCategory} className="space-y-4">
+              {/* Real-time Category Visual Preview Card */}
+              <div
+                className="p-4 rounded-2xl border flex items-center justify-between gap-3 shadow-2xs transition-all duration-200"
+                style={{
+                  backgroundColor: `${newCatColor}12`,
+                  borderColor: `${newCatColor}35`,
+                }}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-2xs"
+                    style={{
+                      backgroundColor: `${newCatColor}20`,
+                      borderColor: `${newCatColor}40`,
+                      color: newCatColor,
+                    }}
+                  >
+                    <CategoryIcon name={newCatIcon} className="w-5 h-5" color={newCatColor} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                      {newCatName || 'Category Preview'}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[11px] font-mono font-bold" style={{ color: newCatColor }}>
+                        {newCatColor}
+                      </span>
+                      <span className="text-slate-300 dark:text-slate-600">•</span>
+                      <span className="text-[11px] uppercase font-semibold text-slate-500">
+                        {newCatType}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <CategoryBadge
+                  category={{ name: newCatName || 'Preview', icon: newCatIcon, color: newCatColor }}
+                  size="sm"
+                />
+              </div>
+
               <Input
                 label="Category Name"
                 placeholder="e.g. Pet Care, Software Subscriptions"
@@ -475,14 +645,48 @@ export const SettingsPage: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                    Accent Color
+                    Custom Hex Color
                   </label>
-                  <input
-                    type="color"
-                    value={newCatColor}
-                    onChange={(e) => setNewCatColor(e.target.value)}
-                    className="w-full h-10 p-1 bg-white dark:bg-surface-elevated/80 border border-slate-200 dark:border-white/10 rounded-xl cursor-pointer"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={newCatColor}
+                      onChange={(e) => setNewCatColor(e.target.value)}
+                      className="w-10 h-10 p-1 bg-white dark:bg-surface-elevated/80 border border-slate-200 dark:border-white/10 rounded-xl cursor-pointer flex-shrink-0"
+                    />
+                    <input
+                      type="text"
+                      value={newCatColor}
+                      onChange={(e) => setNewCatColor(e.target.value)}
+                      className="w-full py-2 px-3 font-mono text-xs bg-white dark:bg-surface-elevated/80 border border-slate-200 dark:border-white/10 rounded-xl font-bold uppercase"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Preset Colors Palette */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  Curated Fintech Color Palette
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_COLORS.map((hex) => {
+                    const isSelected = newCatColor.toLowerCase() === hex.toLowerCase();
+                    return (
+                      <button
+                        type="button"
+                        key={hex}
+                        onClick={() => setNewCatColor(hex)}
+                        className={`w-7 h-7 rounded-lg transition-transform duration-150 flex items-center justify-center ${
+                          isSelected ? 'scale-110 ring-2 ring-offset-2 ring-slate-900 dark:ring-white dark:ring-offset-slate-900' : 'hover:scale-105'
+                        }`}
+                        style={{ backgroundColor: hex }}
+                        title={hex}
+                      >
+                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -491,19 +695,32 @@ export const SettingsPage: React.FC = () => {
                   Select Visual Icon
                 </label>
                 <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                  {iconOptions.map((iconName) => (
-                    <button
-                      type="button"
-                      key={iconName}
-                      onClick={() => setNewCatIcon(iconName)}
-                      className={`p-2.5 rounded-xl border flex items-center justify-center transition-[border-color,background-color,color] duration-150 ease-out-expo ${newCatIcon === iconName
-                          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                          : 'border-slate-200 dark:border-white/5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
-                        }`}
-                    >
-                      <CategoryIcon name={iconName} className="w-4 h-4" />
-                    </button>
-                  ))}
+                  {iconOptions.map((iconName) => {
+                    const isSelected = newCatIcon === iconName;
+                    return (
+                      <button
+                        type="button"
+                        key={iconName}
+                        onClick={() => setNewCatIcon(iconName)}
+                        className="p-2.5 rounded-xl border flex items-center justify-center transition-all duration-150"
+                        style={
+                          isSelected
+                            ? {
+                                borderColor: newCatColor,
+                                backgroundColor: `${newCatColor}20`,
+                                color: newCatColor,
+                              }
+                            : undefined
+                        }
+                      >
+                        <CategoryIcon
+                          name={iconName}
+                          className="w-4 h-4"
+                          color={isSelected ? newCatColor : undefined}
+                        />
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

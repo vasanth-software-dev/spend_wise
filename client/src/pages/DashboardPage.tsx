@@ -19,7 +19,8 @@ import { StatCard } from '../components/ui/StatCard.js';
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card.js';
 import { Button } from '../components/ui/Button.js';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/ui/Skeleton.js';
-import { CategoryIcon } from '../components/ui/CategoryIcon.js';
+import { CategoryBadge } from '../components/ui/CategoryBadge.js';
+import { CategoryIconBox } from '../components/ui/CategoryIconBox.js';
 import { formatINR, formatRelativeDate } from '../utils/format.js';
 import { ExpenseTrendChart } from '../features/dashboard/ExpenseTrendChart.js';
 import { CategoryBreakdownChart } from '../features/dashboard/CategoryBreakdownChart.js';
@@ -46,6 +47,7 @@ export const DashboardPage: React.FC = () => {
   } = useAppSelector((state) => state.dashboard);
 
   const upcomingBills = useAppSelector((state) => state.recurring.upcomingList);
+  const categories = useAppSelector((state) => state.categories.categories);
   const goals = useAppSelector((state) => state.goals.goals);
   const goalsLoading = useAppSelector((state) => state.goals.loading);
   const calendarUpcoming = useAppSelector((state) => state.calendar.upcoming);
@@ -289,9 +291,6 @@ export const DashboardPage: React.FC = () => {
               ) : (
                 recentTransactions.map((tx) => {
                   const isExpense = tx.type === 'expense';
-                  const cat = typeof tx.categoryId === 'object' && tx.categoryId !== null
-                    ? tx.categoryId
-                    : null;
 
                   return (
                     <div
@@ -300,15 +299,12 @@ export const DashboardPage: React.FC = () => {
                       className="py-3 px-2 flex items-center justify-between hover:bg-slate-50/90 dark:hover:bg-slate-800/40 rounded-xl cursor-pointer transition-[background-color] duration-150 ease-out-expo group"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105 ${
-                            isExpense
-                              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                          }`}
-                        >
-                          <CategoryIcon name={cat?.icon || 'Tag'} className="w-4.5 h-4.5" />
-                        </div>
+                        <CategoryIconBox
+                          category={tx.categoryId}
+                          categories={categories}
+                          size="lg"
+                          className="group-hover:scale-105"
+                        />
                         <div className="min-w-0">
                           <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate tracking-tight">
                             {tx.merchant}
@@ -318,9 +314,7 @@ export const DashboardPage: React.FC = () => {
                               {formatRelativeDate(tx.transactionDate)}
                             </span>
                             <span className="text-[10px] text-slate-300 dark:text-slate-600">•</span>
-                            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded">
-                              {cat?.name || 'Uncategorized'}
-                            </span>
+                            <CategoryBadge category={tx.categoryId} categories={categories} size="xs" />
                           </div>
                         </div>
                       </div>
