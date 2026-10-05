@@ -2,6 +2,8 @@ import React from 'react';
 import { Plus, Repeat, CalendarX, Target, Users } from 'lucide-react';
 import { Button } from '../../components/ui/Button.js';
 import { CategoryIcon } from '../../components/ui/CategoryIcon.js';
+import { CategoryBadge } from '../../components/ui/CategoryBadge.js';
+import { CategoryIconBox } from '../../components/ui/CategoryIconBox.js';
 import { EmptyState } from '../../components/ui/EmptyState.js';
 import { TableRowSkeleton } from '../../components/ui/Skeleton.js';
 import { formatINR, formatDate } from '../../utils/format.js';
@@ -27,11 +29,6 @@ const TYPE_ACCENTS: Record<TransactionType, string> = {
   transfer: 'text-indigo-600 dark:text-indigo-400',
 };
 
-const TYPE_BG: Record<TransactionType, string> = {
-  income: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  expense: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-  transfer: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
-};
 
 const TYPE_SIGN: Record<TransactionType, string> = {
   income: '+',
@@ -165,29 +162,22 @@ export const CalendarDayPanel: React.FC<CalendarDayPanelProps> = ({
                   </span>
                 </div>
                 <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {group.items.map((tx) => {
-                    const category =
-                      typeof tx.categoryId === 'object' && tx.categoryId ? tx.categoryId : null;
-                    return (
-                      <button
-                        key={tx._id}
-                        type="button"
-                        onClick={() => onSelectTransaction(tx)}
-                        className="w-full py-2.5 px-2 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors text-left"
-                      >
+                  {group.items.map((tx) => (
+                    <button
+                      key={tx._id}
+                      type="button"
+                      onClick={() => onSelectTransaction(tx)}
+                      className="w-full py-2.5 px-2 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl transition-colors text-left"
+                    >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div
-                            className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border ${TYPE_BG[tx.type]}`}
-                          >
-                            <CategoryIcon name={category?.icon || 'Tag'} className="w-4 h-4" />
-                          </div>
+                          <CategoryIconBox category={tx.categoryId} size="sm" />
                           <div className="min-w-0">
                             <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate tracking-tight">
                               {tx.merchant}
                             </p>
-                            <p className="text-[10px] text-slate-400 font-medium truncate">
-                              {category?.name || 'Uncategorized'}
-                            </p>
+                            <div className="mt-0.5">
+                              <CategoryBadge category={tx.categoryId} size="xs" />
+                            </div>
                           </div>
                         </div>
                         <span
@@ -197,8 +187,7 @@ export const CalendarDayPanel: React.FC<CalendarDayPanelProps> = ({
                           {formatINR(tx.amount)}
                         </span>
                       </button>
-                    );
-                  })}
+                  ))}
                 </div>
               </div>
             ))}
@@ -292,27 +281,21 @@ export const CalendarDayPanel: React.FC<CalendarDayPanelProps> = ({
                   </span>
                 </div>
                 <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {detail.scheduled.map((item) => {
-                    const category =
-                      item.categoryId && typeof item.categoryId === 'object'
-                        ? (item.categoryId as { name?: string; icon?: string })
-                        : null;
-                    return (
-                      <div
-                        key={`${item.recurringTransactionId}-${item.date}`}
-                        className="py-2.5 px-2 flex items-center justify-between gap-3"
-                      >
+                  {detail.scheduled.map((item) => (
+                    <div
+                      key={`${item.recurringTransactionId}-${item.date}`}
+                      className="py-2.5 px-2 flex items-center justify-between gap-3"
+                    >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border border-dashed border-slate-300 dark:border-slate-600 text-slate-400">
-                            <CategoryIcon name={category?.icon || 'Repeat'} className="w-4 h-4" />
-                          </div>
+                          <CategoryIconBox category={item.categoryId} size="sm" />
                           <div className="min-w-0">
                             <p className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate tracking-tight">
                               {item.name}
                             </p>
-                            <p className="text-[10px] text-slate-400 font-medium">
-                              {category?.name || item.merchant} · {item.frequency}
-                            </p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <CategoryBadge category={item.categoryId} size="xs" />
+                              <span className="text-[10px] text-slate-400 font-medium">· {item.frequency}</span>
+                            </div>
                           </div>
                         </div>
                         <span
@@ -326,8 +309,7 @@ export const CalendarDayPanel: React.FC<CalendarDayPanelProps> = ({
                           {formatINR(item.amount)}
                         </span>
                       </div>
-                    );
-                  })}
+                  ))}
                 </div>
               </div>
             )}

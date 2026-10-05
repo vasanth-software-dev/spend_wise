@@ -24,6 +24,7 @@ export const updateTransactionSchema = z.object({
   body: z.object({
     type: z.enum(['expense', 'income', 'transfer']).optional(),
     amount: z.coerce.number().positive().optional(),
+    currency: z.string().optional(),
     categoryId: z.string().nullable().optional(),
     merchant: z.string().optional(),
     description: z.string().optional(),

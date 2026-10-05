@@ -319,9 +319,19 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 onClick={() => setCategoryId(c._id)}
                 className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border text-center transition-[border-color,background-color,color] duration-150 ease-out-expo ${
                   categoryId === c._id
-                    ? 'border-brand-500 bg-brand-500/10 text-brand-700 dark:text-brand-300 font-bold ring-1 ring-brand-500 shadow-2xs'
+                    ? 'font-bold shadow-2xs'
                     : 'border-slate-200/70 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300'
                 }`}
+                style={
+                  categoryId === c._id
+                    ? {
+                        borderColor: c.color || '#4f46e5',
+                        backgroundColor: `${c.color || '#4f46e5'}1f`,
+                        color: c.color || '#4f46e5',
+                        boxShadow: `0 0 0 1px ${c.color || '#4f46e5'}33`,
+                      }
+                    : undefined
+                }
               >
                 <div
                   className="w-7 h-7 rounded-lg flex items-center justify-center"

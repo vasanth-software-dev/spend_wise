@@ -198,6 +198,15 @@ const transactionSlice = createSlice({
     builder.addCase(bulkCategorizeThunk.fulfilled, (state) => {
       state.selectedIds = [];
     });
+    builder.addCase(updateTransactionThunk.fulfilled, (state, action) => {
+      const updated = action.payload;
+      if (updated?._id) {
+        const index = state.transactions.findIndex((t) => t._id === updated._id);
+        if (index !== -1) {
+          state.transactions[index] = { ...state.transactions[index], ...updated };
+        }
+      }
+    });
   },
 });
 

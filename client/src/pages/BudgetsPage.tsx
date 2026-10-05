@@ -14,6 +14,8 @@ import { Input } from '../components/ui/Input.js';
 import { Badge } from '../components/ui/Badge.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
 import { CategorySelect } from '../components/ui/CategorySelect.js';
+import { CategoryBadge } from '../components/ui/CategoryBadge.js';
+import { CategoryIconBox } from '../components/ui/CategoryIconBox.js';
 import { formatINR } from '../utils/format.js';
 
 export const BudgetsPage: React.FC = () => {
@@ -104,13 +106,22 @@ export const BudgetsPage: React.FC = () => {
               <Card key={b._id} interactive className="p-5 sm:p-6 flex flex-col justify-between group">
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                        {b.name}
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-0.5 font-medium">
-                        {cat?.name || 'Overall Monthly Spending'}
-                      </p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      {cat && <CategoryIconBox category={b.categoryId} categories={categories} size="md" />}
+                      <div className="min-w-0">
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight truncate">
+                          {b.name}
+                        </h3>
+                        <div className="mt-1">
+                          {cat ? (
+                            <CategoryBadge category={b.categoryId} categories={categories} size="xs" />
+                          ) : (
+                            <p className="text-xs text-slate-400 font-medium">
+                              Overall Monthly Spending
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     {b.isExceeded ? (

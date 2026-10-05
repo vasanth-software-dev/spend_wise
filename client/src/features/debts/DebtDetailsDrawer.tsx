@@ -1,10 +1,11 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X, Calendar, Tag, Trash2, Edit3, Wallet } from 'lucide-react';
 import type { Debt } from '../../types/index.js';
 import { formatINR, formatDate } from '../../utils/format.js';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
-import { CategoryIcon } from '../../components/ui/CategoryIcon.js';
+import { CategoryBadge } from '../../components/ui/CategoryBadge.js';
 import { DEBT_STATUS_META, DEBT_DIRECTION_META } from './debtUtils.js';
 interface Props { debt: Debt | null; isOpen: boolean; onClose: () => void; onRecordPayment: () => void; onEdit: () => void; onDelete: () => void; onSettle: () => void; }
 export const DebtDetailsDrawer: React.FC<Props> = ({ debt, isOpen, onClose, onRecordPayment, onEdit, onDelete, onSettle }) => {
@@ -16,7 +17,8 @@ const status = debt.status ?? 'ACTIVE';
 const meta = DEBT_STATUS_META[status];
 const dir = DEBT_DIRECTION_META[debt.direction];
 const catName = typeof debt.categoryId === 'object' && debt.categoryId !== null ? (debt.categoryId as { name?: string }).name : undefined;
-return (<div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-label="Debt details">
+return createPortal(
+  <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-label="Debt details">
 <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} />
 <aside className="relative w-full max-w-md h-full bg-white dark:bg-[#0d1322] border-l border-slate-200 dark:border-white/10 shadow-fintech-lg p-5 sm:p-6 overflow-y-auto animate-in slide-in-from-right duration-200">
 <div className="flex items-start justify-between gap-3">
@@ -32,7 +34,7 @@ return (<div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-
 <div className="mt-4 space-y-2 text-xs">
 <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2"><span className="text-slate-500 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Due</span><span className="font-semibold">{debt.dueDate ? formatDate(debt.dueDate) : 'No due date'}</span></div>
 <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2"><span className="text-slate-500">Created</span><span className="font-semibold">{formatDate(debt.createdAt)}</span></div>
-{catName && <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2"><span className="text-slate-500 flex items-center gap-1.5"><Tag className="w-3.5 h-3.5" /> Category</span><span className="font-semibold flex items-center gap-1.5"><CategoryIcon name={(debt.categoryId as { icon?: string })?.icon} className="w-3.5 h-3.5" />{catName}</span></div>}
+{catName && <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2"><span className="text-slate-500 flex items-center gap-1.5"><Tag className="w-3.5 h-3.5" /> Category</span><CategoryBadge category={debt.categoryId} size="xs" /></div>}
 {debt.notes && <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3 text-slate-600 dark:text-slate-300">{debt.notes}</div>}
 </div>
 <div className="mt-5"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5" /> Payment History</h3>
@@ -44,4 +46,6 @@ return (<div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-
 <Button size="sm" variant="outline" onClick={onEdit} leftIcon={<Edit3 className="w-3.5 h-3.5" />}>Edit</Button>
 <Button size="sm" variant="danger" onClick={onDelete} leftIcon={<Trash2 className="w-3.5 h-3.5" />}>Delete</Button>
 </div>
-</aside></div>); };
+</aside></div>,
+document.body
+); };
