@@ -25,6 +25,7 @@ import debtRoutes from './routes/debtRoutes.js';
 import debtCandidateRoutes from './routes/debtCandidateRoutes.js';
 import goalRoutes from './routes/goalRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
+import accountRoutes from './routes/accountRoutes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -106,6 +107,7 @@ export function createApp(): Express {
   app.use('/api/v1/debt-candidates', debtCandidateRoutes);
   app.use('/api/v1/goals', goalRoutes);
   app.use('/api/v1/calendar', calendarRoutes);
+  app.use('/api/v1/accounts', accountRoutes);
 
   // In production, serve the built Vite SPA frontend if available
   const clientDistPaths = [

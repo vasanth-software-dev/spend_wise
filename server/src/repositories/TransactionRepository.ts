@@ -193,14 +193,48 @@ export class TransactionRepository {
     const result = await TransactionModel.aggregate(pipeline);
     let totalIncome = 0;
     let totalExpense = 0;
+    let incomeCount = 0;
+    let expenseCount = 0;
 
     for (const item of result) {
-      if (item._id === 'income') totalIncome = item.totalAmount;
-      if (item._id === 'expense') totalExpense = item.totalAmount;
+      if (item._id === 'income') {
+        totalIncome = item.totalAmount;
+        incomeCount = item.count;
+      }
+      if (item._id === 'expense') {
+        totalExpense = item.totalAmount;
+        expenseCount = item.count;
+      }
     }
 
     const totalSavings = totalIncome - totalExpense;
     const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
+
+    // Salary breakdown
+    const salaryResult = await TransactionModel.aggregate([
+      {
+        $match: {
+          userId: new Types.ObjectId(userId),
+          status: 'confirmed',
+          type: 'income',
+          transactionDate: { $gte: startDate, $lte: endDate },
+          $or: [
+            { merchant: { $regex: /salary|payroll|stipend/i } },
+            { notes: { $regex: /salary|payroll/i } },
+            { description: { $regex: /salary|payroll/i } },
+          ],
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const salaryIncome = salaryResult[0]?.total || 0;
+    const otherIncome = Math.max(0, totalIncome - salaryIncome);
 
     // Overall historical balance (all time confirmed)
     const balanceResult = await TransactionModel.aggregate([
@@ -233,6 +267,10 @@ export class TransactionRepository {
       expensesThisMonth: totalExpense,
       savingsThisMonth: totalSavings,
       savingsRate: Math.round(savingsRate * 100) / 100,
+      incomeCount,
+      expenseCount,
+      salaryIncome,
+      otherIncome,
     };
   }
 
@@ -322,9 +360,9 @@ export class TransactionRepository {
     ]);
   }
 
-  // Top Merchants aggregation
-  async getTopMerchants(userId: string, startDate: Date, endDate: Date, limit = 5) {
-    return TransactionModel.aggregate([
+  // Top Merchants aggregation with previous period comparison
+  async getTopMerchants(userId: string, startDate: Date, endDate: Date, limit = 6, prevStartDate?: Date, prevEndDate?: Date) {
+    const merchants = await TransactionModel.aggregate([
       {
         $match: {
           userId: new Types.ObjectId(userId),
@@ -351,6 +389,54 @@ export class TransactionRepository {
         },
       },
     ]);
+
+    if (!prevStartDate || !prevEndDate || merchants.length === 0) {
+      return merchants.map((m) => ({
+        ...m,
+        previousAmount: 0,
+        changePercentage: 0,
+      }));
+    }
+
+    const merchantNames = merchants.map((m) => m.merchant);
+    const prevMerchants = await TransactionModel.aggregate([
+      {
+        $match: {
+          userId: new Types.ObjectId(userId),
+          status: 'confirmed',
+          type: 'expense',
+          merchant: { $in: merchantNames },
+          transactionDate: { $gte: prevStartDate, $lte: prevEndDate },
+        },
+      },
+      {
+        $group: {
+          _id: '$merchant',
+          totalAmount: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const prevMap = new Map<string, number>();
+    for (const pm of prevMerchants) {
+      prevMap.set(pm._id, pm.totalAmount);
+    }
+
+    return merchants.map((m) => {
+      const prevAmount = prevMap.get(m.merchant) || 0;
+      let changePercentage = 0;
+      if (prevAmount > 0) {
+        changePercentage = Math.round(((m.totalAmount - prevAmount) / prevAmount) * 1000) / 10;
+      } else if (m.totalAmount > 0) {
+        changePercentage = 100;
+      }
+
+      return {
+        ...m,
+        previousAmount: prevAmount,
+        changePercentage,
+      };
+    });
   }
 
   // Payment method distribution aggregation

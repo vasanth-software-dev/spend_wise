@@ -293,6 +293,14 @@ export interface DashboardSummary {
   expensesThisMonth: number;
   savingsThisMonth: number;
   savingsRate: number;
+  incomeCount?: number;
+  expenseCount?: number;
+  salaryIncome?: number;
+  otherIncome?: number;
+  incomeChangePercent?: number;
+  expensesChangePercent?: number;
+  savingsChangePercent?: number;
+  balanceChangePercent?: number;
 }
 
 export interface SpendingTrendPoint {
@@ -315,6 +323,8 @@ export interface TopMerchantItem {
   merchant: string;
   totalAmount: number;
   count: number;
+  previousAmount?: number;
+  changePercentage?: number;
 }
 
 export interface PaymentDistributionItem {
@@ -406,3 +416,42 @@ export interface DebtSummary {
   settledDebts: number;
   partiallyPaidDebts: number;
 }
+
+export type AccountType = 'bank' | 'cash' | 'credit_card' | 'wallet' | 'investment' | 'other';
+
+export interface Account {
+  _id: string;
+  userId: string;
+  name: string;
+  type: AccountType;
+  balance: number;
+  currency: string;
+  institutionName?: string;
+  accountNumberMasked?: string;
+  color?: string;
+  isDefault?: boolean;
+  isActive?: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NetWorthSummary {
+  netWorth: number;
+  totalAssets: number;
+  totalLiabilities: number;
+  assetsBreakdown: {
+    bank: number;
+    cash: number;
+    wallet: number;
+    investment: number;
+    other: number;
+    receivables: number;
+  };
+  liabilitiesBreakdown: {
+    creditCards: number;
+    debtsOwed: number;
+    otherLoans: number;
+  };
+}
+

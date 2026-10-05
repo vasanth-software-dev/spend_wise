@@ -22,6 +22,7 @@ import {
   FileText,
   FileSpreadsheet,
   UploadCloud,
+  Landmark,
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../store/index.js';
 import { setThemeMode } from '../store/slices/themeSlice.js';
@@ -103,6 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
         accentColor: '#f43f5e',
         items: [
           { label: 'Transactions', to: '/transactions', icon: Receipt, color: '#f43f5e' },
+          { label: 'Accounts', to: '/accounts', icon: Landmark, color: '#0ea5e9' },
           { label: 'Recurring Bills', to: '/recurring', icon: Repeat, color: '#8b5cf6' },
           { label: 'Debts & Loans', to: '/debts', icon: Coins, color: '#f59e0b' },
           { label: 'People & Splits', to: '/people', icon: Users, color: '#ec4899' },

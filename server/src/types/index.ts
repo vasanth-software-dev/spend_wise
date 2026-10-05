@@ -515,3 +515,23 @@ export interface IDebt {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type AccountType = 'bank' | 'cash' | 'credit_card' | 'wallet' | 'investment' | 'other';
+
+export interface IAccount {
+  _id: Types.ObjectId | string;
+  userId: Types.ObjectId | string;
+  name: string;
+  type: AccountType;
+  balance: number;
+  currency: string;
+  institutionName?: string;
+  accountNumberMasked?: string;
+  color?: string;
+  isDefault?: boolean;
+  isActive?: boolean;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+

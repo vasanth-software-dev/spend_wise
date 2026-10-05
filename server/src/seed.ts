@@ -10,6 +10,7 @@ import { EmailAccountModel } from './models/EmailAccount.js';
 import { DetectedTransactionModel } from './models/DetectedTransaction.js';
 import { NotificationModel } from './models/Notification.js';
 import { PersonModel } from './models/Person.js';
+import { AccountModel } from './models/Account.js';
 import { hashPassword } from './utils/hash.js';
 import { categoryRepository, DEFAULT_SYSTEM_CATEGORIES } from './repositories/CategoryRepository.js';
 import { normalizePersonName } from './services/PersonService.js';
@@ -32,6 +33,7 @@ async function seed() {
     PersonModel.deleteMany({}),
     GoalModel.deleteMany({}),
     GoalContributionModel.deleteMany({}),
+    AccountModel.deleteMany({}),
   ]);
 
   try {
@@ -109,6 +111,67 @@ async function seed() {
     detectedCount: 4,
     syncFrequencyMinutes: 120,
   });
+
+  // Seed Financial Accounts for Primary User (Section 22 & 47)
+  console.log('🏦 Setting up Financial Accounts & Net Worth...');
+  await AccountModel.create([
+    {
+      userId: primaryUser._id,
+      name: 'HDFC Salary Account',
+      type: 'bank',
+      balance: 42850,
+      currency: 'INR',
+      institutionName: 'HDFC Bank',
+      accountNumberMasked: '•••• 7079',
+      color: '#0ea5e9',
+      isDefault: true,
+      isActive: true,
+    },
+    {
+      userId: primaryUser._id,
+      name: 'SBI Credit Card',
+      type: 'credit_card',
+      balance: -8420,
+      currency: 'INR',
+      institutionName: 'SBI Cards',
+      accountNumberMasked: '•••• 5678',
+      color: '#f43f5e',
+      isDefault: false,
+      isActive: true,
+    },
+    {
+      userId: primaryUser._id,
+      name: 'Cash in Hand',
+      type: 'cash',
+      balance: 2500,
+      currency: 'INR',
+      color: '#10b981',
+      isDefault: false,
+      isActive: true,
+    },
+    {
+      userId: primaryUser._id,
+      name: 'Paytm Wallet',
+      type: 'wallet',
+      balance: 1800,
+      currency: 'INR',
+      institutionName: 'Paytm Payments Bank',
+      color: '#f59e0b',
+      isDefault: false,
+      isActive: true,
+    },
+    {
+      userId: primaryUser._id,
+      name: 'Zerodha Kite Portfolio',
+      type: 'investment',
+      balance: 85000,
+      currency: 'INR',
+      institutionName: 'Zerodha Broking',
+      color: '#8b5cf6',
+      isDefault: false,
+      isActive: true,
+    },
+  ]);
 
   // Seed Budgets for Primary User
   console.log('🎯 Seeding Budgets...');

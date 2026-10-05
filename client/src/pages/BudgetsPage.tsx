@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, PiggyBank, Trash2 } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, PiggyBank, Trash2, AlertTriangle, CheckCircle2, TrendingUp, ArrowRight } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import {
   fetchBudgetsThunk,
@@ -17,11 +18,14 @@ import { CategorySelect } from '../components/ui/CategorySelect.js';
 import { CategoryBadge } from '../components/ui/CategoryBadge.js';
 import { CategoryIconBox } from '../components/ui/CategoryIconBox.js';
 import { formatINR } from '../utils/format.js';
+import { calculateBudgetPacing } from '../utils/financialCalculations.js';
 
 export const BudgetsPage: React.FC = () => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const budgets = useAppSelector((state) => state.budgets.budgets);
   const categories = useAppSelector((state) => state.categories.categories);
+  const transactions = useAppSelector((state) => state.transactions.transactions);
   const loading = useAppSelector((state) => state.budgets.loading);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,10 +59,25 @@ export const BudgetsPage: React.FC = () => {
       setName('');
       setAmount('');
       setCategoryId('');
+      setThreshold('80');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Aggregate metrics
+  const aggregate = useMemo(() => {
+    const totalBudget = budgets.reduce((sum, b) => sum + (b.amount || 0), 0);
+    const totalSpent = budgets.reduce((sum, b) => sum + (b.spent || 0), 0);
+    const totalRemaining = Math.max(0, totalBudget - totalSpent);
+    const overBudgetCount = budgets.filter((b) => b.isExceeded).length;
+    const warningCount = budgets.filter((b) => b.isWarning && !b.isExceeded).length;
+    const overallPercentage = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
+
+    return { totalBudget, totalSpent, totalRemaining, overBudgetCount, warningCount, overallPercentage };
+  }, [budgets]);
+
+  const thresholdPresets = [50, 75, 80, 90, 100];
 
   return (
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-12">
@@ -69,7 +88,7 @@ export const BudgetsPage: React.FC = () => {
             Budgets & Spending Limits
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Establish proactive spending guardrails with automatic 80% threshold warnings.
+            Establish proactive spending guardrails with pace projections and smart threshold warnings.
           </p>
         </div>
 
@@ -82,6 +101,82 @@ export const BudgetsPage: React.FC = () => {
           Create Budget
         </Button>
       </div>
+
+      {/* Aggregate Overview KPI Banner */}
+      {budgets.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="p-4 bg-slate-900/40 border-slate-800">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Total Budget Pool
+            </span>
+            <div className="text-2xl font-extrabold text-white font-mono tabular-financial mt-1">
+              {formatINR(aggregate.totalBudget)}
+            </div>
+            <span className="text-xs text-slate-500 mt-0.5 block">
+              Across {budgets.length} configured targets
+            </span>
+          </Card>
+
+          <Card className="p-4 bg-slate-900/40 border-slate-800">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Total Spent So Far
+            </span>
+            <div className="text-2xl font-extrabold text-rose-400 font-mono tabular-financial mt-1">
+              {formatINR(aggregate.totalSpent)}
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs font-semibold text-slate-400">
+                {aggregate.overallPercentage}% allocated
+              </span>
+            </div>
+          </Card>
+
+          <Card className="p-4 bg-slate-900/40 border-slate-800">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Discretionary Remaining
+            </span>
+            <div className="text-2xl font-extrabold text-emerald-400 font-mono tabular-financial mt-1">
+              {formatINR(aggregate.totalRemaining)}
+            </div>
+            <span className="text-xs text-slate-500 mt-0.5 block">
+              Until end of current cycle
+            </span>
+          </Card>
+
+          <Card className="p-4 bg-slate-900/40 border-slate-800">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Health Status
+            </span>
+            <div className="text-lg font-bold text-white mt-1.5 flex items-center gap-2">
+              {aggregate.overBudgetCount > 0 ? (
+                <>
+                  <AlertTriangle className="w-5 h-5 text-rose-500 flex-shrink-0" />
+                  <span className="text-rose-400 text-sm font-semibold">
+                    {aggregate.overBudgetCount} exceeded
+                  </span>
+                </>
+              ) : aggregate.warningCount > 0 ? (
+                <>
+                  <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                  <span className="text-amber-400 text-sm font-semibold">
+                    {aggregate.warningCount} near threshold
+                  </span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                  <span className="text-emerald-400 text-sm font-semibold">
+                    All budgets on track
+                  </span>
+                </>
+              )}
+            </div>
+            <span className="text-xs text-slate-500 mt-0.5 block">
+              Active monitoring enabled
+            </span>
+          </Card>
+        </div>
+      )}
 
       {budgets.length === 0 && !loading ? (
         <EmptyState
@@ -101,6 +196,7 @@ export const BudgetsPage: React.FC = () => {
                 : null;
 
             const percentage = Math.min(100, b.percentageUsed);
+            const pacing = calculateBudgetPacing(b, transactions);
 
             return (
               <Card key={b._id} interactive className="p-5 sm:p-6 flex flex-col justify-between group">
@@ -179,11 +275,44 @@ export const BudgetsPage: React.FC = () => {
                       </span>
                     </div>
                   </div>
+
+                  {/* Spending Pace & Projected Overrun Note */}
+                  <div className={`mt-4 p-2.5 rounded-xl border text-xs flex items-start gap-2 ${
+                    pacing.isPaceExceeding
+                      ? 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+                      : 'bg-slate-850/60 border-white/5 text-slate-400'
+                  }`}>
+                    {pacing.isPaceExceeding ? (
+                      <TrendingUp className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    )}
+                    <div className="leading-snug">
+                      <span className="font-semibold text-white">
+                        {pacing.isPaceExceeding ? 'Pacing Alert: ' : 'Pace: '}
+                      </span>
+                      {pacing.paceMessage}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Footer Actions */}
-                <div className="mt-6 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400">Alert at {b.notificationThreshold || 80}%</span>
+                <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-slate-400">
+                      Alert at {b.notificationThreshold || 80}%
+                    </span>
+                    {cat && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/transactions?categoryId=${cat._id}`)}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 ml-2"
+                      >
+                        Ledger <ArrowRight className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
                   <button
                     onClick={() => {
                       if (confirm(`Delete budget "${b.name}"?`)) {
@@ -244,9 +373,25 @@ export const BudgetsPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1">
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">
               Warning Notification Threshold (%)
             </label>
+            <div className="flex items-center gap-2 mb-2">
+              {thresholdPresets.map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => setThreshold(String(pct))}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all ${
+                    threshold === String(pct)
+                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
             <input
               type="number"
               min="50"

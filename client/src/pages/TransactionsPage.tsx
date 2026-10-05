@@ -62,6 +62,31 @@ export const TransactionsPage: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   const location = useLocation();
 
+  const groupedTransactions = useMemo(() => {
+    const groups: { dateKey: string; displayDate: string; items: Transaction[]; dayTotal: number }[] = [];
+    const map = new Map<string, { displayDate: string; items: Transaction[]; dayTotal: number }>();
+
+    for (const tx of transactions) {
+      const d = new Date(tx.transactionDate);
+      const dateKey = !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : 'undated';
+      if (!map.has(dateKey)) {
+        const displayDate = !isNaN(d.getTime())
+          ? d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+          : 'Undated';
+        map.set(dateKey, { displayDate, items: [], dayTotal: 0 });
+      }
+      const entry = map.get(dateKey)!;
+      entry.items.push(tx);
+      if (tx.type === 'expense') entry.dayTotal -= tx.amount;
+      else if (tx.type === 'income') entry.dayTotal += tx.amount;
+    }
+
+    for (const [dateKey, val] of map.entries()) {
+      groups.push({ dateKey, displayDate: val.displayDate, items: val.items, dayTotal: val.dayTotal });
+    }
+    return groups;
+  }, [transactions]);
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('import') === 'true') {
@@ -623,105 +648,118 @@ export const TransactionsPage: React.FC = () => {
               />
             </div>
 
-            {/* Mobile Stacked Card View (transformed for mobile, no horizontal scrolling!) */}
-            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
-              {transactions.map((tx) => {
-                const isExpense = tx.type === 'expense';
-                const isSelected = selectedIds.includes(tx._id);
+            {/* Mobile Stacked Card View grouped by date */}
+            <div className="md:hidden">
+              {groupedTransactions.map((group) => (
+                <div key={group.dateKey} className="border-b border-slate-100 dark:border-slate-800/80 last:border-b-0">
+                  <div className="px-4 py-2 bg-slate-100/70 dark:bg-slate-850/80 border-b border-slate-200/50 dark:border-white/5 flex items-center justify-between text-xs sticky top-16 z-10 backdrop-blur-md">
+                    <span className="font-extrabold text-slate-800 dark:text-slate-200 tracking-tight">
+                      {group.displayDate}
+                    </span>
+                    <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400">
+                      {group.items.length} {group.items.length === 1 ? 'txn' : 'txns'} · {group.dayTotal >= 0 ? '+' : ''}{formatINR(group.dayTotal)}
+                    </span>
+                  </div>
 
-                return (
-                  <div
-                    key={tx._id}
-                    onClick={(e) => {
-                      const target = e.target as HTMLElement | null;
-                      if (target?.closest('input, button, a')) return;
-                      setSelectedTx(tx);
-                    }}
-                    className={`p-4 flex items-center justify-between gap-3 active:bg-slate-50 dark:active:bg-slate-800/60 transition-colors ${
-                      isSelected ? 'bg-brand-500/10 dark:bg-brand-950/20' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          dispatch(toggleSelectId(tx._id));
-                        }}
-                        className="pr-1 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                          }}
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {group.items.map((tx) => {
+                      const isExpense = tx.type === 'expense';
+                      const isSelected = selectedIds.includes(tx._id);
+
+                      return (
+                        <div
+                          key={tx._id}
                           onClick={(e) => {
-                            e.stopPropagation();
-                            dispatch(toggleSelectId(tx._id));
+                            const target = e.target as HTMLElement | null;
+                            if (target?.closest('input, button, a')) return;
+                            setSelectedTx(tx);
                           }}
-                          className="rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
-                        />
-                      </div>
-
-                      <CategoryIconBox category={tx.categoryId} categories={categories} size="lg" />
-
-                      <div className="min-w-0">
-                        <p className="font-bold text-slate-900 dark:text-white truncate text-xs sm:text-sm tracking-tight">
-                          {tx.merchant}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-400 flex-wrap">
-                          <span>{formatDate(tx.transactionDate, 'dd MMM')}</span>
-                          <span>•</span>
-                          <CategoryBadge category={tx.categoryId} categories={categories} size="xs" />
-                          {(tx.refNo || tx.externalTransactionId) && (
-                            <>
-                              <span>•</span>
-                              <span className="font-mono text-[10px] text-brand-600 dark:text-brand-400 truncate max-w-[110px]" title={tx.refNo || tx.externalTransactionId}>
-                                #{tx.refNo || tx.externalTransactionId}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        {tx.notes && (
-                          <span className="text-[11px] text-slate-400 truncate block mt-0.5 font-normal">
-                            {tx.notes}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2.5 flex-shrink-0">
-                      <div className="text-right">
-                        <span
-                          className={`text-sm font-extrabold font-mono tabular-financial block ${
-                            isExpense
-                              ? 'text-slate-900 dark:text-white'
-                              : 'text-emerald-600 dark:text-emerald-400'
+                          className={`p-3.5 flex items-center justify-between gap-3 active:bg-slate-50 dark:active:bg-slate-800/60 transition-colors ${
+                            isSelected ? 'bg-brand-500/10 dark:bg-brand-950/20' : ''
                           }`}
                         >
-                          {isExpense ? '-' : '+'}
-                          {formatINR(tx.amount)}
-                        </span>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 mt-0.5 block">
-                          {tx.paymentMethod}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingTx(tx);
-                        }}
-                        className="p-2 rounded-xl text-slate-400 hover:text-brand-600 hover:bg-brand-500/10 dark:hover:text-brand-400 dark:hover:bg-brand-500/20 transition-colors border border-slate-200/60 dark:border-slate-800"
-                        title="Edit Transaction"
-                        aria-label={`Edit ${tx.merchant}`}
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                    </div>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                dispatch(toggleSelectId(tx._id));
+                              }}
+                              className="pr-1 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  dispatch(toggleSelectId(tx._id));
+                                }}
+                                className="rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                              />
+                            </div>
+
+                            <CategoryIconBox category={tx.categoryId} categories={categories} size="lg" />
+
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-900 dark:text-white truncate text-xs sm:text-sm tracking-tight">
+                                {tx.merchant}
+                              </p>
+                              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-400 flex-wrap">
+                                <CategoryBadge category={tx.categoryId} categories={categories} size="xs" />
+                                {(tx.refNo || tx.externalTransactionId) && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="font-mono text-[10px] text-brand-600 dark:text-brand-400 truncate max-w-[110px]" title={tx.refNo || tx.externalTransactionId}>
+                                      #{tx.refNo || tx.externalTransactionId}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                              {tx.notes && (
+                                <span className="text-[11px] text-slate-400 truncate block mt-0.5 font-normal">
+                                  {tx.notes}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2.5 flex-shrink-0">
+                            <div className="text-right">
+                              <span
+                                className={`text-sm font-extrabold font-mono tabular-financial block ${
+                                  isExpense
+                                    ? 'text-slate-900 dark:text-white'
+                                    : 'text-emerald-600 dark:text-emerald-400'
+                                }`}
+                              >
+                                {isExpense ? '-' : '+'}
+                                {formatINR(tx.amount)}
+                              </span>
+                              <span className="text-[10px] uppercase font-bold text-slate-400 mt-0.5 block">
+                                {tx.paymentMethod}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTx(tx);
+                              }}
+                              className="p-2 rounded-xl text-slate-400 hover:text-brand-600 hover:bg-brand-500/10 dark:hover:text-brand-400 dark:hover:bg-brand-500/20 transition-colors border border-slate-200/60 dark:border-slate-800"
+                              title="Edit Transaction"
+                              aria-label={`Edit ${tx.merchant}`}
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </>
         )}

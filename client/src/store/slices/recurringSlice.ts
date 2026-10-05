@@ -62,6 +62,20 @@ export const deleteRecurringThunk = createAsyncThunk(
   }
 );
 
+export const updateRecurringThunk = createAsyncThunk(
+  'recurring/update',
+  async ({ id, data }: { id: string; data: any }, { dispatch, rejectWithValue }) => {
+    try {
+      const res = await api.patch(`/recurring/${id}`, data);
+      dispatch(fetchRecurringThunk());
+      dispatch(fetchUpcomingThunk());
+      return res.data.data.recurring;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to update recurring transaction');
+    }
+  }
+);
+
 const recurringSlice = createSlice({
   name: 'recurring',
   initialState,

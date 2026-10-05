@@ -219,22 +219,59 @@ export class TransactionService {
         startDate.setDate(now.getDate() - 30);
     }
 
-    // Start of the current calendar month for summary stats
+    // Start of current and previous calendar months for comparative analytics
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    const [summary, spendingTrend, categoryBreakdown, topMerchants, paymentDistribution, recent] =
-      await Promise.all([
-        transactionRepository.getDashboardSummary(userId, startOfMonth, endOfMonth),
-        transactionRepository.getSpendingTrend(userId, startDate, now, groupBy),
-        transactionRepository.getCategoryBreakdown(userId, startDate, now, 'expense'),
-        transactionRepository.getTopMerchants(userId, startDate, now, 6),
-        transactionRepository.getPaymentMethodDistribution(userId, startDate, now),
-        transactionRepository.findWithFilters({ userId, page: 1, limit: 5 }),
-      ]);
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+    const [
+      summary,
+      previousSummary,
+      spendingTrend,
+      categoryBreakdown,
+      previousCategoryBreakdown,
+      topMerchants,
+      paymentDistribution,
+      recent,
+    ] = await Promise.all([
+      transactionRepository.getDashboardSummary(userId, startOfMonth, endOfMonth),
+      transactionRepository.getDashboardSummary(userId, startOfPrevMonth, endOfPrevMonth),
+      transactionRepository.getSpendingTrend(userId, startDate, now, groupBy),
+      transactionRepository.getCategoryBreakdown(userId, startDate, now, 'expense'),
+      transactionRepository.getCategoryBreakdown(userId, startOfPrevMonth, endOfPrevMonth, 'expense'),
+      transactionRepository.getTopMerchants(userId, startDate, now, 6, startOfPrevMonth, endOfPrevMonth),
+      transactionRepository.getPaymentMethodDistribution(userId, startDate, now),
+      transactionRepository.findWithFilters({ userId, page: 1, limit: 5 }),
+    ]);
+
+    const incomeChangePercent = previousSummary.incomeThisMonth > 0
+      ? Math.round(((summary.incomeThisMonth - previousSummary.incomeThisMonth) / previousSummary.incomeThisMonth) * 1000) / 10
+      : (summary.incomeThisMonth > 0 ? 100 : 0);
+
+    const expensesChangePercent = previousSummary.expensesThisMonth > 0
+      ? Math.round(((summary.expensesThisMonth - previousSummary.expensesThisMonth) / previousSummary.expensesThisMonth) * 1000) / 10
+      : (summary.expensesThisMonth > 0 ? 100 : 0);
+
+    const savingsChangePercent = previousSummary.savingsThisMonth !== 0
+      ? Math.round(((summary.savingsThisMonth - previousSummary.savingsThisMonth) / Math.abs(previousSummary.savingsThisMonth)) * 1000) / 10
+      : (summary.savingsThisMonth > 0 ? 100 : 0);
+
+    const balanceChangePercent = previousSummary.totalBalance > 0
+      ? Math.round(((summary.totalBalance - previousSummary.totalBalance) / previousSummary.totalBalance) * 1000) / 10
+      : 0;
 
     return {
-      summary,
+      summary: {
+        ...summary,
+        incomeChangePercent,
+        expensesChangePercent,
+        savingsChangePercent,
+        balanceChangePercent,
+      },
+      previousSummary,
+      previousCategoryBreakdown,
       spendingTrend,
       categoryBreakdown,
       topMerchants,

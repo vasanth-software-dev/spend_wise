@@ -13,6 +13,8 @@ export type DashboardTimeRange = 'today' | '7d' | '30d' | '3m' | '6m' | '1y';
 
 interface DashboardState {
   summary: DashboardSummary | null;
+  previousSummary: DashboardSummary | null;
+  previousCategoryBreakdown: CategoryBreakdownItem[];
   spendingTrend: SpendingTrendPoint[];
   categoryBreakdown: CategoryBreakdownItem[];
   topMerchants: TopMerchantItem[];
@@ -25,6 +27,8 @@ interface DashboardState {
 
 const initialState: DashboardState = {
   summary: null,
+  previousSummary: null,
+  previousCategoryBreakdown: [],
   spendingTrend: [],
   categoryBreakdown: [],
   topMerchants: [],
@@ -62,6 +66,8 @@ const dashboardSlice = createSlice({
     });
     builder.addCase(fetchDashboardThunk.fulfilled, (state, action) => {
       state.summary = action.payload.summary;
+      state.previousSummary = action.payload.previousSummary || null;
+      state.previousCategoryBreakdown = action.payload.previousCategoryBreakdown || [];
       state.spendingTrend = action.payload.spendingTrend;
       state.categoryBreakdown = action.payload.categoryBreakdown;
       state.topMerchants = action.payload.topMerchants;
