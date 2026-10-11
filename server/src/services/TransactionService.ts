@@ -188,43 +188,81 @@ export class TransactionService {
     });
   }
 
-  async getDashboardData(userId: string, timeRange: 'today' | '7d' | '30d' | '3m' | '6m' | '1y' = '30d') {
+  async getDashboardData(
+    userId: string,
+    timeRange: 'today' | '7d' | '30d' | '3m' | '6m' | '1y' = '30d',
+    month?: number,
+    year?: number
+  ) {
     const now = new Date();
-    let startDate = new Date();
-    let groupBy: 'day' | 'month' = 'day';
+    const hasSpecificMonth = month !== undefined && !isNaN(month) && year !== undefined && !isNaN(year);
+    const selectedYear = hasSpecificMonth ? year! : now.getFullYear();
+    const selectedMonthIndex = hasSpecificMonth ? month! - 1 : now.getMonth();
 
-    switch (timeRange) {
-      case 'today':
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case '7d':
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case '30d':
-        startDate.setDate(now.getDate() - 30);
-        break;
-      case '3m':
-        startDate.setMonth(now.getMonth() - 3);
-        groupBy = 'month';
-        break;
-      case '6m':
-        startDate.setMonth(now.getMonth() - 6);
-        groupBy = 'month';
-        break;
-      case '1y':
-        startDate.setFullYear(now.getFullYear() - 1);
-        groupBy = 'month';
-        break;
-      default:
-        startDate.setDate(now.getDate() - 30);
+    // Start of selected (or current) and previous calendar months for comparative analytics
+    const startOfMonth = new Date(selectedYear, selectedMonthIndex, 1, 0, 0, 0, 0);
+    const endOfMonth = new Date(selectedYear, selectedMonthIndex + 1, 0, 23, 59, 59, 999);
+
+    const startOfPrevMonth = new Date(selectedYear, selectedMonthIndex - 1, 1, 0, 0, 0, 0);
+    const endOfPrevMonth = new Date(selectedYear, selectedMonthIndex, 0, 23, 59, 59, 999);
+
+    let trendStartDate = startOfMonth;
+    let trendEndDate = endOfMonth;
+    let trendGroupBy: 'day' | 'month' = 'day';
+
+    if (hasSpecificMonth) {
+      if (timeRange === '7d') {
+        trendStartDate = new Date(endOfMonth.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (timeRange === '3m') {
+        trendStartDate = new Date(selectedYear, selectedMonthIndex - 2, 1, 0, 0, 0, 0);
+        trendGroupBy = 'month';
+      } else if (timeRange === '6m') {
+        trendStartDate = new Date(selectedYear, selectedMonthIndex - 5, 1, 0, 0, 0, 0);
+        trendGroupBy = 'month';
+      } else if (timeRange === '1y') {
+        trendStartDate = new Date(selectedYear - 1, selectedMonthIndex + 1, 1, 0, 0, 0, 0);
+        trendGroupBy = 'month';
+      } else {
+        trendStartDate = startOfMonth;
+        trendEndDate = endOfMonth;
+        trendGroupBy = 'day';
+      }
+    } else {
+      let startDate = new Date();
+      let groupBy: 'day' | 'month' = 'day';
+
+      switch (timeRange) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case '7d':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case '30d':
+          startDate.setDate(now.getDate() - 30);
+          break;
+        case '3m':
+          startDate.setMonth(now.getMonth() - 3);
+          groupBy = 'month';
+          break;
+        case '6m':
+          startDate.setMonth(now.getMonth() - 6);
+          groupBy = 'month';
+          break;
+        case '1y':
+          startDate.setFullYear(now.getFullYear() - 1);
+          groupBy = 'month';
+          break;
+        default:
+          startDate.setDate(now.getDate() - 30);
+      }
+      trendStartDate = startDate;
+      trendEndDate = now;
+      trendGroupBy = groupBy;
     }
 
-    // Start of current and previous calendar months for comparative analytics
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
-    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    const catStartDate = hasSpecificMonth ? startOfMonth : trendStartDate;
+    const catEndDate = hasSpecificMonth ? endOfMonth : trendEndDate;
 
     const [
       summary,
@@ -238,12 +276,18 @@ export class TransactionService {
     ] = await Promise.all([
       transactionRepository.getDashboardSummary(userId, startOfMonth, endOfMonth),
       transactionRepository.getDashboardSummary(userId, startOfPrevMonth, endOfPrevMonth),
-      transactionRepository.getSpendingTrend(userId, startDate, now, groupBy),
-      transactionRepository.getCategoryBreakdown(userId, startDate, now, 'expense'),
+      transactionRepository.getSpendingTrend(userId, trendStartDate, trendEndDate, trendGroupBy),
+      transactionRepository.getCategoryBreakdown(userId, catStartDate, catEndDate, 'expense'),
       transactionRepository.getCategoryBreakdown(userId, startOfPrevMonth, endOfPrevMonth, 'expense'),
-      transactionRepository.getTopMerchants(userId, startDate, now, 6, startOfPrevMonth, endOfPrevMonth),
-      transactionRepository.getPaymentMethodDistribution(userId, startDate, now),
-      transactionRepository.findWithFilters({ userId, page: 1, limit: 5 }),
+      transactionRepository.getTopMerchants(userId, catStartDate, catEndDate, 6, startOfPrevMonth, endOfPrevMonth),
+      transactionRepository.getPaymentMethodDistribution(userId, catStartDate, catEndDate),
+      transactionRepository.findWithFilters({
+        userId,
+        startDate: hasSpecificMonth ? startOfMonth : undefined,
+        endDate: hasSpecificMonth ? endOfMonth : undefined,
+        page: 1,
+        limit: 5,
+      }),
     ]);
 
     const incomeChangePercent = previousSummary.incomeThisMonth > 0
@@ -278,6 +322,8 @@ export class TransactionService {
       paymentDistribution,
       recentTransactions: recent.transactions,
       timeRange,
+      selectedMonth: hasSpecificMonth ? month : (now.getMonth() + 1),
+      selectedYear: hasSpecificMonth ? year : now.getFullYear(),
     };
   }
 

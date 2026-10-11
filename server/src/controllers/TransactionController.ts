@@ -277,7 +277,9 @@ export class TransactionController {
     try {
       const userId = req.user!.userId;
       const timeRange = (req.query.timeRange as 'today' | '7d' | '30d' | '3m' | '6m' | '1y') || '30d';
-      const data = await transactionService.getDashboardData(userId, timeRange);
+      const month = req.query.month ? parseInt(req.query.month as string, 10) : undefined;
+      const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+      const data = await transactionService.getDashboardData(userId, timeRange, month, year);
       sendSuccess(res, data);
     } catch (err) {
       next(err);

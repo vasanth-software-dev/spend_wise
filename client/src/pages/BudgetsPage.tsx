@@ -7,6 +7,7 @@ import {
   createBudgetThunk,
   deleteBudgetThunk,
 } from '../store/slices/budgetSlice.js';
+import { fetchDashboardThunk } from '../store/slices/dashboardSlice.js';
 import { fetchCategoriesThunk } from '../store/slices/categorySlice.js';
 import { Card } from '../components/ui/Card.js';
 import { Button } from '../components/ui/Button.js';
@@ -26,6 +27,7 @@ export const BudgetsPage: React.FC = () => {
   const budgets = useAppSelector((state) => state.budgets.budgets);
   const categories = useAppSelector((state) => state.categories.categories);
   const transactions = useAppSelector((state) => state.transactions.transactions);
+  const summary = useAppSelector((state) => state.dashboard.summary);
   const loading = useAppSelector((state) => state.budgets.loading);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,6 +40,7 @@ export const BudgetsPage: React.FC = () => {
   useEffect(() => {
     dispatch(fetchBudgetsThunk());
     dispatch(fetchCategoriesThunk());
+    dispatch(fetchDashboardThunk());
   }, [dispatch]);
 
   const handleCreateBudget = async (e: React.FormEvent) => {
@@ -70,12 +73,14 @@ export const BudgetsPage: React.FC = () => {
     const totalBudget = budgets.reduce((sum, b) => sum + (b.amount || 0), 0);
     const totalSpent = budgets.reduce((sum, b) => sum + (b.spent || 0), 0);
     const totalRemaining = Math.max(0, totalBudget - totalSpent);
+    const totalBalance = summary?.totalBalance || 0;
+    const unbudgetedBalance = Math.max(0, totalBalance - totalBudget);
     const overBudgetCount = budgets.filter((b) => b.isExceeded).length;
     const warningCount = budgets.filter((b) => b.isWarning && !b.isExceeded).length;
     const overallPercentage = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
 
-    return { totalBudget, totalSpent, totalRemaining, overBudgetCount, warningCount, overallPercentage };
-  }, [budgets]);
+    return { totalBudget, totalSpent, totalRemaining, totalBalance, unbudgetedBalance, overBudgetCount, warningCount, overallPercentage };
+  }, [budgets, summary]);
 
   const thresholdPresets = [50, 75, 80, 90, 100];
 
@@ -104,7 +109,19 @@ export const BudgetsPage: React.FC = () => {
 
       {/* Aggregate Overview KPI Banner */}
       {budgets.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card className="p-4 bg-slate-900/40 border-slate-800">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Total Balance
+            </span>
+            <div className="text-2xl font-extrabold text-white font-mono tabular-financial mt-1">
+              {formatINR(aggregate.totalBalance)}
+            </div>
+            <span className="text-xs text-slate-500 mt-0.5 block">
+              All-time confirmed balance
+            </span>
+          </Card>
+
           <Card className="p-4 bg-slate-900/40 border-slate-800">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
               Total Budget Pool
@@ -140,6 +157,18 @@ export const BudgetsPage: React.FC = () => {
             </div>
             <span className="text-xs text-slate-500 mt-0.5 block">
               Until end of current cycle
+            </span>
+          </Card>
+
+          <Card className="p-4 bg-slate-900/40 border-slate-800">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Unbudgeted Balance
+            </span>
+            <div className="text-2xl font-extrabold text-amber-400 font-mono tabular-financial mt-1">
+              {formatINR(aggregate.unbudgetedBalance)}
+            </div>
+            <span className="text-xs text-slate-500 mt-0.5 block">
+              Outside budget guardrails
             </span>
           </Card>
 

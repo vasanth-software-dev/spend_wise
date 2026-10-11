@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { api } from '../../services/api.js';
 import {
   DashboardSummary,
@@ -11,6 +11,12 @@ import {
 
 export type DashboardTimeRange = 'today' | '7d' | '30d' | '3m' | '6m' | '1y';
 
+export interface FetchDashboardParams {
+  timeRange?: DashboardTimeRange;
+  month?: number;
+  year?: number;
+}
+
 interface DashboardState {
   summary: DashboardSummary | null;
   previousSummary: DashboardSummary | null;
@@ -21,9 +27,13 @@ interface DashboardState {
   paymentDistribution: PaymentDistributionItem[];
   recentTransactions: Transaction[];
   timeRange: DashboardTimeRange;
+  selectedMonth: number;
+  selectedYear: number;
   loading: boolean;
   error: string | null;
 }
+
+const currentDate = new Date();
 
 const initialState: DashboardState = {
   summary: null,
@@ -35,16 +45,39 @@ const initialState: DashboardState = {
   paymentDistribution: [],
   recentTransactions: [],
   timeRange: 'today',
+  selectedMonth: currentDate.getMonth() + 1,
+  selectedYear: currentDate.getFullYear(),
   loading: false,
   error: null,
 };
 
 export const fetchDashboardThunk = createAsyncThunk(
   'dashboard/fetchData',
-  async (timeRange: DashboardTimeRange = 'today', { rejectWithValue }) => {
+  async (arg: DashboardTimeRange | FetchDashboardParams | undefined, { getState, rejectWithValue }) => {
     try {
-      const res = await api.get(`/transactions/dashboard?timeRange=${timeRange}`);
-      return res.data.data;
+      const state = (getState() as any).dashboard;
+      let timeRange: DashboardTimeRange = state?.timeRange || 'today';
+      let month: number | undefined = state?.selectedMonth;
+      let year: number | undefined = state?.selectedYear;
+
+      if (typeof arg === 'string') {
+        timeRange = arg;
+      } else if (arg && typeof arg === 'object') {
+        if (arg.timeRange) timeRange = arg.timeRange;
+        if (arg.month !== undefined) month = arg.month;
+        if (arg.year !== undefined) year = arg.year;
+      }
+
+      const params: Record<string, any> = { timeRange };
+      if (month !== undefined) params.month = month;
+      if (year !== undefined) params.year = year;
+
+      const res = await api.get('/transactions/dashboard', { params });
+      return {
+        ...res.data.data,
+        selectedMonth: month ?? (new Date().getMonth() + 1),
+        selectedYear: year ?? new Date().getFullYear(),
+      };
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Failed to load dashboard');
     }
@@ -55,8 +88,12 @@ const dashboardSlice = createSlice({
   name: 'dashboard',
   initialState,
   reducers: {
-    setTimeRange: (state, action) => {
+    setTimeRange: (state, action: PayloadAction<DashboardTimeRange>) => {
       state.timeRange = action.payload;
+    },
+    setSelectedMonthYear: (state, action: PayloadAction<{ month: number; year: number }>) => {
+      state.selectedMonth = action.payload.month;
+      state.selectedYear = action.payload.year;
     },
   },
   extraReducers: (builder) => {
@@ -74,6 +111,8 @@ const dashboardSlice = createSlice({
       state.paymentDistribution = action.payload.paymentDistribution;
       state.recentTransactions = action.payload.recentTransactions;
       state.timeRange = action.payload.timeRange;
+      if (action.payload.selectedMonth) state.selectedMonth = action.payload.selectedMonth;
+      if (action.payload.selectedYear) state.selectedYear = action.payload.selectedYear;
       state.loading = false;
     });
     builder.addCase(fetchDashboardThunk.rejected, (state, action) => {
@@ -83,5 +122,5 @@ const dashboardSlice = createSlice({
   },
 });
 
-export const { setTimeRange } = dashboardSlice.actions;
+export const { setTimeRange, setSelectedMonthYear } = dashboardSlice.actions;
 export default dashboardSlice.reducer;
