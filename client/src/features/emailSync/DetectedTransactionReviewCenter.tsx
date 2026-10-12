@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Check,
@@ -13,6 +13,10 @@ import {
   MailCheck,
   SlidersHorizontal,
   ArrowRight,
+  RefreshCw,
+  ExternalLink,
+  ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/index.js';
 import {
@@ -22,7 +26,13 @@ import {
   updateDetectedThunk,
   confirmAllDetectedThunk,
   rejectAllDetectedThunk,
+  fetchPendingDetectedThunk,
 } from '../../store/slices/detectedTransactionSlice.js';
+import {
+  fetchAccountsThunk,
+  syncAccountThunk,
+  simulateInboundThunk,
+} from '../../store/slices/emailAccountSlice.js';
 import { fetchCategoriesThunk } from '../../store/slices/categorySlice.js';
 import { formatINR, formatDate, getConfidenceBadge } from '../../utils/format.js';
 import { Button } from '../../components/ui/Button.js';
@@ -38,9 +48,11 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
   const { pendingTransactions, actionLoading, bulkConfirmLoading, bulkRejectLoading } = useAppSelector(
     (state) => state.detectedTransactions
   );
+  const { accounts, isSyncing } = useAppSelector((state) => state.emailAccounts);
   const categories = useAppSelector((state) => state.categories.categories);
 
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const [editingItem, setEditingItem] = useState<DetectedTransaction | null>(null);
   const [showClearModal, setShowClearModal] = useState(false);
@@ -51,11 +63,17 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
   const [editNotes, setEditNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Ensure categories are loaded
+  // Quick simulator state inside settings modal
+  const [simTemplate, setSimTemplate] = useState('gpay_swiggy');
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
+
+  // Ensure categories and accounts are loaded
   useEffect(() => {
     if (categories.length === 0) {
       dispatch(fetchCategoriesThunk());
     }
+    dispatch(fetchAccountsThunk());
   }, [dispatch, categories.length]);
 
   // Only display review center when there are actual detected transactions requiring review
@@ -65,8 +83,9 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
 
   const activeItems = pendingTransactions;
   const flaggedCount = activeItems.length;
-  const autoMatchedCount = 0;
-  const totalScanned = flaggedCount;
+  const autoCategorizedCount = activeItems.filter(
+    (tx) => Boolean(tx.suggestedCategory || tx.categoryId)
+  ).length;
 
   const getSelectedCategoryId = (tx: DetectedTransaction): string => {
     if (tx.categoryId) return String(tx.categoryId);
@@ -199,9 +218,73 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
     }
   };
 
+  // Dynamic sync calculation
+  const latestSyncDate = useMemo(() => {
+    const dates = accounts
+      .map((a) => a.lastSyncAt)
+      .filter(Boolean)
+      .map((d) => new Date(d!).getTime());
+    return dates.length > 0 ? new Date(Math.max(...dates)) : null;
+  }, [accounts]);
+
+  const isAnySyncing = useMemo(() => {
+    return isManualSyncing || Object.values(isSyncing).some(Boolean);
+  }, [isManualSyncing, isSyncing]);
+
+  const syncTimeBadgeText = useMemo(() => {
+    if (isAnySyncing) return 'Syncing...';
+    if (!latestSyncDate) return 'Live Sync Active';
+    const diffSec = Math.floor((Date.now() - latestSyncDate.getTime()) / 1000);
+    if (diffSec < 60) return 'Synced just now';
+    if (diffSec < 3600) return `Synced ${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `Synced ${Math.floor(diffSec / 3600)}h ago`;
+    return `Synced ${Math.floor(diffSec / 86400)}d ago`;
+  }, [isAnySyncing, latestSyncDate]);
+
+  const handleTriggerSync = async () => {
+    if (accounts.length === 0) {
+      toast.info('No email or sync accounts connected yet.');
+      return;
+    }
+    setIsManualSyncing(true);
+    try {
+      for (const account of accounts) {
+        if (account.status !== 'paused') {
+          await dispatch(syncAccountThunk(account._id)).unwrap();
+        }
+      }
+      await dispatch(fetchPendingDetectedThunk()).unwrap();
+      toast.success('Sync complete. Detected transactions updated.');
+    } catch (err: any) {
+      toast.error(typeof err === 'string' ? err : 'Failed to sync transactions');
+    } finally {
+      setIsManualSyncing(false);
+    }
+  };
+
+  const handleSimulateAlert = async () => {
+    const forwardingAcc = accounts.find((a) => a.provider === 'forwarding') || accounts[0];
+    if (!forwardingAcc) {
+      toast.error('Please configure a sync account first.');
+      return;
+    }
+    setIsSimulating(true);
+    try {
+      const res = await dispatch(
+        simulateInboundThunk({ accountId: forwardingAcc._id, templateKey: simTemplate })
+      ).unwrap();
+      toast.success(res.message || 'Simulated transaction processed successfully!');
+      dispatch(fetchPendingDetectedThunk());
+    } catch (err: any) {
+      toast.error(typeof err === 'string' ? err : 'Simulation failed');
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-2xs overflow-hidden transition-all duration-200">
-      {/* Main Header Row - Formatted to precisely match the reference image */}
+      {/* Main Header Row */}
       <div className="p-3.5 sm:px-5 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
         {/* Left Side: Email Icon + Title + Status Badge + Subtitle */}
         <div className="flex items-center gap-3.5 min-w-0">
@@ -212,16 +295,19 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                Automated SMS & Statement Engine
+                Smart Bank &amp; SMS Sync
               </h3>
-              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200/60 dark:border-emerald-800/40 px-2 py-0.5 rounded-full inline-flex items-center">
-                Synced 2m ago
+              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200/60 dark:border-emerald-800/40 px-2 py-0.5 rounded-full inline-flex items-center gap-1.5">
+                {isAnySyncing ? (
+                  <RefreshCw className="w-3 h-3 animate-spin text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                )}
+                {syncTimeBadgeText}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {flaggedCount > 0
-                ? `${totalScanned} total transactions scanned today. ${autoMatchedCount} auto-matched with receipts, ${flaggedCount} require category verification.`
-                : '12 total transactions scanned today. All 12 auto-matched with receipts, 0 require category verification.'}
+              {flaggedCount} incoming transaction{flaggedCount === 1 ? '' : 's'} detected from bank alerts &amp; SMS ({autoCategorizedCount} auto-categorized). Review &amp; confirm to update your balances.
             </p>
           </div>
         </div>
@@ -234,7 +320,7 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
               if (flaggedCount > 0) {
                 setIsExpanded(!isExpanded);
               } else {
-                navigate('/email-sync');
+                setIsSettingsModalOpen(true);
               }
             }}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-[#4f46e5] hover:bg-[#4338ca] dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white shadow-2xs hover:shadow-indigo-500/25 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
@@ -251,12 +337,12 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => navigate('/email-sync')}
-            className="p-2.5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-[background-color,border-color] duration-150 ease-out shadow-2xs cursor-pointer"
-            title="Configure SMS & Statement Engine settings"
-            aria-label="Configure SMS & Statement Engine settings"
+            onClick={() => setIsSettingsModalOpen(true)}
+            className="p-2.5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-[background-color,border-color] duration-150 ease-out shadow-2xs cursor-pointer group"
+            title="Configure Sync Engine settings &amp; status in dashboard"
+            aria-label="Configure Sync Engine settings &amp; status in dashboard"
           >
-            <SlidersHorizontal className="w-4 h-4" />
+            <SlidersHorizontal className="w-4 h-4 group-hover:text-[#4f46e5] dark:group-hover:text-indigo-400 transition-colors" />
           </button>
         </div>
       </div>
@@ -555,6 +641,161 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
               isLoading={bulkConfirmLoading}
             >
               Accept All ({flaggedCount})
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Sync Engine Settings Modal (Opens directly in Dashboard) */}
+      <Modal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        title="Sync Engine Settings & Status"
+        description="Real-time transaction detection preferences, connected channels, and sync status."
+      >
+        <div className="space-y-4">
+          {/* Status & Quick Stats */}
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Engine Status:
+                  </span>
+                  <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Active &amp; Monitoring
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  {latestSyncDate
+                    ? `Last checked: ${formatDate(latestSyncDate, 'dd MMM yyyy, h:mm a')}`
+                    : 'Ready for incoming bank transactions'}
+                </p>
+              </div>
+            </div>
+
+            <Button
+              size="sm"
+              variant="outline"
+              leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${isAnySyncing ? 'animate-spin text-brand-600' : ''}`} />}
+              onClick={handleTriggerSync}
+              disabled={isAnySyncing || accounts.length === 0}
+              isLoading={isAnySyncing}
+              className="text-xs"
+            >
+              Sync Now
+            </Button>
+          </div>
+
+          {/* Connected Sync Accounts */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Connected Inboxes &amp; Channels ({accounts.length})
+              </span>
+              <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                {flaggedCount} pending review
+              </span>
+            </div>
+
+            {accounts.length > 0 ? (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {accounts.map((acc) => (
+                  <div
+                    key={acc._id}
+                    className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="min-w-0 flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0">
+                        <Mail className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                          {acc.email || acc.forwardingAddress || 'Sync Channel'}
+                        </div>
+                        <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">
+                          {acc.provider} &bull; {acc.status} &bull; {acc.detectedCount || 0} detected
+                        </div>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        acc.status === 'active'
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
+                          : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
+                      }`}
+                    >
+                      {acc.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3 text-center text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800">
+                No active sync inboxes connected yet.
+              </div>
+            )}
+          </div>
+
+          {/* Quick Bank Alert Test / Simulator */}
+          <div className="p-3.5 bg-indigo-50/50 dark:bg-indigo-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900/50 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span className="text-xs font-bold text-indigo-900 dark:text-indigo-300">
+                Test Transaction Simulation
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 dark:text-slate-400">
+              Instantly test how SpendWise parses Indian bank SMS, UPI, or statement alerts without waiting for an actual email.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <select
+                value={simTemplate}
+                onChange={(e) => setSimTemplate(e.target.value)}
+                className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+              >
+                <option value="gpay_swiggy">Swiggy ₹489 (Google Pay UPI)</option>
+                <option value="hdfc_debit">HDFC Bank ₹1,250 Debit Alert</option>
+                <option value="phonepe_chai">PhonePe ₹220 (Chai Point)</option>
+                <option value="amazon_order">Amazon ₹1,899 Order Receipt</option>
+              </select>
+              <Button
+                size="sm"
+                variant="primary"
+                isLoading={isSimulating}
+                onClick={handleSimulateAlert}
+                className="text-xs whitespace-nowrap"
+              >
+                Simulate Alert
+              </Button>
+            </div>
+          </div>
+
+          {/* Modal Footer */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSettingsModalOpen(false);
+                navigate('/email-sync');
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer"
+            >
+              <span>Open Full Email &amp; Statement Sync Hub</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsSettingsModalOpen(false)}
+            >
+              Close
             </Button>
           </div>
         </div>

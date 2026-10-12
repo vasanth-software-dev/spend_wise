@@ -36,11 +36,13 @@ module.exports = async (req, res) => {
   try {
     const app = await getApp();
 
-    // Vercel rewrites may alter req.url to '/api' or '/api/index'
-    // Normalize req.url to match original requested endpoint for Express routes
-    const originalUrl = req.headers['x-matched-path'] || req.originalUrl || req.url;
-    if (originalUrl && originalUrl.startsWith('/api') && req.url !== originalUrl) {
-      req.url = originalUrl;
+    // Vercel rewrites may alter req.url to '/api' or '/api/index.js'
+    // Ensure req.url retains or recovers the full requested endpoint (e.g. /api/v1/auth/me)
+    const original = req.originalUrl || req.url;
+    if (original && original !== '/api' && !original.startsWith('/api/index')) {
+      req.url = original;
+    } else if (req.headers['x-matched-path'] && !req.headers['x-matched-path'].includes('index')) {
+      req.url = req.headers['x-matched-path'];
     }
 
     return app(req, res);
