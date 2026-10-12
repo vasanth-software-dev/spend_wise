@@ -16,6 +16,10 @@ import {
   Check,
   Send,
   Calendar,
+  Globe,
+  Webhook,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import {
@@ -88,6 +92,8 @@ export const EmailSyncPage: React.FC = () => {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedFilter, setCopiedFilter] = useState(false);
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+  const [showRoutingDetails, setShowRoutingDetails] = useState(false);
   const [simTemplate, setSimTemplate] = useState('gpay_swiggy');
   const [isSimulating, setIsSimulating] = useState(false);
   const [simFeedback, setSimFeedback] = useState<string | null>(null);
@@ -634,7 +640,8 @@ export const EmailSyncPage: React.FC = () => {
                   {/* Inbound address */}
                   <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Globe className="w-3.5 h-3.5 text-indigo-500" />
                         Your Private Inbound Address
                       </span>
                       <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
@@ -660,6 +667,57 @@ export const EmailSyncPage: React.FC = () => {
                         {copiedAddress ? 'Copied' : 'Copy'}
                       </Button>
                     </div>
+                  </div>
+
+                  {/* Webhook & Inbound Routing Integration */}
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setShowRoutingDetails(!showRoutingDetails)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Webhook className="w-3.5 h-3.5 text-indigo-500" />
+                        Inbound Webhook &amp; Routing Details
+                      </span>
+                      {showRoutingDetails ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+                    </button>
+
+                    {showRoutingDetails && (
+                      <div className="p-3 bg-white dark:bg-slate-900 text-xs space-y-3 border-t border-slate-200 dark:border-slate-800">
+                        <div>
+                          <p className="font-semibold text-slate-600 dark:text-slate-400 uppercase text-[10px] tracking-wider mb-1 flex items-center gap-1">
+                            <Webhook className="w-3 h-3 text-indigo-500" /> Webhook Ingest Endpoint
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 text-[11px] font-mono p-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 truncate">
+                              {`${window.location.origin}/api/v1/email-accounts/forwarding/inbound`}
+                            </code>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/api/v1/email-accounts/forwarding/inbound`);
+                                setCopiedWebhook(true);
+                                setTimeout(() => setCopiedWebhook(false), 2000);
+                              }}
+                              leftIcon={copiedWebhook ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            >
+                              {copiedWebhook ? 'Copied' : 'Copy'}
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-lg bg-indigo-50/60 dark:bg-indigo-950/30 text-[11px] text-indigo-900 dark:text-indigo-300 space-y-1.5">
+                          <p className="font-bold">Inbound Mail Delivery Options:</p>
+                          <ul className="list-disc pl-4 space-y-1 text-slate-600 dark:text-slate-400 leading-relaxed">
+                            <li><strong>Cloudflare Email Routing (Free):</strong> Route all emails on your domain to a free Cloudflare Worker that forwards emails to the webhook.</li>
+                            <li><strong>SendGrid / Mailgun Inbound Parse:</strong> Point MX records to provider and webhook to SpendWise inbound URL.</li>
+                            <li><strong>Gmail / Outlook Auto-Forward:</strong> Add the private address above in your email client's Forwarding settings.</li>
+                          </ul>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Gmail verification code callout if received */}
