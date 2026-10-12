@@ -15,6 +15,72 @@
  */
 
 export default {
+  /**
+   * HTTP Fetch Handler
+   * Responds to browser visits (GET) and HTTP webhooks/tests with status information.
+   */
+  async fetch(request, env, ctx) {
+    const webhookUrl = env.SPENDWISE_WEBHOOK_URL || 'https://myspendwise.dpdns.org/api/v1/email-accounts/forwarding/inbound';
+    const secretConfigured = !!env.SPENDWISE_WEBHOOK_SECRET;
+
+    // Health check / browser view
+    if (request.method === 'GET') {
+      return new Response(
+        JSON.stringify(
+          {
+            status: 'online',
+            service: 'SpendWise Inbound Email Worker',
+            message: 'Worker is active and listening for incoming email events via Cloudflare Email Routing.',
+            webhookDestination: webhookUrl,
+            secretConfigured,
+            instructions: 'Emails sent to sync-*@myspendwise.dpdns.org trigger the email() handler and are forwarded to SpendWise.',
+          },
+          null,
+          2
+        ),
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    }
+
+    // Allow forwarding manual test HTTP POST payloads to SpendWise
+    if (request.method === 'POST') {
+      try {
+        const body = await request.text();
+        const headersToSend = { 'Content-Type': 'application/json' };
+        if (env.SPENDWISE_WEBHOOK_SECRET) {
+          headersToSend['x-webhook-secret'] = env.SPENDWISE_WEBHOOK_SECRET;
+        }
+
+        const res = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: headersToSend,
+          body,
+        });
+
+        const resText = await res.text();
+        return new Response(resText, {
+          status: res.status,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    return new Response('Method Not Allowed', { status: 405 });
+  },
+
+  /**
+   * Cloudflare Email Routing Handler
+   * Triggered when an email arrives for sync-*@myspendwise.dpdns.org
+   */
   async email(message, env, ctx) {
     const webhookUrl = env.SPENDWISE_WEBHOOK_URL || 'https://myspendwise.dpdns.org/api/v1/email-accounts/forwarding/inbound';
     const secret = env.SPENDWISE_WEBHOOK_SECRET || '';
@@ -61,3 +127,4 @@ export default {
     }
   },
 };
+
