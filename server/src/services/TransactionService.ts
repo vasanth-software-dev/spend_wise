@@ -1,8 +1,10 @@
 import { transactionRepository, TransactionFilterParams } from '../repositories/TransactionRepository.js';
 import { categoryRepository } from '../repositories/CategoryRepository.js';
+import { accountRepository } from '../repositories/AccountRepository.js';
 import { duplicateDetectionService } from './DuplicateDetectionService.js';
 import { personService, isIdentifiablePerson } from './PersonService.js';
 import { debtCandidateService } from './DebtCandidateService.js';
+import { budgetService } from './BudgetService.js';
 import { ITransaction, TransactionType, PaymentMethod, TransactionSource } from '../types/index.js';
 import { roundTo2Decimals } from '../utils/currency.js';
 import { Types } from 'mongoose';
@@ -17,6 +19,8 @@ export interface CreateTransactionDTO {
   paymentMethod: PaymentMethod;
   source?: TransactionSource;
   sourceAccountId?: string | null;
+  accountId?: string | null;
+  destinationAccountId?: string | null;
   externalTransactionId?: string;
   refNo?: string;
   transactionDate?: Date | string;
@@ -66,6 +70,8 @@ export class TransactionService {
       paymentMethod: data.paymentMethod,
       source: data.source || 'manual',
       sourceAccountId: data.sourceAccountId ? new Types.ObjectId(data.sourceAccountId) : null,
+      accountId: data.accountId ? new Types.ObjectId(data.accountId) : null,
+      destinationAccountId: data.destinationAccountId ? new Types.ObjectId(data.destinationAccountId) : null,
       externalTransactionId: refNo,
       refNo: refNo,
       transactionDate: txDate,
@@ -75,6 +81,26 @@ export class TransactionService {
       personId: data.personId ? new Types.ObjectId(data.personId) : null,
       vpa: data.vpa ? data.vpa.trim().toLowerCase() : null,
       metadata: data.metadata || {},
+    });
+
+    // Synchronize account balances if account is linked
+    if (transaction.status === 'confirmed') {
+      if (data.type === 'expense' && data.accountId) {
+        await accountRepository.adjustBalance(data.accountId, -amount);
+      } else if (data.type === 'income' && data.accountId) {
+        await accountRepository.adjustBalance(data.accountId, +amount);
+      } else if (data.type === 'transfer') {
+        if (data.accountId) {
+          await accountRepository.adjustBalance(data.accountId, -amount);
+        }
+        if (data.destinationAccountId) {
+          await accountRepository.adjustBalance(data.destinationAccountId, +amount);
+        }
+      }
+    }
+
+    budgetService.checkBudgetAlerts(userId).catch((err) => {
+      console.warn('Failed to check budget alerts:', err);
     });
 
     return transaction;
@@ -89,9 +115,18 @@ export class TransactionService {
   }
 
   async updateTransaction(id: string, userId: string, updateData: Partial<CreateTransactionDTO>): Promise<ITransaction | null> {
+    const existing = await transactionRepository.findById(id, userId);
+    if (!existing) return null;
+
     const payload: Partial<ITransaction> = {};
 
-    if (updateData.amount !== undefined) payload.amount = roundTo2Decimals(Number(updateData.amount));
+    if (updateData.amount !== undefined) {
+      const amt = roundTo2Decimals(Number(updateData.amount));
+      if (isNaN(amt) || amt <= 0) {
+        throw new Error('Amount must be a positive number');
+      }
+      payload.amount = amt;
+    }
     if (updateData.type) payload.type = updateData.type;
     if (updateData.currency) payload.currency = updateData.currency;
     if (updateData.merchant) payload.merchant = updateData.merchant.trim();
@@ -113,12 +148,70 @@ export class TransactionService {
     if (updateData.vpa !== undefined) {
       payload.vpa = updateData.vpa ? updateData.vpa.trim().toLowerCase() : null;
     }
+    if (updateData.accountId !== undefined) {
+      payload.accountId = updateData.accountId ? new Types.ObjectId(updateData.accountId) : null;
+    }
+    if (updateData.destinationAccountId !== undefined) {
+      payload.destinationAccountId = updateData.destinationAccountId ? new Types.ObjectId(updateData.destinationAccountId) : null;
+    }
 
-    return transactionRepository.update(id, userId, payload);
+    // Revert old transaction balance impact if it was confirmed
+    if (existing.status === 'confirmed') {
+      if (existing.type === 'expense' && existing.accountId) {
+        await accountRepository.adjustBalance(existing.accountId, +existing.amount);
+      } else if (existing.type === 'income' && existing.accountId) {
+        await accountRepository.adjustBalance(existing.accountId, -existing.amount);
+      } else if (existing.type === 'transfer') {
+        if (existing.accountId) {
+          await accountRepository.adjustBalance(existing.accountId, +existing.amount);
+        }
+        if (existing.destinationAccountId) {
+          await accountRepository.adjustBalance(existing.destinationAccountId, -existing.amount);
+        }
+      }
+    }
+
+    const updated = await transactionRepository.update(id, userId, payload);
+
+    // Apply new transaction balance impact
+    if (updated && updated.status === 'confirmed') {
+      if (updated.type === 'expense' && updated.accountId) {
+        await accountRepository.adjustBalance(updated.accountId, -updated.amount);
+      } else if (updated.type === 'income' && updated.accountId) {
+        await accountRepository.adjustBalance(updated.accountId, +updated.amount);
+      } else if (updated.type === 'transfer') {
+        if (updated.accountId) {
+          await accountRepository.adjustBalance(updated.accountId, -updated.amount);
+        }
+        if (updated.destinationAccountId) {
+          await accountRepository.adjustBalance(updated.destinationAccountId, +updated.amount);
+        }
+      }
+    }
+
+    return updated;
   }
 
   async deleteTransaction(id: string, userId: string): Promise<boolean> {
-    return transactionRepository.delete(id, userId);
+    const existing = await transactionRepository.findById(id, userId);
+    if (!existing) return false;
+
+    const res = await transactionRepository.delete(id, userId);
+    if (res && existing.status === 'confirmed') {
+      if (existing.type === 'expense' && existing.accountId) {
+        await accountRepository.adjustBalance(existing.accountId, +existing.amount);
+      } else if (existing.type === 'income' && existing.accountId) {
+        await accountRepository.adjustBalance(existing.accountId, -existing.amount);
+      } else if (existing.type === 'transfer') {
+        if (existing.accountId) {
+          await accountRepository.adjustBalance(existing.accountId, +existing.amount);
+        }
+        if (existing.destinationAccountId) {
+          await accountRepository.adjustBalance(existing.destinationAccountId, -existing.amount);
+        }
+      }
+    }
+    return res;
   }
 
   /**
@@ -179,6 +272,25 @@ export class TransactionService {
   }
 
   async bulkDelete(ids: string[], userId: string): Promise<number> {
+    const transactions = await Promise.all(
+      ids.map((id) => transactionRepository.findById(id, userId))
+    );
+    for (const tx of transactions) {
+      if (tx && tx.status === 'confirmed') {
+        if (tx.type === 'expense' && tx.accountId) {
+          await accountRepository.adjustBalance(tx.accountId, +tx.amount);
+        } else if (tx.type === 'income' && tx.accountId) {
+          await accountRepository.adjustBalance(tx.accountId, -tx.amount);
+        } else if (tx.type === 'transfer') {
+          if (tx.accountId) {
+            await accountRepository.adjustBalance(tx.accountId, +tx.amount);
+          }
+          if (tx.destinationAccountId) {
+            await accountRepository.adjustBalance(tx.destinationAccountId, -tx.amount);
+          }
+        }
+      }
+    }
     return transactionRepository.deleteMany(ids, userId);
   }
 
@@ -188,59 +300,142 @@ export class TransactionService {
     });
   }
 
-  async getDashboardData(userId: string, timeRange: 'today' | '7d' | '30d' | '3m' | '6m' | '1y' = '30d') {
+  async getDashboardData(
+    userId: string,
+    timeRange: 'today' | '7d' | '30d' | '3m' | '6m' | '1y' = '30d',
+    month?: number,
+    year?: number
+  ) {
     const now = new Date();
-    let startDate = new Date();
-    let groupBy: 'day' | 'month' = 'day';
+    const hasSpecificMonth = month !== undefined && !isNaN(month) && year !== undefined && !isNaN(year);
+    const selectedYear = hasSpecificMonth ? year! : now.getFullYear();
+    const selectedMonthIndex = hasSpecificMonth ? month! - 1 : now.getMonth();
 
-    switch (timeRange) {
-      case 'today':
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case '7d':
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case '30d':
-        startDate.setDate(now.getDate() - 30);
-        break;
-      case '3m':
-        startDate.setMonth(now.getMonth() - 3);
-        groupBy = 'month';
-        break;
-      case '6m':
-        startDate.setMonth(now.getMonth() - 6);
-        groupBy = 'month';
-        break;
-      case '1y':
-        startDate.setFullYear(now.getFullYear() - 1);
-        groupBy = 'month';
-        break;
-      default:
-        startDate.setDate(now.getDate() - 30);
+    // Start of selected (or current) and previous calendar months for comparative analytics
+    const startOfMonth = new Date(selectedYear, selectedMonthIndex, 1, 0, 0, 0, 0);
+    const endOfMonth = new Date(selectedYear, selectedMonthIndex + 1, 0, 23, 59, 59, 999);
+
+    const startOfPrevMonth = new Date(selectedYear, selectedMonthIndex - 1, 1, 0, 0, 0, 0);
+    const endOfPrevMonth = new Date(selectedYear, selectedMonthIndex, 0, 23, 59, 59, 999);
+
+    let trendStartDate = startOfMonth;
+    let trendEndDate = endOfMonth;
+    let trendGroupBy: 'day' | 'month' = 'day';
+
+    if (hasSpecificMonth) {
+      if (timeRange === '7d') {
+        trendStartDate = new Date(endOfMonth.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (timeRange === '3m') {
+        trendStartDate = new Date(selectedYear, selectedMonthIndex - 2, 1, 0, 0, 0, 0);
+        trendGroupBy = 'month';
+      } else if (timeRange === '6m') {
+        trendStartDate = new Date(selectedYear, selectedMonthIndex - 5, 1, 0, 0, 0, 0);
+        trendGroupBy = 'month';
+      } else if (timeRange === '1y') {
+        trendStartDate = new Date(selectedYear - 1, selectedMonthIndex + 1, 1, 0, 0, 0, 0);
+        trendGroupBy = 'month';
+      } else {
+        trendStartDate = startOfMonth;
+        trendEndDate = endOfMonth;
+        trendGroupBy = 'day';
+      }
+    } else {
+      let startDate = new Date();
+      let groupBy: 'day' | 'month' = 'day';
+
+      switch (timeRange) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case '7d':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case '30d':
+          startDate.setDate(now.getDate() - 30);
+          break;
+        case '3m':
+          startDate.setMonth(now.getMonth() - 3);
+          groupBy = 'month';
+          break;
+        case '6m':
+          startDate.setMonth(now.getMonth() - 6);
+          groupBy = 'month';
+          break;
+        case '1y':
+          startDate.setFullYear(now.getFullYear() - 1);
+          groupBy = 'month';
+          break;
+        default:
+          startDate.setDate(now.getDate() - 30);
+      }
+      trendStartDate = startDate;
+      trendEndDate = now;
+      trendGroupBy = groupBy;
     }
 
-    // Start of the current calendar month for summary stats
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const catStartDate = hasSpecificMonth ? startOfMonth : trendStartDate;
+    const catEndDate = hasSpecificMonth ? endOfMonth : trendEndDate;
 
-    const [summary, spendingTrend, categoryBreakdown, topMerchants, paymentDistribution, recent] =
-      await Promise.all([
-        transactionRepository.getDashboardSummary(userId, startOfMonth, endOfMonth),
-        transactionRepository.getSpendingTrend(userId, startDate, now, groupBy),
-        transactionRepository.getCategoryBreakdown(userId, startDate, now, 'expense'),
-        transactionRepository.getTopMerchants(userId, startDate, now, 6),
-        transactionRepository.getPaymentMethodDistribution(userId, startDate, now),
-        transactionRepository.findWithFilters({ userId, page: 1, limit: 5 }),
-      ]);
+    const [
+      summary,
+      previousSummary,
+      spendingTrend,
+      categoryBreakdown,
+      previousCategoryBreakdown,
+      topMerchants,
+      paymentDistribution,
+      recent,
+    ] = await Promise.all([
+      transactionRepository.getDashboardSummary(userId, startOfMonth, endOfMonth),
+      transactionRepository.getDashboardSummary(userId, startOfPrevMonth, endOfPrevMonth),
+      transactionRepository.getSpendingTrend(userId, trendStartDate, trendEndDate, trendGroupBy),
+      transactionRepository.getCategoryBreakdown(userId, catStartDate, catEndDate, 'expense'),
+      transactionRepository.getCategoryBreakdown(userId, startOfPrevMonth, endOfPrevMonth, 'expense'),
+      transactionRepository.getTopMerchants(userId, catStartDate, catEndDate, 6, startOfPrevMonth, endOfPrevMonth),
+      transactionRepository.getPaymentMethodDistribution(userId, catStartDate, catEndDate),
+      transactionRepository.findWithFilters({
+        userId,
+        startDate: hasSpecificMonth ? startOfMonth : undefined,
+        endDate: hasSpecificMonth ? endOfMonth : undefined,
+        page: 1,
+        limit: 5,
+      }),
+    ]);
+
+    const incomeChangePercent = previousSummary.incomeThisMonth > 0
+      ? Math.round(((summary.incomeThisMonth - previousSummary.incomeThisMonth) / previousSummary.incomeThisMonth) * 1000) / 10
+      : (summary.incomeThisMonth > 0 ? 100 : 0);
+
+    const expensesChangePercent = previousSummary.expensesThisMonth > 0
+      ? Math.round(((summary.expensesThisMonth - previousSummary.expensesThisMonth) / previousSummary.expensesThisMonth) * 1000) / 10
+      : (summary.expensesThisMonth > 0 ? 100 : 0);
+
+    const savingsChangePercent = previousSummary.savingsThisMonth !== 0
+      ? Math.round(((summary.savingsThisMonth - previousSummary.savingsThisMonth) / Math.abs(previousSummary.savingsThisMonth)) * 1000) / 10
+      : (summary.savingsThisMonth > 0 ? 100 : 0);
+
+    const balanceChangePercent = previousSummary.totalBalance > 0
+      ? Math.round(((summary.totalBalance - previousSummary.totalBalance) / previousSummary.totalBalance) * 1000) / 10
+      : 0;
 
     return {
-      summary,
+      summary: {
+        ...summary,
+        incomeChangePercent,
+        expensesChangePercent,
+        savingsChangePercent,
+        balanceChangePercent,
+      },
+      previousSummary,
+      previousCategoryBreakdown,
       spendingTrend,
       categoryBreakdown,
       topMerchants,
       paymentDistribution,
       recentTransactions: recent.transactions,
       timeRange,
+      selectedMonth: hasSpecificMonth ? month : (now.getMonth() + 1),
+      selectedYear: hasSpecificMonth ? year : now.getFullYear(),
     };
   }
 

@@ -1,12 +1,14 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { api } from '../../services/api.js';
 import { Transaction } from '../../types/index.js';
+import { fetchAccountsThunk, fetchNetWorthThunk } from './accountSlice.js';
 
 export interface TransactionFilters {
   search?: string;
   startDate?: string;
   endDate?: string;
   categoryId?: string;
+  accountId?: string;
   type?: string;
   paymentMethod?: string;
   sortBy?: 'transactionDate' | 'amount' | 'merchant';
@@ -31,6 +33,7 @@ const initialFilters: TransactionFilters = {
   startDate: '',
   endDate: '',
   categoryId: '',
+  accountId: '',
   type: '',
   paymentMethod: '',
   sortBy: 'transactionDate',
@@ -62,6 +65,7 @@ export const fetchTransactionsThunk = createAsyncThunk(
       if (combined.startDate) params.append('startDate', combined.startDate);
       if (combined.endDate) params.append('endDate', combined.endDate);
       if (combined.categoryId) params.append('categoryId', combined.categoryId);
+      if (combined.accountId) params.append('accountId', combined.accountId);
       if (combined.type) params.append('type', combined.type);
       if (combined.paymentMethod) params.append('paymentMethod', combined.paymentMethod);
       if (combined.sortBy) params.append('sortBy', combined.sortBy);
@@ -87,6 +91,8 @@ export const createTransactionThunk = createAsyncThunk(
     try {
       const res = await api.post('/transactions', txData);
       dispatch(fetchTransactionsThunk(undefined));
+      dispatch(fetchAccountsThunk());
+      dispatch(fetchNetWorthThunk());
       return res.data.data.transaction;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Failed to create transaction');
@@ -100,6 +106,8 @@ export const updateTransactionThunk = createAsyncThunk(
     try {
       const res = await api.patch(`/transactions/${id}`, data);
       dispatch(fetchTransactionsThunk(undefined));
+      dispatch(fetchAccountsThunk());
+      dispatch(fetchNetWorthThunk());
       return res.data.data.transaction;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Failed to update transaction');
@@ -113,6 +121,8 @@ export const deleteTransactionThunk = createAsyncThunk(
     try {
       await api.delete(`/transactions/${id}`);
       dispatch(fetchTransactionsThunk(undefined));
+      dispatch(fetchAccountsThunk());
+      dispatch(fetchNetWorthThunk());
       return id;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Failed to delete transaction');
@@ -126,6 +136,8 @@ export const bulkDeleteThunk = createAsyncThunk(
     try {
       await api.post('/transactions/bulk-delete', { ids });
       dispatch(fetchTransactionsThunk(undefined));
+      dispatch(fetchAccountsThunk());
+      dispatch(fetchNetWorthThunk());
       return ids;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Failed to delete selected transactions');

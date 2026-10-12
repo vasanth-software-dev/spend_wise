@@ -24,7 +24,7 @@ export const AddContributionModal: React.FC<AddContributionModalProps> = ({
   goal,
 }) => {
   const dispatch = useAppDispatch();
-  const accounts = useAppSelector((state) => state.emailAccounts.accounts);
+  const accounts = useAppSelector((state) => state.accounts.accounts);
   const submitting = useAppSelector((state) => state.goals.submitting);
 
   const [amount, setAmount] = useState('');
@@ -162,7 +162,7 @@ export const AddContributionModal: React.FC<AddContributionModalProps> = ({
               <option value="">No account</option>
               {accounts.map((account) => (
                 <option key={account._id} value={account._id}>
-                  {account.email}
+                  {account.name} {account.institutionName ? `(${account.institutionName})` : ''} — ₹{account.balance.toLocaleString('en-IN')}
                 </option>
               ))}
             </select>

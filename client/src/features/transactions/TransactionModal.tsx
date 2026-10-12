@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { ScanLine } from 'lucide-react';
+import { ScanLine, Zap, Check } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/index.js';
 import { createTransactionThunk, updateTransactionThunk } from '../../store/slices/transactionSlice.js';
+import { createRecurringThunk } from '../../store/slices/recurringSlice.js';
 import { fetchDashboardThunk } from '../../store/slices/dashboardSlice.js';
+import { fetchAccountsThunk } from '../../store/slices/accountSlice.js';
 import { Modal } from '../../components/ui/Modal.js';
 import { Button } from '../../components/ui/Button.js';
 import { Input } from '../../components/ui/Input.js';
 import { CategoryIcon } from '../../components/ui/CategoryIcon.js';
 import { ReceiptScannerModal } from '../receiptScanner/ReceiptScannerModal.js';
-import { TransactionType, PaymentMethod, Transaction } from '../../types/index.js';
-import { toast } from '../..//components/ui/Toast.js';
+import { TransactionType, PaymentMethod, Transaction, RecurringFrequency } from '../../types/index.js';
+import { parseQuickTransaction, ParsedQuickEntry } from '../../utils/quickTransactionParser.js';
+import { toast } from '../../components/ui/Toast.js';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -31,6 +34,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 }) => {
   const dispatch = useAppDispatch();
   const categories = useAppSelector((state) => state.categories.categories);
+  const accounts = useAppSelector((state) => state.accounts.accounts);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const isEditing = !!transaction;
@@ -40,15 +44,24 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [amount, setAmount] = useState('');
   const [merchant, setMerchant] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [accountId, setAccountId] = useState('');
+  const [destinationAccountId, setDestinationAccountId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi');
   const [date, setDate] = useState(initialDate);
   const [refNo, setRefNo] = useState('');
   const [notes, setNotes] = useState('');
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>('monthly');
+  const [quickInput, setQuickInput] = useState('');
+  const [quickPreview, setQuickPreview] = useState<ParsedQuickEntry | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
+      if (accounts.length === 0) {
+        dispatch(fetchAccountsThunk());
+      }
       if (transaction) {
         setType(transaction.type);
         setAmount(String(transaction.amount));
@@ -58,6 +71,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             ? transaction.categoryId._id
             : (transaction.categoryId as string) || '';
         setCategoryId(catId);
+        const accId =
+          typeof transaction.accountId === 'object' && transaction.accountId !== null
+            ? (transaction.accountId as any)._id
+            : (transaction.accountId as string) || '';
+        setAccountId(accId);
+        const destAccId =
+          typeof transaction.destinationAccountId === 'object' && transaction.destinationAccountId !== null
+            ? (transaction.destinationAccountId as any)._id
+            : (transaction.destinationAccountId as string) || '';
+        setDestinationAccountId(destAccId);
         setPaymentMethod(transaction.paymentMethod || 'upi');
         setRefNo(transaction.refNo || transaction.externalTransactionId || '');
         setDate(
@@ -79,9 +102,32 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         // Pick default category for type
         const defaultCat = categories.find((c) => c.type === defaultType || c.type === 'both');
         if (defaultCat) setCategoryId(defaultCat._id);
+
+        // Pre-select default account if available
+        const defaultAcc = accounts.find((a) => a.isDefault);
+        if (defaultAcc) {
+          setAccountId(defaultAcc._id);
+        } else if (accounts.length > 0) {
+          setAccountId(accounts[0]._id);
+        } else {
+          setAccountId('');
+        }
+        setDestinationAccountId('');
       }
     }
-  }, [isOpen, transaction, defaultType, categories, initialDate]);
+  }, [isOpen, transaction, defaultType, categories, accounts, initialDate, dispatch]);
+
+  const handleParseQuick = () => {
+    if (!quickInput.trim()) return;
+    const parsed = parseQuickTransaction(quickInput, categories);
+    setQuickPreview(parsed);
+    if (parsed.amount) setAmount(String(parsed.amount));
+    if (parsed.merchant) setMerchant(parsed.merchant);
+    if (parsed.type) handleTypeChange(parsed.type);
+    if (parsed.categoryId) setCategoryId(parsed.categoryId);
+    if (parsed.paymentMethod) setPaymentMethod(parsed.paymentMethod);
+    toast.info(`Parsed: ${parsed.merchant} · ₹${parsed.amount || 0}`);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,6 +156,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               amount: numAmount,
               currency: 'INR',
               categoryId: categoryId || null,
+              accountId: accountId || null,
+              destinationAccountId: type === 'transfer' ? destinationAccountId || null : null,
               merchant: merchant.trim(),
               paymentMethod,
               refNo: trimmedRef,
@@ -131,6 +179,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             amount: numAmount,
             currency: 'INR',
             categoryId: categoryId || undefined,
+            accountId: accountId || undefined,
+            destinationAccountId: type === 'transfer' ? destinationAccountId || undefined : undefined,
             merchant: merchant.trim(),
             paymentMethod,
             refNo: trimmedRef,
@@ -138,10 +188,31 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             transactionDate: new Date(date),
             notes: notes.trim() || undefined,
             source: 'manual',
+            isRecurring,
           })
         ).unwrap();
 
-        toast.success('Transaction created successfully');
+        if (isRecurring) {
+          try {
+            await dispatch(
+              createRecurringThunk({
+                name: merchant.trim(),
+                amount: numAmount,
+                currency: 'INR',
+                type,
+                categoryId: categoryId || null,
+                merchant: merchant.trim(),
+                paymentMethod,
+                frequency: recurringFrequency,
+                startDate: new Date(date),
+              })
+            ).unwrap();
+          } catch {
+            // Silently continue if recurring record creation encounters a warning
+          }
+        }
+
+        toast.success('Transaction recorded successfully');
         dispatch(fetchDashboardThunk('30d'));
         onClose();
       }
@@ -230,6 +301,57 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             Transfer
           </button>
         </div>
+
+        {/* Natural Quick Entry box for fast input */}
+        {!isEditing && (
+          <div className="p-3 bg-brand-500/[0.06] border border-brand-500/25 rounded-2xl space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-brand-600 dark:text-brand-400">
+              <span className="flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-brand-500" />
+                Natural Quick Entry
+              </span>
+              <span className="text-[10px] font-normal text-slate-400">Press Enter or Parse</span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={quickInput}
+                onChange={(e) => setQuickInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleParseQuick();
+                  }
+                }}
+                placeholder="e.g. Swiggy 420 food or Salary 68000"
+                className="flex-1 text-xs px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={handleParseQuick}
+                className="text-xs px-3"
+              >
+                Parse
+              </Button>
+            </div>
+            {quickPreview && (
+              <div className="flex items-center gap-2 text-[11px] font-mono p-2 bg-white/80 dark:bg-slate-900/80 rounded-xl border border-brand-500/30 text-slate-700 dark:text-slate-300 animate-in fade-in">
+                <span className="font-bold text-brand-600 dark:text-brand-400 flex items-center gap-0.5">
+                  <Check className="w-3 h-3" /> Parsed:
+                </span>
+                <span>₹{quickPreview.amount || 0}</span>
+                <span>•</span>
+                <span className="font-semibold">{quickPreview.merchant}</span>
+                <span>•</span>
+                <span className="capitalize">{quickPreview.type}</span>
+                <span>•</span>
+                <span className="uppercase">{quickPreview.paymentMethod}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Scan Receipt / Ticket entry point, available when adding a new expense */}
         {!isEditing && (
@@ -345,36 +467,77 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </div>
         </div>
 
-        {/* Payment Method & Date */}
+        {/* Linked Account & Payment Method / Destination */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-              Payment Method
+              Account {type === 'transfer' ? '(From)' : ''}
             </label>
             <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
               className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors shadow-2xs font-medium"
             >
-              {paymentMethods.map((pm) => (
-                <option key={pm.id} value={pm.id}>
-                  {pm.label}
+              <option value="">No account linked</option>
+              {accounts.map((acc) => (
+                <option key={acc._id} value={acc._id}>
+                  {acc.name} ({acc.type.toUpperCase()})
                 </option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-              Date
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors shadow-2xs font-medium"
-            />
-          </div>
+          {type === 'transfer' ? (
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                Destination Account (To)
+              </label>
+              <select
+                value={destinationAccountId}
+                onChange={(e) => setDestinationAccountId(e.target.value)}
+                className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors shadow-2xs font-medium"
+              >
+                <option value="">Select destination</option>
+                {accounts
+                  .filter((a) => a._id !== accountId)
+                  .map((acc) => (
+                    <option key={acc._id} value={acc._id}>
+                      {acc.name} ({acc.type.toUpperCase()})
+                    </option>
+                  ))}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                Payment Method
+              </label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors shadow-2xs font-medium"
+              >
+                {paymentMethods.map((pm) => (
+                  <option key={pm.id} value={pm.id}>
+                    {pm.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Date Field */}
+        <div>
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+            Date
+          </label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors shadow-2xs font-medium"
+          />
         </div>
 
         {/* Ref.No / Reference ID */}
@@ -392,6 +555,35 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
         />
+
+        {/* Recurring Commitment Option */}
+        {!isEditing && (
+          <div className="p-3 bg-slate-50 dark:bg-slate-850/60 rounded-xl border border-slate-200/60 dark:border-slate-800 flex items-center justify-between">
+            <div>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Recurring Commitment</span>
+              <p className="text-[11px] text-slate-400">Track future scheduled occurrences</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {isRecurring && (
+                <select
+                  value={recurringFrequency}
+                  onChange={(e) => setRecurringFrequency(e.target.value as RecurringFrequency)}
+                  className="text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 font-medium text-slate-900 dark:text-slate-100"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              )}
+              <input
+                type="checkbox"
+                checked={isRecurring}
+                onChange={(e) => setIsRecurring(e.target.checked)}
+                className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500 accent-brand-600 cursor-pointer"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100 dark:border-slate-800">
           <Button type="button" variant="outline" size="sm" onClick={onClose}>

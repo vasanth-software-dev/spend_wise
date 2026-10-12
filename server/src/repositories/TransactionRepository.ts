@@ -2,12 +2,14 @@ import { TransactionModel } from '../models/Transaction.js';
 import { ITransaction } from '../types/index.js';
 import { Types } from 'mongoose';
 import { buildRefNoQueryPattern } from '../utils/referenceNumber.js';
+import '../models/Account.js';
 
 export interface TransactionFilterParams {
   userId: string;
   startDate?: Date;
   endDate?: Date;
   categoryId?: string;
+  accountId?: string;
   type?: 'expense' | 'income' | 'transfer';
   paymentMethod?: string;
   source?: string;
@@ -83,7 +85,7 @@ export class TransactionRepository {
     totalPages: number;
   }> {
     const page = Math.max(1, params.page || 1);
-    const limit = Math.min(100, Math.max(1, params.limit || 20));
+    const limit = Math.min(params.limit && params.limit > 100 ? 50000 : 100, Math.max(1, params.limit || 20));
     const skip = (page - 1) * limit;
 
     const query: Record<string, unknown> = {
@@ -148,6 +150,21 @@ export class TransactionRepository {
       query.$or = searchOr;
     }
 
+    if (params.accountId) {
+      const accId = new Types.ObjectId(params.accountId);
+      const accountMatch = [
+        { accountId: accId },
+        { destinationAccountId: accId },
+      ];
+      if (query.$or) {
+        const existingOr = query.$or;
+        delete query.$or;
+        query.$and = [{ $or: existingOr }, { $or: accountMatch }];
+      } else {
+        query.$or = accountMatch;
+      }
+    }
+
     const sortField = params.sortBy || 'transactionDate';
     const sortDirection = params.sortOrder === 'asc' ? 1 : -1;
 
@@ -159,6 +176,8 @@ export class TransactionRepository {
         .populate('categoryId')
         .populate('personId', 'name vpa email')
         .populate('sourceAccountId', 'email provider')
+        .populate('accountId', 'name type')
+        .populate('destinationAccountId', 'name type')
         .lean(),
       TransactionModel.countDocuments(query),
     ]);
@@ -193,14 +212,48 @@ export class TransactionRepository {
     const result = await TransactionModel.aggregate(pipeline);
     let totalIncome = 0;
     let totalExpense = 0;
+    let incomeCount = 0;
+    let expenseCount = 0;
 
     for (const item of result) {
-      if (item._id === 'income') totalIncome = item.totalAmount;
-      if (item._id === 'expense') totalExpense = item.totalAmount;
+      if (item._id === 'income') {
+        totalIncome = item.totalAmount;
+        incomeCount = item.count;
+      }
+      if (item._id === 'expense') {
+        totalExpense = item.totalAmount;
+        expenseCount = item.count;
+      }
     }
 
     const totalSavings = totalIncome - totalExpense;
     const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
+
+    // Salary breakdown
+    const salaryResult = await TransactionModel.aggregate([
+      {
+        $match: {
+          userId: new Types.ObjectId(userId),
+          status: 'confirmed',
+          type: 'income',
+          transactionDate: { $gte: startDate, $lte: endDate },
+          $or: [
+            { merchant: { $regex: /salary|payroll|stipend/i } },
+            { notes: { $regex: /salary|payroll/i } },
+            { description: { $regex: /salary|payroll/i } },
+          ],
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const salaryIncome = salaryResult[0]?.total || 0;
+    const otherIncome = Math.max(0, totalIncome - salaryIncome);
 
     // Overall historical balance (all time confirmed)
     const balanceResult = await TransactionModel.aggregate([
@@ -233,6 +286,10 @@ export class TransactionRepository {
       expensesThisMonth: totalExpense,
       savingsThisMonth: totalSavings,
       savingsRate: Math.round(savingsRate * 100) / 100,
+      incomeCount,
+      expenseCount,
+      salaryIncome,
+      otherIncome,
     };
   }
 
@@ -322,9 +379,9 @@ export class TransactionRepository {
     ]);
   }
 
-  // Top Merchants aggregation
-  async getTopMerchants(userId: string, startDate: Date, endDate: Date, limit = 5) {
-    return TransactionModel.aggregate([
+  // Top Merchants aggregation with previous period comparison
+  async getTopMerchants(userId: string, startDate: Date, endDate: Date, limit = 6, prevStartDate?: Date, prevEndDate?: Date) {
+    const merchants = await TransactionModel.aggregate([
       {
         $match: {
           userId: new Types.ObjectId(userId),
@@ -351,15 +408,64 @@ export class TransactionRepository {
         },
       },
     ]);
+
+    if (!prevStartDate || !prevEndDate || merchants.length === 0) {
+      return merchants.map((m) => ({
+        ...m,
+        previousAmount: 0,
+        changePercentage: 0,
+      }));
+    }
+
+    const merchantNames = merchants.map((m) => m.merchant);
+    const prevMerchants = await TransactionModel.aggregate([
+      {
+        $match: {
+          userId: new Types.ObjectId(userId),
+          status: 'confirmed',
+          type: 'expense',
+          merchant: { $in: merchantNames },
+          transactionDate: { $gte: prevStartDate, $lte: prevEndDate },
+        },
+      },
+      {
+        $group: {
+          _id: '$merchant',
+          totalAmount: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const prevMap = new Map<string, number>();
+    for (const pm of prevMerchants) {
+      prevMap.set(pm._id, pm.totalAmount);
+    }
+
+    return merchants.map((m) => {
+      const prevAmount = prevMap.get(m.merchant) || 0;
+      let changePercentage = 0;
+      if (prevAmount > 0) {
+        changePercentage = Math.round(((m.totalAmount - prevAmount) / prevAmount) * 1000) / 10;
+      } else if (m.totalAmount > 0) {
+        changePercentage = 100;
+      }
+
+      return {
+        ...m,
+        previousAmount: prevAmount,
+        changePercentage,
+      };
+    });
   }
 
-  // Payment method distribution aggregation
-  async getPaymentMethodDistribution(userId: string, startDate: Date, endDate: Date) {
+  // Payment method distribution aggregation (defaults to expense outflows)
+  async getPaymentMethodDistribution(userId: string, startDate: Date, endDate: Date, type: 'expense' | 'income' = 'expense') {
     return TransactionModel.aggregate([
       {
         $match: {
           userId: new Types.ObjectId(userId),
           status: 'confirmed',
+          type,
           transactionDate: { $gte: startDate, $lte: endDate },
         },
       },
@@ -426,6 +532,8 @@ export class TransactionRepository {
       .sort({ transactionDate: 1, createdAt: 1 })
       .populate('categoryId', 'name icon color type')
       .populate('sourceAccountId', 'email provider')
+      .populate('accountId', 'name type')
+      .populate('destinationAccountId', 'name type')
       .lean();
   }
 

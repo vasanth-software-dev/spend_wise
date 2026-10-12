@@ -11,7 +11,7 @@ describe('UPI & Email Parser Framework', () => {
   const bankParser = new BankParser();
   const registry = new EmailParserRegistry();
 
-  it('correctly parses Google Pay payment notification', () => {
+  it('correctly parses Google Pay payment notification', async () => {
     const email: EmailMessage = {
       id: 'gpay-msg-1',
       sender: 'payments-noreply@google.com',
@@ -26,7 +26,7 @@ Payment method: HDFC Bank A/C XX1234`,
     };
 
     expect(gpayParser.canParse(email)).toBe(true);
-    const parsed = gpayParser.parse(email);
+    const parsed = await gpayParser.parse(email);
     expect(parsed).not.toBeNull();
     expect(parsed?.amount).toBe(500);
     expect(parsed?.merchant).toBe('Swiggy');
@@ -35,7 +35,7 @@ Payment method: HDFC Bank A/C XX1234`,
     expect(parsed?.confidenceScore).toBeGreaterThanOrEqual(90);
   });
 
-  it('correctly parses PhonePe transaction email', () => {
+  it('correctly parses PhonePe transaction email', async () => {
     const email: EmailMessage = {
       id: 'phonepe-msg-1',
       sender: 'noreply@phonepe.com',
@@ -50,7 +50,7 @@ Debited from: SBI **5678`,
     };
 
     expect(phonepeParser.canParse(email)).toBe(true);
-    const parsed = phonepeParser.parse(email);
+    const parsed = await phonepeParser.parse(email);
     expect(parsed).not.toBeNull();
     expect(parsed?.amount).toBe(1299);
     expect(parsed?.merchant).toContain('Amazon');
@@ -59,7 +59,7 @@ Debited from: SBI **5678`,
     expect(parsed?.confidenceScore).toBeGreaterThanOrEqual(90);
   });
 
-  it('correctly parses HDFC Bank debit alert email', () => {
+  it('correctly parses HDFC Bank debit alert email', async () => {
     const email: EmailMessage = {
       id: 'hdfc-msg-1',
       sender: 'alerts@hdfcbank.net',
@@ -73,7 +73,7 @@ Available Balance: INR 1,24,500.00.`,
     };
 
     expect(bankParser.canParse(email)).toBe(true);
-    const parsed = bankParser.parse(email);
+    const parsed = await bankParser.parse(email);
     expect(parsed).not.toBeNull();
     expect(parsed?.amount).toBe(1850);
     expect(parsed?.type).toBe('expense');
@@ -81,7 +81,7 @@ Available Balance: INR 1,24,500.00.`,
     expect(parsed?.confidenceScore).toBeGreaterThanOrEqual(90);
   });
 
-  it('correctly parses an HDFC UPI credit alert with sender and Date fields', () => {
+  it('correctly parses an HDFC UPI credit alert with sender and Date fields', async () => {
     const email: EmailMessage = {
       id: 'hdfc-credit-msg-1',
       sender: 'alerts@hdfcbank.net',
@@ -100,7 +100,7 @@ b. Sender: ABIRAMI P (VPA: abirami24011998@oksbi)
 c. UPI Reference No.: 626938962830`,
     };
 
-    const parsed = bankParser.parse(email);
+    const parsed = await bankParser.parse(email);
     expect(parsed).not.toBeNull();
     expect(parsed?.amount).toBe(1);
     expect(parsed?.type).toBe('income');
@@ -109,7 +109,7 @@ c. UPI Reference No.: 626938962830`,
     expect(parsed?.transactionDate.toISOString().slice(0, 10)).toBe('2026-09-26');
   });
 
-  it('preserves exact email time for debit alert without hardcoding 12:00 PM', () => {
+  it('preserves exact email time for debit alert without hardcoding 12:00 PM', async () => {
     const email: EmailMessage = {
       id: 'flipkart-msg-1',
       sender: 'HDFC Bank InstaAlerts <alerts@hdfcbank.bank.in>',
@@ -122,7 +122,7 @@ Rs.1289.00 is debited from your account ending 7079 towards VPA flipkart1.payu@h
 UPI transaction reference no.: 085003279578.`,
     };
 
-    const parsed = bankParser.parse(email);
+    const parsed = await bankParser.parse(email);
     expect(parsed).not.toBeNull();
     expect(parsed?.amount).toBe(1289);
     expect(parsed?.merchant).toBe('Flipkart Payments');
@@ -130,7 +130,7 @@ UPI transaction reference no.: 085003279578.`,
     expect(parsed?.transactionDate.getTime()).toBe(new Date('2026-09-27T03:20:04.000Z').getTime());
   });
 
-  it('uses Registry to parse and rank highest confidence result', () => {
+  it('uses Registry to parse and rank highest confidence result', async () => {
     const email: EmailMessage = {
       id: 'reg-msg-1',
       sender: 'payments-noreply@google.com',
@@ -140,13 +140,13 @@ UPI transaction reference no.: 085003279578.`,
       bodyText: 'UPI transaction ID: 426819284192',
     };
 
-    const best = registry.parse(email);
+    const best = await registry.parse(email);
     expect(best).not.toBeNull();
     expect(best?.amount).toBe(450);
     expect(best?.upiReference).toBe('426819284192');
   });
 
-  it('rejects unwanted marketing, job alerts, loan/card offers, and travel booking confirmations', () => {
+  it('rejects unwanted marketing, job alerts, loan/card offers, and travel booking confirmations', async () => {
     const unwantedEmails: EmailMessage[] = [
       {
         id: 'unwanted-1',
@@ -191,7 +191,7 @@ UPI transaction reference no.: 085003279578.`,
     ];
 
     for (const email of unwantedEmails) {
-      expect(registry.parse(email)).toBeNull();
+      expect(await registry.parse(email)).toBeNull();
     }
   });
 });

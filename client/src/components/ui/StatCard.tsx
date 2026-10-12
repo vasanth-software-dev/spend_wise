@@ -37,13 +37,12 @@ export const StatCard: React.FC<StatCardProps> = ({
       interactive
       className={`relative overflow-hidden p-5 sm:p-6 transition-[transform,box-shadow,border-color] duration-150 ease-out-expo group ${
         isHero
-          ? 'bg-gradient-to-b from-white to-slate-50/50 dark:from-slate-900 dark:to-slate-900/80 border-slate-200/90 dark:border-slate-800 ring-1 ring-brand-500/20 shadow-fintech-md'
-          : ''
+          ? 'border-emerald-500/40 dark:border-emerald-500/30 ring-1 ring-emerald-500/20 shadow-xs'
+          : 'border-slate-200/80 dark:border-slate-800'
       }`}
     >
-      {/* Top subtle highlight shimmer for hero */}
       {isHero && (
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-brand-500/60 to-transparent" />
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-emerald-500" />
       )}
 
       <div className="flex items-center justify-between gap-2">

@@ -43,3 +43,16 @@ export function getConfidenceBadge(score: number): { label: string; color: strin
   if (score >= 50) return { label: `${score}% Review`, color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800' };
   return { label: `${score}% Low`, color: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-400 dark:border-rose-800' };
 }
+
+/**
+ * Returns YYYY-MM-DD formatted using local system date components,
+ * preventing UTC shift anomalies (e.g. Oct 1 shifting to Sep 30 in IST).
+ */
+export function toLocalISODate(date: string | Date = new Date()): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}

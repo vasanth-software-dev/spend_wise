@@ -16,7 +16,7 @@ import {
   deleteGoalThunk,
   fetchGoalThunk,
 } from '../store/slices/goalSlice.js';
-import { fetchAccountsThunk } from '../store/slices/emailAccountSlice.js';
+import { fetchAccountsThunk } from '../store/slices/accountSlice.js';
 import { Button } from '../components/ui/Button.js';
 import { Card } from '../components/ui/Card.js';
 import { Badge } from '../components/ui/Badge.js';

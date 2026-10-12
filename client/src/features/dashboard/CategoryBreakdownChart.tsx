@@ -10,6 +10,7 @@ import { CategoryBreakdownItem } from '../../types/index.js';
 import { formatINR } from '../../utils/format.js';
 import { useAppSelector } from '../../store/index.js';
 import { resolveCategoryMeta } from '../../constants/categories.js';
+import { useNavigate } from 'react-router-dom';
 
 interface CategoryBreakdownChartProps {
   data: CategoryBreakdownItem[];
@@ -20,6 +21,7 @@ const DEFAULT_COLORS = [
 ];
 
 export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ data }) => {
+  const navigate = useNavigate();
   const categories = useAppSelector((state) => state.categories?.categories);
 
   const getEntryColor = (entry: CategoryBreakdownItem, index: number) => {
@@ -99,11 +101,22 @@ export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ 
           const percentage = total > 0 ? Math.round((item.totalAmount / total) * 100) : 0;
           const color = getEntryColor(item, index);
           return (
-            <div key={item._id || index} className="space-y-1 group">
+            <div
+              key={item._id || index}
+              onClick={() => {
+                if (item._id && item._id !== 'uncategorized') {
+                  navigate(`/transactions?categoryId=${item._id}`);
+                } else {
+                  navigate('/transactions');
+                }
+              }}
+              className="space-y-1 group cursor-pointer p-1.5 rounded-lg hover:bg-slate-100/60 dark:hover:bg-slate-800/40 transition-colors"
+              title={`View ${item.categoryName} transactions`}
+            >
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2 truncate">
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                  <span className="truncate text-slate-700 dark:text-slate-300 font-semibold tracking-tight text-[11px] sm:text-xs">
+                  <span className="truncate text-slate-700 dark:text-slate-300 font-semibold tracking-tight text-[11px] sm:text-xs group-hover:text-brand-500 transition-colors">
                     {item.categoryName}
                   </span>
                 </div>

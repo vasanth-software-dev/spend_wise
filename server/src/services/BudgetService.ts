@@ -1,5 +1,6 @@
 import { budgetRepository, BudgetWithSpending } from '../repositories/BudgetRepository.js';
 import { notificationRepository } from '../repositories/NotificationRepository.js';
+import { NotificationModel } from '../models/Notification.js';
 import { IBudget } from '../types/index.js';
 import { Types } from 'mongoose';
 
@@ -32,30 +33,39 @@ export class BudgetService {
   }
 
   async getBudgets(userId: string): Promise<BudgetWithSpending[]> {
-    const budgets = await budgetRepository.getBudgetsWithProgress(userId);
+    return budgetRepository.getBudgetsWithProgress(userId);
+  }
 
-    // Check if any budget crossed threshold and trigger notification if not already notified
+  /**
+   * Evaluates budgets and creates at most one notification per budget per 24h.
+   */
+  async checkBudgetAlerts(userId: string): Promise<void> {
+    const budgets = await budgetRepository.getBudgetsWithProgress(userId);
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
     for (const b of budgets) {
-      if (b.isExceeded) {
+      if (!b.isExceeded && !b.isWarning) continue;
+
+      const notifType = b.isExceeded ? 'budget_exceeded' : 'budget_warning';
+      const existing = await NotificationModel.findOne({
+        userId: new Types.ObjectId(userId),
+        type: notifType,
+        'data.budgetId': String(b._id),
+        createdAt: { $gte: oneDayAgo },
+      }).lean();
+
+      if (!existing) {
         await notificationRepository.create({
           userId: new Types.ObjectId(userId),
-          title: `Budget Exceeded: ${b.name}`,
-          message: `You have spent ₹${b.spent.toLocaleString('en-IN')} of your ₹${b.amount.toLocaleString('en-IN')} budget (${b.percentageUsed}%).`,
-          type: 'budget_exceeded',
-          data: { budgetId: String(b._id), percentageUsed: b.percentageUsed },
-        });
-      } else if (b.isWarning) {
-        await notificationRepository.create({
-          userId: new Types.ObjectId(userId),
-          title: `Budget Warning: ${b.name}`,
-          message: `You have used ${b.percentageUsed}% of your ${b.name} budget. ₹${b.remaining.toLocaleString('en-IN')} remaining.`,
-          type: 'budget_warning',
+          title: b.isExceeded ? `Budget Exceeded: ${b.name}` : `Budget Warning: ${b.name}`,
+          message: b.isExceeded
+            ? `You have spent ₹${b.spent.toLocaleString('en-IN')} of your ₹${b.amount.toLocaleString('en-IN')} budget (${b.percentageUsed}%).`
+            : `You have used ${b.percentageUsed}% of your ${b.name} budget. ₹${b.remaining.toLocaleString('en-IN')} remaining.`,
+          type: notifType,
           data: { budgetId: String(b._id), percentageUsed: b.percentageUsed },
         });
       }
     }
-
-    return budgets;
   }
 
   async updateBudget(id: string, userId: string, updateData: Partial<CreateBudgetDTO>): Promise<IBudget | null> {

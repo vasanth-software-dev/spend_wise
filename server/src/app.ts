@@ -25,6 +25,7 @@ import debtRoutes from './routes/debtRoutes.js';
 import debtCandidateRoutes from './routes/debtCandidateRoutes.js';
 import goalRoutes from './routes/goalRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
+import accountRoutes from './routes/accountRoutes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -50,16 +51,17 @@ export function createApp(): Express {
     origin: (origin, callback) => {
       // Same-origin, curl and native-app requests carry no Origin header.
       if (!origin) return callback(null, true);
-      if (
-        allowedOrigins.includes(origin) ||
-        origin === env.CLIENT_URL ||
-        origin.endsWith('.vercel.app') ||
-        origin.endsWith('.ngrok-free.app') ||
-        origin.endsWith('.ngrok.io') ||
-        origin.includes('localhost') ||
-        origin.includes('127.0.0.1')
-      ) {
+      if (allowedOrigins.includes(origin) || origin === env.CLIENT_URL.replace(/\/$/, '')) {
         return callback(null, true);
+      }
+      try {
+        const parsed = new URL(origin);
+        // Allow loopback origins in development or test
+        if (env.NODE_ENV !== 'production' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) {
+          return callback(null, true);
+        }
+      } catch {
+        return callback(null, false);
       }
       return callback(null, false);
     },
@@ -106,6 +108,7 @@ export function createApp(): Express {
   app.use('/api/v1/debt-candidates', debtCandidateRoutes);
   app.use('/api/v1/goals', goalRoutes);
   app.use('/api/v1/calendar', calendarRoutes);
+  app.use('/api/v1/accounts', accountRoutes);
 
   // In production, serve the built Vite SPA frontend if available
   const clientDistPaths = [

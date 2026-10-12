@@ -173,6 +173,9 @@ export class EmailAccountController {
           sendError(res, 'Unauthorized inbound webhook signature', 401, 'INVALID_WEBHOOK_SECRET');
           return;
         }
+      } else if (env.NODE_ENV === 'production') {
+        sendError(res, 'Inbound webhook secret must be configured in production', 401, 'WEBHOOK_SECRET_REQUIRED');
+        return;
       }
 
       const result = await emailSyncService.processInboundEmail(req.body);

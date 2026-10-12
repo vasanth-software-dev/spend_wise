@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Wallet,
   ArrowUpRight,
@@ -7,24 +7,43 @@ import {
   Plus,
   RefreshCw,
   ChevronRight,
+  AlertCircle,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
-import { DashboardTimeRange, fetchDashboardThunk, setTimeRange } from '../store/slices/dashboardSlice.js';
+import {
+  DashboardTimeRange,
+  fetchDashboardThunk,
+  setTimeRange,
+  setSelectedMonthYear,
+} from '../store/slices/dashboardSlice.js';
 import { fetchPendingDetectedThunk } from '../store/slices/detectedTransactionSlice.js';
 import { fetchUpcomingThunk } from '../store/slices/recurringSlice.js';
 import { fetchCategoriesThunk } from '../store/slices/categorySlice.js';
 import { fetchGoalsThunk } from '../store/slices/goalSlice.js';
+import { fetchBudgetsThunk } from '../store/slices/budgetSlice.js';
+import { fetchDebtsThunk } from '../store/slices/debtSlice.js';
 import { fetchCalendarUpcomingThunk } from '../store/slices/calendarSlice.js';
+import { fetchNetWorthThunk } from '../store/slices/accountSlice.js';
 import { StatCard } from '../components/ui/StatCard.js';
+import { MonthYearPicker } from '../components/ui/MonthYearPicker.js';
 import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/Card.js';
 import { Button } from '../components/ui/Button.js';
 import { StatCardSkeleton, TableRowSkeleton } from '../components/ui/Skeleton.js';
 import { CategoryBadge } from '../components/ui/CategoryBadge.js';
 import { CategoryIconBox } from '../components/ui/CategoryIconBox.js';
 import { formatINR, formatRelativeDate } from '../utils/format.js';
+import {
+  calculateSafeToSpend,
+  calculateFinancialHealthScore,
+  generateSpendingInsights,
+} from '../utils/financialCalculations.js';
 import { ExpenseTrendChart } from '../features/dashboard/ExpenseTrendChart.js';
 import { CategoryBreakdownChart } from '../features/dashboard/CategoryBreakdownChart.js';
 import { TopMerchantsChart } from '../features/dashboard/TopMerchantsChart.js';
+import { SafeToSpendCard } from '../features/dashboard/SafeToSpendCard.js';
+import { MonthlyComparisonSection } from '../features/dashboard/MonthlyComparisonSection.js';
+import { FinancialHealthWidget } from '../features/dashboard/FinancialHealthWidget.js';
+import { SpendingInsightsWidget } from '../features/dashboard/SpendingInsightsWidget.js';
 import { DetectedTransactionReviewCenter } from '../features/emailSync/DetectedTransactionReviewCenter.js';
 import { GoalsWidget } from '../features/dashboard/GoalsWidget.js';
 import { UpcomingList } from '../features/calendar/UpcomingList.js';
@@ -38,11 +57,15 @@ export const DashboardPage: React.FC = () => {
   const user = useAppSelector((state) => state.auth.user);
   const {
     summary,
+    previousSummary,
+    previousCategoryBreakdown,
     spendingTrend,
     categoryBreakdown,
     topMerchants,
     recentTransactions,
     timeRange,
+    selectedMonth,
+    selectedYear,
     loading,
   } = useAppSelector((state) => state.dashboard);
 
@@ -50,12 +73,66 @@ export const DashboardPage: React.FC = () => {
   const categories = useAppSelector((state) => state.categories.categories);
   const goals = useAppSelector((state) => state.goals.goals);
   const goalsLoading = useAppSelector((state) => state.goals.loading);
+  const budgets = useAppSelector((state) => state.budgets.budgets);
+  const debts = useAppSelector((state) => state.debts.debts);
   const calendarUpcoming = useAppSelector((state) => state.calendar.upcoming);
   const upcomingLoading = useAppSelector((state) => state.calendar.upcomingLoading);
+  const netWorthSummary = useAppSelector((state) => state.accounts.netWorthSummary);
 
-  // Prefer the calendar's projected occurrences (they carry real dates and
-  // distinguish scheduled income from scheduled outflows); fall back to the
-  // recurring list so the widget is never empty while data loads.
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+
+  const isCurrentMonth = useMemo(() => {
+    const now = new Date();
+    return selectedMonth === now.getMonth() + 1 && selectedYear === now.getFullYear();
+  }, [selectedMonth, selectedYear]);
+
+  const selectedMonthName = useMemo(() => {
+    return new Intl.DateTimeFormat('en-IN', { month: 'long' }).format(
+      new Date(selectedYear, selectedMonth - 1, 1)
+    );
+  }, [selectedMonth, selectedYear]);
+
+  const budgetAlerts = useMemo(() => {
+    return budgets.filter((b) => {
+      const pct = b.amount > 0 ? (b.spent / b.amount) * 100 : 0;
+      return pct >= 80;
+    });
+  }, [budgets]);
+
+  useEffect(() => {
+    dispatch(fetchPendingDetectedThunk());
+    dispatch(fetchUpcomingThunk());
+    dispatch(fetchCategoriesThunk());
+    dispatch(fetchGoalsThunk());
+    dispatch(fetchBudgetsThunk());
+    dispatch(fetchDebtsThunk());
+    dispatch(fetchCalendarUpcomingThunk(30));
+    dispatch(fetchNetWorthThunk());
+  }, [dispatch]);
+
+  useEffect(() => {
+    dispatch(fetchDashboardThunk({ timeRange, month: selectedMonth, year: selectedYear }));
+  }, [dispatch, timeRange, selectedMonth, selectedYear]);
+
+  const handleRangeChange = (range: DashboardTimeRange) => {
+    dispatch(setTimeRange(range));
+    dispatch(fetchDashboardThunk({ timeRange: range, month: selectedMonth, year: selectedYear }));
+  };
+
+  const handleMonthYearChange = (month: number, year: number) => {
+    dispatch(setSelectedMonthYear({ month, year }));
+    dispatch(fetchDashboardThunk({ timeRange, month, year }));
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   const upcomingItems =
     calendarUpcoming?.upcoming.length
       ? calendarUpcoming.upcoming
@@ -70,30 +147,135 @@ export const DashboardPage: React.FC = () => {
           frequency: bill.frequency,
         }));
 
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  // Safe to Spend calculation
+  const safeToSpendResult = useMemo(() => {
+    return calculateSafeToSpend({
+      currentBalance: summary?.totalBalance || 0,
+      upcomingBills: upcomingBills.map((b) => ({
+        amount: b.amount,
+        type: b.type,
+        nextDueDate: b.nextDueDate,
+      })),
+      plannedDebts: debts.map((d) => ({
+        originalAmount: d.originalAmount,
+        remainingAmount: d.remainingAmount,
+        dueDate: d.dueDate,
+        direction: d.direction,
+      })),
+    });
+  }, [summary?.totalBalance, upcomingBills, debts]);
 
-  useEffect(() => {
-    dispatch(fetchDashboardThunk(timeRange));
-    dispatch(fetchPendingDetectedThunk());
-    dispatch(fetchUpcomingThunk());
-    dispatch(fetchCategoriesThunk());
-    dispatch(fetchGoalsThunk());
-    dispatch(fetchCalendarUpcomingThunk(30));
-  }, [dispatch, timeRange]);
+  // Monthly Comparison calculation
+  const comparisonResult = useMemo(() => {
+    const curDate = new Date(selectedYear, selectedMonth - 1, 1);
+    const curMonthName = new Intl.DateTimeFormat('en-IN', { month: 'long' }).format(curDate);
+    const prevDate = new Date(selectedYear, selectedMonth - 2, 1);
+    const prevMonthName = new Intl.DateTimeFormat('en-IN', { month: 'long' }).format(prevDate);
 
-  const handleRangeChange = (range: DashboardTimeRange) => {
-    dispatch(setTimeRange(range));
-    dispatch(fetchDashboardThunk(range));
-  };
+    const curIncome = summary?.incomeThisMonth || 0;
+    const curExpense = summary?.expensesThisMonth || 0;
+    const curSavings = curIncome - curExpense;
+    const curSavingsRate = curIncome > 0 ? Math.round((curSavings / curIncome) * 100) : 0;
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  };
+    const prevIncome = previousSummary?.incomeThisMonth || 0;
+    const prevExpense = previousSummary?.expensesThisMonth || 0;
+    const prevSavings = prevIncome - prevExpense;
+    const prevSavingsRate = prevIncome > 0 ? Math.round((prevSavings / prevIncome) * 100) : 0;
+
+    const incomeChangePercent = summary?.incomeChangePercent ?? 0;
+    const expensesChangePercent = summary?.expensesChangePercent ?? 0;
+    const savingsChangePercent = summary?.savingsChangePercent ?? 0;
+
+    // Map categories comparison
+    const curCatMap = new Map(categoryBreakdown.map((c) => [c.categoryName, c]));
+    const prevCatMap = new Map(previousCategoryBreakdown.map((c) => [c.categoryName, c]));
+
+    const allCatNames = Array.from(new Set([...curCatMap.keys(), ...prevCatMap.keys()]));
+    const comparedCategories = allCatNames.map((name) => {
+      const cur = curCatMap.get(name);
+      const prev = prevCatMap.get(name);
+      const curAmt = cur?.totalAmount || 0;
+      const prevAmt = prev?.totalAmount || 0;
+      const change = prevAmt > 0
+        ? Math.round(((curAmt - prevAmt) / prevAmt) * 1000) / 10
+        : (curAmt > 0 ? 100 : 0);
+
+      return {
+        categoryId: cur?._id || prev?._id || name,
+        categoryName: name,
+        categoryColor: cur?.categoryColor || prev?.categoryColor || '#64748b',
+        currentAmount: curAmt,
+        previousAmount: prevAmt,
+        changePercentage: change,
+        isIncreased: curAmt > prevAmt,
+      };
+    });
+
+    comparedCategories.sort((a, b) => b.currentAmount - a.currentAmount);
+
+    return {
+      currentMonth: {
+        name: curMonthName,
+        income: curIncome,
+        expenses: curExpense,
+        savings: curSavings,
+        savingsRate: curSavingsRate,
+      },
+      previousMonth: {
+        name: prevMonthName,
+        income: prevIncome,
+        expenses: prevExpense,
+        savings: prevSavings,
+        savingsRate: prevSavingsRate,
+      },
+      changes: {
+        incomeChangePercent,
+        expensesChangePercent,
+        savingsChangePercent,
+      },
+      categories: comparedCategories,
+    };
+  }, [summary, previousSummary, categoryBreakdown, previousCategoryBreakdown]);
+
+  // Deterministic Financial Health Score
+  const healthScore = useMemo(() => {
+    return calculateFinancialHealthScore({
+      monthlyIncome: summary?.incomeThisMonth || 0,
+      monthlyExpenses: summary?.expensesThisMonth || 0,
+      savingsRate: summary?.savingsRate || 0,
+      budgets,
+      transactions: recentTransactions,
+      upcomingObligations: safeToSpendResult.upcomingObligations,
+      currentBalance: summary?.totalBalance || 0,
+    });
+  }, [summary, budgets, recentTransactions, safeToSpendResult]);
+
+  // Real Spending Insights
+  const spendingInsights = useMemo(() => {
+    return generateSpendingInsights({
+      monthlyComparison: comparisonResult,
+      budgets,
+      transactions: recentTransactions,
+      upcomingBills,
+      safeToSpend: safeToSpendResult,
+    });
+  }, [comparisonResult, budgets, recentTransactions, upcomingBills, safeToSpendResult]);
+
+  // Trend indicator helpers
+  const balanceChange = summary?.balanceChangePercent || 0;
+  const isBalancePositive = balanceChange >= 0;
+
+  const incomeChange = summary?.incomeChangePercent || 0;
+  const isIncomePositive = incomeChange >= 0;
+
+  // Expenses: decrease is positive (+), increase is negative (-)
+  const expenseChange = summary?.expensesChangePercent || 0;
+  const isExpenseFavorable = expenseChange <= 0;
+
+  const savingsChange = summary?.savingsChangePercent || 0;
+  const isSavingsPositive = savingsChange >= 0;
+
+  const prevMonthName = comparisonResult.previousMonth.name;
 
   return (
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-12">
@@ -102,7 +284,7 @@ export const DashboardPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2 py-0.5 rounded-full">
-              Financial Command Center
+              Personal Financial Command Center
             </span>
             <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
               • Real-time
@@ -116,10 +298,34 @@ export const DashboardPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center flex-wrap gap-2.5">
+          {netWorthSummary && (
+            <Link
+              to="/accounts"
+              className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-emerald-500/40 transition-colors shadow-2xs group"
+              title="View all financial accounts and net worth balance sheet"
+            >
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-300">
+                Net Worth:
+              </span>
+              <span className={`text-xs font-bold font-mono ${
+                netWorthSummary.netWorth >= 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-400'
+              }`}>
+                {formatINR(netWorthSummary.netWorth)}
+              </span>
+            </Link>
+          )}
+
+          {/* Month & Year Selector - Matches user reference */}
+          <MonthYearPicker
+            selectedMonth={selectedMonth}
+            selectedYear={selectedYear}
+            onChange={handleMonthYearChange}
+          />
+
           {/* Refresh Button */}
           <button
-            onClick={() => dispatch(fetchDashboardThunk(timeRange))}
+            onClick={() => dispatch(fetchDashboardThunk({ timeRange, month: selectedMonth, year: selectedYear }))}
             className="p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-[background-color,border-color] duration-150 ease-out-expo shadow-2xs"
             title="Refresh analytics"
             aria-label="Refresh analytics"
@@ -140,8 +346,53 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Historical Month Active Notice */}
+      {!isCurrentMonth && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-xs text-brand-700 dark:text-brand-300 shadow-2xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-brand-500 animate-pulse" />
+            <span className="font-bold">Historical Period Active:</span>
+            <span>
+              Displaying confirmed inflows, outlays, and category metrics for <strong>{selectedMonthName} {selectedYear}</strong>.
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              const now = new Date();
+              handleMonthYearChange(now.getMonth() + 1, now.getFullYear());
+            }}
+            className="self-start sm:self-auto font-bold underline hover:text-brand-900 dark:hover:text-white transition-colors"
+          >
+            Reset to live month ({new Intl.DateTimeFormat('en-IN', { month: 'short' }).format(new Date())})
+          </button>
+        </div>
+      )}
+
       {/* Detected Transactions Review Center (Top priority if any pending) */}
       <DetectedTransactionReviewCenter />
+
+      {/* Active Budget Alerts Notice */}
+      {budgetAlerts.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-800 dark:text-amber-300 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <span className="p-1.5 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex-shrink-0">
+              <AlertCircle className="w-4 h-4" />
+            </span>
+            <div>
+              <span className="font-bold">Budget Spending Alert: </span>
+              <span>
+                {budgetAlerts.length} budget{budgetAlerts.length > 1 ? 's have' : ' has'} reached or exceeded 80% of limit ({budgetAlerts.map(b => b.name || 'Category').join(', ')}).
+              </span>
+            </div>
+          </div>
+          <Link
+            to="/budgets"
+            className="self-start sm:self-auto font-bold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 underline transition-colors whitespace-nowrap"
+          >
+            Review Budgets &rarr;
+          </Link>
+        </div>
+      )}
 
       {/* 4 Stat Cards - Financial Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
@@ -154,6 +405,7 @@ export const DashboardPage: React.FC = () => {
           </>
         ) : (
           <>
+            {/* 1. Total Balance */}
             <StatCard
               title="Total Balance"
               amount={formatINR(summary?.totalBalance || 0)}
@@ -162,40 +414,61 @@ export const DashboardPage: React.FC = () => {
               accentColor="emerald"
               isHero={true}
               trend={{
-                value: (summary?.savingsThisMonth || 0) >= 0 ? '+ Active' : 'Deficit',
-                isPositive: (summary?.savingsThisMonth || 0) >= 0,
+                value: balanceChange !== 0
+                  ? `${isBalancePositive ? '+' : ''}${balanceChange}% vs ${prevMonthName}`
+                  : (summary?.totalBalance || 0) >= 0 ? 'Active Positive' : 'Deficit',
+                isPositive: isBalancePositive,
               }}
             />
+
+            {/* 2. Income This Month */}
             <StatCard
-              title="Income This Month"
+              title={isCurrentMonth ? "Income This Month" : `Income (${selectedMonthName})`}
               amount={formatINR(summary?.incomeThisMonth || 0)}
-              subtitle="Salary & inflows"
+              subtitle={
+                summary?.salaryIncome && summary?.salaryIncome > 0
+                  ? `Salary: ${formatINR(summary.salaryIncome)} · Other: ${formatINR(summary?.otherIncome || 0)}`
+                  : `Inflows for ${selectedMonthName} ${selectedYear}`
+              }
               icon={<ArrowUpRight className="w-4.5 h-4.5" />}
               accentColor="emerald"
-              trend={{ value: 'Inflows', isPositive: true }}
+              trend={{
+                value: incomeChange !== 0 ? `${isIncomePositive ? '+' : ''}${incomeChange}% vs ${prevMonthName}` : 'Inflows',
+                isPositive: isIncomePositive,
+              }}
             />
+
+            {/* 3. Expenses This Month */}
             <StatCard
-              title="Expenses This Month"
+              title={isCurrentMonth ? "Expenses This Month" : `Expenses (${selectedMonthName})`}
               amount={formatINR(summary?.expensesThisMonth || 0)}
-              subtitle="All debit transactions"
+              subtitle={`${summary?.expenseCount || 0} transactions recorded in ${selectedMonthName}`}
               icon={<ArrowDownLeft className="w-4.5 h-4.5" />}
-              accentColor="rose"
-              trend={{ value: 'Outflows', isPositive: false }}
+              accentColor={isExpenseFavorable ? 'emerald' : 'rose'}
+              trend={{
+                value: expenseChange !== 0 ? `${expenseChange > 0 ? '+' : ''}${expenseChange}% vs ${prevMonthName}` : 'Outflows',
+                isPositive: isExpenseFavorable,
+              }}
             />
+
+            {/* 4. Savings This Month (Savings = Income - Expenses) */}
             <StatCard
-              title="Savings This Month"
+              title={isCurrentMonth ? "Savings This Month" : `Savings (${selectedMonthName})`}
               amount={formatINR(summary?.savingsThisMonth || 0)}
-              subtitle={`${summary?.savingsRate || 0}% Savings rate`}
+              subtitle={`${summary?.savingsRate || 0}% Savings rate (${selectedMonthName})`}
               icon={<PiggyBank className="w-4.5 h-4.5" />}
               accentColor="amber"
               trend={{
-                value: `${summary?.savingsRate || 0}% Rate`,
+                value: savingsChange !== 0 ? `${isSavingsPositive ? '+' : ''}${savingsChange}% vs ${prevMonthName}` : `${summary?.savingsRate || 0}% Rate`,
                 isPositive: (summary?.savingsThisMonth || 0) >= 0,
               }}
             />
           </>
         )}
       </div>
+
+      {/* Safe to Spend Hero Component */}
+      <SafeToSpendCard safeToSpendData={safeToSpendResult} loading={loading && !summary} />
 
       {/* Main Charts Section */}
       <div className="space-y-6">
@@ -232,20 +505,39 @@ export const DashboardPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="p-5 sm:p-7">
             <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle>Category Distribution</CardTitle>
-              <CardDescription>Proportional spending across defined categories</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Category Distribution</CardTitle>
+                  <CardDescription>Proportional spending across defined categories</CardDescription>
+                </div>
+                <span className="text-[11px] text-slate-400">Click to filter</span>
+              </div>
             </CardHeader>
             <CategoryBreakdownChart data={categoryBreakdown} />
           </Card>
 
           <Card className="p-5 sm:p-7">
             <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle>Top Merchants</CardTitle>
-              <CardDescription>Concentration of highest debit transactions</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Top Merchants</CardTitle>
+                  <CardDescription>Highest debit concentration with previous period shifts</CardDescription>
+                </div>
+                <span className="text-[11px] text-slate-400">Click to filter</span>
+              </div>
             </CardHeader>
             <TopMerchantsChart data={topMerchants} />
           </Card>
         </div>
+      </div>
+
+      {/* Dedicated Monthly Comparison Section */}
+      <MonthlyComparisonSection comparison={comparisonResult} loading={loading && !summary} />
+
+      {/* 2-Column Grid: Financial Health & Spending Insights */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <FinancialHealthWidget healthScore={healthScore} loading={loading && !summary} />
+        <SpendingInsightsWidget insights={spendingInsights} loading={loading && !summary} />
       </div>
 
       {/* Bottom Section: Goals & Upcoming widgets */}
@@ -266,8 +558,12 @@ export const DashboardPage: React.FC = () => {
           <div>
             <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <CardTitle className="text-sm sm:text-base">Recent Ledger Activity</CardTitle>
-                <CardDescription>Latest confirmed debits & credits</CardDescription>
+                <CardTitle className="text-sm sm:text-base">
+                  {isCurrentMonth ? 'Recent Ledger Activity' : `Ledger Activity (${selectedMonthName} ${selectedYear})`}
+                </CardTitle>
+                <CardDescription>
+                  {isCurrentMonth ? 'Latest confirmed debits & credits' : `Transactions in ${selectedMonthName} ${selectedYear}`}
+                </CardDescription>
               </div>
               <Link
                 to="/transactions"
@@ -285,15 +581,28 @@ export const DashboardPage: React.FC = () => {
                   <TableRowSkeleton />
                 </>
               ) : recentTransactions.length === 0 ? (
-                <div className="py-10 text-center text-xs text-slate-400 font-medium">
-                  No transactions recorded yet. Click "+ Add Transaction" to begin.
+                <div className="py-12 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-500 flex items-center justify-center mx-auto mb-3">
+                    <Wallet className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    No transactions recorded for {selectedMonthName} {selectedYear}
+                  </h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">
+                    Track your financial transactions to see real-time balance calculations, spending pace, and intelligent insights.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    leftIcon={<Plus className="w-4 h-4" />}
+                    onClick={() => setIsAddModalOpen(true)}
+                  >
+                    Add a transaction
+                  </Button>
                 </div>
               ) : (
-                recentTransactions.map((tx) => {
-                  const isExpense = tx.type === 'expense';
-
-                  return (
-                    <div
+                recentTransactions.map((tx) => (
+                  <div
                       key={tx._id}
                       onClick={() => setSelectedTx(tx)}
                       className="py-3 px-2 flex items-center justify-between hover:bg-slate-50/90 dark:hover:bg-slate-800/40 rounded-xl cursor-pointer transition-[background-color] duration-150 ease-out-expo group"
@@ -322,12 +631,14 @@ export const DashboardPage: React.FC = () => {
                       <div className="text-right flex-shrink-0 pl-3">
                         <span
                           className={`text-xs sm:text-sm font-extrabold tabular-financial font-mono ${
-                            isExpense
-                              ? 'text-slate-900 dark:text-white'
-                              : 'text-emerald-600 dark:text-emerald-400'
+                            tx.type === 'income'
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : tx.type === 'transfer'
+                              ? 'text-sky-600 dark:text-sky-400'
+                              : 'text-slate-900 dark:text-white'
                           }`}
                         >
-                          {isExpense ? '-' : '+'}
+                          {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '↔ ' : '-'}
                           {formatINR(tx.amount)}
                         </span>
                         <span className="block text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 mt-0.5 tracking-wider">
@@ -335,9 +646,8 @@ export const DashboardPage: React.FC = () => {
                         </span>
                       </div>
                     </div>
-                  );
-                })
-              )}
+                  ))
+                )}
             </div>
           </div>
 
@@ -357,6 +667,9 @@ export const DashboardPage: React.FC = () => {
       <TransactionModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
+        onSuccess={() => {
+          dispatch(fetchDashboardThunk({ timeRange, month: selectedMonth, year: selectedYear }));
+        }}
       />
 
       {/* Transaction Details Drawer */}
@@ -377,7 +690,7 @@ export const DashboardPage: React.FC = () => {
           transaction={editingTx}
           onClose={() => setEditingTx(null)}
           onSuccess={() => {
-            dispatch(fetchDashboardThunk(timeRange));
+            dispatch(fetchDashboardThunk({ timeRange, month: selectedMonth, year: selectedYear }));
           }}
         />
       )}

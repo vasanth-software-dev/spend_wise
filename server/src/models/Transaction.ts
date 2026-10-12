@@ -29,6 +29,8 @@ const transactionSchema = new Schema<ITransaction>(
       default: 'manual',
     },
     sourceAccountId: { type: Schema.Types.ObjectId, ref: 'EmailAccount', default: null },
+    accountId: { type: Schema.Types.ObjectId, ref: 'Account', default: null, index: true },
+    destinationAccountId: { type: Schema.Types.ObjectId, ref: 'Account', default: null },
     externalTransactionId: { type: String, trim: true, default: null },
     refNo: { type: String, trim: true, default: null },
     transactionDate: { type: Date, required: true, default: Date.now },
@@ -69,6 +71,8 @@ transactionSchema.pre('save', function (next) {
 // Indexed queries
 transactionSchema.index({ userId: 1, transactionDate: -1 });
 transactionSchema.index({ userId: 1, categoryId: 1 });
+transactionSchema.index({ userId: 1, accountId: 1, transactionDate: -1 });
+transactionSchema.index({ userId: 1, destinationAccountId: 1, transactionDate: -1 });
 transactionSchema.index({ userId: 1, source: 1 });
 transactionSchema.index({ userId: 1, status: 1 });
 transactionSchema.index({ userId: 1, externalTransactionId: 1 });

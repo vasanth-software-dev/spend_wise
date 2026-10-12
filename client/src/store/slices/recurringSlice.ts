@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { api } from '../../services/api.js';
 import { RecurringTransaction } from '../../types/index.js';
+import { fetchNotificationsThunk } from './notificationSlice.js';
 
 interface RecurringState {
   recurringList: RecurringTransaction[];
@@ -16,9 +17,10 @@ const initialState: RecurringState = {
   error: null,
 };
 
-export const fetchRecurringThunk = createAsyncThunk('recurring/fetchAll', async (_, { rejectWithValue }) => {
+export const fetchRecurringThunk = createAsyncThunk('recurring/fetchAll', async (_, { dispatch, rejectWithValue }) => {
   try {
     const res = await api.get('/recurring');
+    dispatch(fetchNotificationsThunk());
     return res.data.data.recurring;
   } catch (err: any) {
     return rejectWithValue(err.response?.data?.message || 'Failed to load recurring transactions');
@@ -58,6 +60,34 @@ export const deleteRecurringThunk = createAsyncThunk(
       return id;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Failed to delete recurring transaction');
+    }
+  }
+);
+
+export const updateRecurringThunk = createAsyncThunk(
+  'recurring/update',
+  async ({ id, data }: { id: string; data: any }, { dispatch, rejectWithValue }) => {
+    try {
+      const res = await api.patch(`/recurring/${id}`, data);
+      dispatch(fetchRecurringThunk());
+      dispatch(fetchUpcomingThunk());
+      return res.data.data.recurring;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to update recurring transaction');
+    }
+  }
+);
+
+export const processRecurringThunk = createAsyncThunk(
+  'recurring/process',
+  async (id: string, { dispatch, rejectWithValue }) => {
+    try {
+      const res = await api.post(`/recurring/${id}/process`);
+      dispatch(fetchRecurringThunk());
+      dispatch(fetchUpcomingThunk());
+      return res.data.data;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to process recurring payment');
     }
   }
 );

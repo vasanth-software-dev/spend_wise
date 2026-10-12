@@ -14,6 +14,7 @@ import debtReducer from './slices/debtSlice.js';
 import debtCandidateReducer from './slices/debtCandidateSlice.js';
 import goalReducer from './slices/goalSlice.js';
 import calendarReducer from './slices/calendarSlice.js';
+import accountReducer from './slices/accountSlice.js';
 
 export const store = configureStore({
   reducer: {
@@ -31,6 +32,7 @@ export const store = configureStore({
     debtCandidates: debtCandidateReducer,
     goals: goalReducer,
     calendar: calendarReducer,
+    accounts: accountReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

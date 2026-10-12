@@ -63,6 +63,35 @@ export class RecurringController {
       next(err);
     }
   }
+
+  async process(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const { id } = req.params;
+      const result = await recurringService.processRecurring(id, userId);
+      sendSuccess(res, result, 'Recurring payment recorded in transactions');
+    } catch (err: any) {
+      if (err.message === 'NOT_FOUND') {
+        sendError(res, 'Item not found or unauthorized', 404);
+        return;
+      }
+      if (err.message === 'ALREADY_PROCESSED_RECENTLY') {
+        sendError(res, 'This recurring payment was already recorded recently. Accidental duplicate prevented.', 409);
+        return;
+      }
+      next(err);
+    }
+  }
+
+  async syncReminders(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const count = await recurringService.syncReminders(userId);
+      sendSuccess(res, { remindersGenerated: count }, 'Bill and subscription reminders synced');
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const recurringController = new RecurringController();

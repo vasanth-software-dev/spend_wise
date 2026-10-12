@@ -30,7 +30,7 @@ https://isolated.mail.google.com/mail/vf-9812498124`;
     expect(result.requestedByEmail).toBe('user@gmail.com');
   });
 
-  it('unwraps forwarded message headers and feeds into parser registry', () => {
+  it('unwraps forwarded message headers and feeds into parser registry', async () => {
     const rawForwardedEmail: EmailMessage = {
       id: 'fwd-msg-1',
       sender: 'my-personal-gmail@gmail.com', // The user's Gmail forwarded it
@@ -60,14 +60,14 @@ Payment method: HDFC Bank A/C XX1234`,
     expect(originalSubject).toBe('You paid ₹500 to Swiggy using Google Pay');
 
     // Feed unwrapped email into parser registry
-    const parsed = emailParserRegistry.parse(unwrapped);
+    const parsed = await emailParserRegistry.parse(unwrapped);
     expect(parsed).not.toBeNull();
     expect(parsed?.amount).toBe(500);
     expect(parsed?.merchant).toBe('Swiggy');
     expect(parsed?.upiReference).toBe('426819284192');
   });
 
-  it('parses forwarded HDFC Bank debit alerts correctly', () => {
+  it('parses forwarded HDFC Bank debit alerts correctly', async () => {
     const rawHdfcForwarded: EmailMessage = {
       id: 'fwd-hdfc-1',
       sender: 'user@gmail.com',
@@ -87,7 +87,7 @@ Available Balance: INR 1,24,500.00.`,
     };
 
     const { unwrapped } = unwrapForwardedEmail(rawHdfcForwarded);
-    const parsed = emailParserRegistry.parse(unwrapped);
+    const parsed = await emailParserRegistry.parse(unwrapped);
 
     expect(parsed).not.toBeNull();
     expect(parsed?.amount).toBe(1850);

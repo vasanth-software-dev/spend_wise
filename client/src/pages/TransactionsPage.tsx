@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -26,9 +27,11 @@ import {
   deleteTransactionThunk,
 } from '../store/slices/transactionSlice.js';
 import { fetchCategoriesThunk } from '../store/slices/categorySlice.js';
+import { fetchAccountsThunk } from '../store/slices/accountSlice.js';
 import { Button } from '../components/ui/Button.js';
 import { Card } from '../components/ui/Card.js';
 import { Modal } from '../components/ui/Modal.js';
+import { ConfirmModal } from '../components/ui/ConfirmModal.js';
 import { CategoryBadge } from '../components/ui/CategoryBadge.js';
 import { CategoryIconBox } from '../components/ui/CategoryIconBox.js';
 import { resolveCategoryMeta } from '../constants/categories.js';
@@ -43,12 +46,15 @@ import { Transaction } from '../types/index.js';
 import { AgGridTable } from '../components/ui/AgGridTable.js';
 import type { ColDef } from 'ag-grid-community';
 import type { CustomCellRendererProps } from 'ag-grid-react';
+import { api } from '../services/api.js';
+import { toast } from '../components/ui/Toast.js';
 
 export const TransactionsPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const { transactions, total, page, totalPages, filters, selectedIds, loading } =
     useAppSelector((state) => state.transactions);
   const categories = useAppSelector((state) => state.categories.categories);
+  const accounts = useAppSelector((state) => state.accounts.accounts);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
@@ -56,15 +62,84 @@ export const TransactionsPage: React.FC = () => {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isCategorizeModalOpen, setIsCategorizeModalOpen] = useState(false);
   const [selectedBulkCategory, setSelectedBulkCategory] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [deleteConfirmState, setDeleteConfirmState] = useState<{
+    isOpen: boolean;
+    type: 'single' | 'bulk';
+    targetId?: string;
+    count?: number;
+  }>({ isOpen: false, type: 'single' });
+  const location = useLocation();
+
+  const groupedTransactions = useMemo(() => {
+    const groups: { dateKey: string; displayDate: string; items: Transaction[]; dayTotal: number }[] = [];
+    const map = new Map<string, { displayDate: string; items: Transaction[]; dayTotal: number }>();
+
+    for (const tx of transactions) {
+      const d = new Date(tx.transactionDate);
+      const dateKey = !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : 'undated';
+      if (!map.has(dateKey)) {
+        const displayDate = !isNaN(d.getTime())
+          ? d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+          : 'Undated';
+        map.set(dateKey, { displayDate, items: [], dayTotal: 0 });
+      }
+      const entry = map.get(dateKey)!;
+      entry.items.push(tx);
+      if (tx.type === 'expense') entry.dayTotal -= tx.amount;
+      else if (tx.type === 'income') entry.dayTotal += tx.amount;
+    }
+
+    for (const [dateKey, val] of map.entries()) {
+      groups.push({ dateKey, displayDate: val.displayDate, items: val.items, dayTotal: val.dayTotal });
+    }
+    return groups;
+  }, [transactions]);
+
+  const filteredMetrics = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    for (const t of transactions) {
+      if (t.type === 'income') income += t.amount;
+      else if (t.type === 'expense') expense += t.amount;
+    }
+    return { income, expense, net: income - expense };
+  }, [transactions]);
 
   useEffect(() => {
-    dispatch(fetchTransactionsThunk(undefined));
+    const params = new URLSearchParams(location.search);
+    if (params.get('import') === 'true') {
+      setIsImportModalOpen(true);
+    }
+    const urlAccountId = params.get('accountId');
+    if (urlAccountId) {
+      dispatch(setFilters({ accountId: urlAccountId, page: 1 }));
+      dispatch(fetchTransactionsThunk({ accountId: urlAccountId, page: 1 }));
+    } else {
+      dispatch(fetchTransactionsThunk(undefined));
+    }
     dispatch(fetchCategoriesThunk());
-  }, [dispatch]);
+    dispatch(fetchAccountsThunk());
+  }, [dispatch, location.search]);
+
+  const [searchInput, setSearchInput] = useState(filters.search || '');
+
+  useEffect(() => {
+    setSearchInput(filters.search || '');
+  }, [filters.search]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchInput !== (filters.search || '')) {
+        dispatch(setFilters({ search: searchInput }));
+        dispatch(fetchTransactionsThunk({ search: searchInput, page: 1 }));
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput, filters.search, dispatch]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    dispatch(setFilters({ search: e.target.value }));
-    dispatch(fetchTransactionsThunk({ search: e.target.value, page: 1 }));
+    setSearchInput(e.target.value);
   };
 
   const handlePageChange = (newPage: number) => {
@@ -74,18 +149,41 @@ export const TransactionsPage: React.FC = () => {
     }
   };
 
-  const handleExportCSV = () => {
-    const params = new URLSearchParams();
-    if (filters.search) params.append('search', filters.search);
-    if (filters.categoryId) params.append('categoryId', filters.categoryId);
-    if (filters.type) params.append('type', filters.type);
-    window.open(`/api/v1/transactions/export?${params.toString()}`, '_blank');
+  const handleExportCSV = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.search) params.append('search', filters.search);
+      if (filters.categoryId) params.append('categoryId', filters.categoryId);
+      if (filters.accountId) params.append('accountId', filters.accountId);
+      if (filters.type) params.append('type', filters.type);
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+
+      const res = await api.get(`/transactions/export?${params.toString()}`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `spendwise-transactions-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success('Transactions CSV exported successfully');
+    } catch (err: any) {
+      console.error('Export CSV error:', err);
+      toast.error(err?.response?.data?.message || 'Failed to export transactions CSV');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleBulkDelete = () => {
-    if (confirm(`Are you sure you want to delete ${selectedIds.length} transactions?`)) {
-      dispatch(bulkDeleteThunk(selectedIds));
-    }
+    if (selectedIds.length === 0) return;
+    setDeleteConfirmState({ isOpen: true, type: 'bulk', count: selectedIds.length });
   };
 
   const handleConfirmBulkCategorize = () => {
@@ -97,10 +195,7 @@ export const TransactionsPage: React.FC = () => {
   };
 
   const handleDeleteSingle = (id: string) => {
-    if (confirm('Delete this transaction?')) {
-      dispatch(deleteTransactionThunk(id));
-      setSelectedTx(null);
-    }
+    setDeleteConfirmState({ isOpen: true, type: 'single', targetId: id });
   };
 
   const bulkTypeFilter = useMemo(() => {
@@ -195,6 +290,11 @@ export const TransactionsPage: React.FC = () => {
                   <span className="font-bold text-slate-800 dark:text-slate-200 block truncate tracking-tight text-xs sm:text-sm">
                     {tx.merchant}
                   </span>
+                  {tx.type === 'transfer' && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">
+                      Transfer
+                    </span>
+                  )}
                   {tx.personId && typeof tx.personId === 'object' && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-600 dark:text-brand-400 bg-brand-500/10 px-1.5 py-0.5 rounded border border-brand-500/20">
                       <UserRound className="w-2.5 h-2.5" />
@@ -299,11 +399,18 @@ export const TransactionsPage: React.FC = () => {
         cellRenderer: (params: CustomCellRendererProps<Transaction>) => {
           const tx = params.data;
           if (!tx) return null;
-          const isExpense = tx.type === 'expense';
           return (
             <div className="flex items-center justify-end w-full h-full font-extrabold text-sm sm:text-base font-mono tabular-financial">
-              <span className={isExpense ? 'text-slate-900 dark:text-white' : 'text-emerald-600 dark:text-emerald-400'}>
-                {isExpense ? '-' : '+'}
+              <span
+                className={
+                  tx.type === 'income'
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : tx.type === 'transfer'
+                    ? 'text-sky-600 dark:text-sky-400'
+                    : 'text-slate-900 dark:text-white'
+                }
+              >
+                {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '↔ ' : '-'}
                 {formatINR(tx.amount)}
               </span>
             </div>
@@ -387,6 +494,7 @@ export const TransactionsPage: React.FC = () => {
             variant="outline"
             leftIcon={<Download className="w-4 h-4" />}
             onClick={handleExportCSV}
+            isLoading={isExporting}
           >
             Export CSV
           </Button>
@@ -402,6 +510,57 @@ export const TransactionsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Active Filter Financial Overview */}
+      {transactions.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/5 flex items-center justify-between shadow-2xs">
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Page Inflow
+              </span>
+              <div className="text-base sm:text-lg font-extrabold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
+                +{formatINR(filteredMetrics.income)}
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-slate-400 font-mono">
+              {transactions.filter((t) => t.type === 'income').length} tx
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/5 flex items-center justify-between shadow-2xs">
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Page Outflow
+              </span>
+              <div className="text-base sm:text-lg font-extrabold font-mono text-rose-500 mt-0.5">
+                -{formatINR(filteredMetrics.expense)}
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-slate-400 font-mono">
+              {transactions.filter((t) => t.type === 'expense').length} tx
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/5 flex items-center justify-between shadow-2xs">
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Net Result
+              </span>
+              <div
+                className={`text-base sm:text-lg font-extrabold font-mono mt-0.5 ${
+                  filteredMetrics.net >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-500'
+                }`}
+              >
+                {formatINR(filteredMetrics.net)}
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-slate-400 font-mono">
+              {total} total ledger
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Filter and Search Bar */}
       <Card className="p-4 sm:p-5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
@@ -410,7 +569,7 @@ export const TransactionsPage: React.FC = () => {
             <Search className="w-4 h-4 text-slate-400 group-focus-within:text-brand-500 absolute left-3.5 top-3 pointer-events-none transition-colors" />
             <input
               type="text"
-              value={filters.search}
+              value={searchInput}
               onChange={handleSearchChange}
               placeholder="Search merchant, Ref.No, notes, UPI UTR..."
               className="w-full bg-slate-100/80 dark:bg-slate-800/80 text-xs sm:text-sm pl-10 pr-4 py-2.5 rounded-xl border border-transparent focus:border-brand-500/50 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-[border-color,background-color,box-shadow] duration-150 ease-out-expo placeholder:text-slate-400 shadow-2xs"
@@ -486,6 +645,24 @@ export const TransactionsPage: React.FC = () => {
               <option value="cash">Cash</option>
             </select>
 
+            {/* Account Filter */}
+            <select
+              value={filters.accountId || ''}
+              onChange={(e) => {
+                dispatch(setFilters({ accountId: e.target.value }));
+                dispatch(fetchTransactionsThunk({ accountId: e.target.value, page: 1 }));
+              }}
+              className="text-xs py-2 px-3 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl border border-slate-200/60 dark:border-white/5 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-slate-700 dark:text-slate-200 font-semibold shadow-2xs flex-shrink-0"
+              aria-label="Filter by account"
+            >
+              <option value="">All Accounts</option>
+              {accounts.map((acc) => (
+                <option key={acc._id} value={acc._id}>
+                  {acc.name} ({acc.type.replace('_', ' ')})
+                </option>
+              ))}
+            </select>
+
             {/* Sort Order */}
             <select
               value={`${filters.sortBy}-${filters.sortOrder}`}
@@ -502,7 +679,7 @@ export const TransactionsPage: React.FC = () => {
               <option value="amount-asc">Lowest Amount</option>
             </select>
 
-            {(filters.search || filters.categoryId || filters.type || filters.paymentMethod) && (
+            {(filters.search || filters.categoryId || filters.accountId || filters.type || filters.paymentMethod) && (
               <button
                 onClick={() => {
                   dispatch(resetFilters());
@@ -544,6 +721,51 @@ export const TransactionsPage: React.FC = () => {
           </div>
         )}
       </Card>
+
+      {/* Financial KPI Summary Banner for Currently Loaded / Filtered Transactions */}
+      {transactions.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-fintech">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              Filtered Inflows
+            </span>
+            <span className="text-base sm:text-lg font-extrabold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5 block tabular-financial">
+              +{formatINR(filteredMetrics.income)}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-fintech">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              Filtered Outflows
+            </span>
+            <span className="text-base sm:text-lg font-extrabold font-mono text-slate-900 dark:text-white mt-0.5 block tabular-financial">
+              -{formatINR(filteredMetrics.expense)}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-fintech">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              Net In This View
+            </span>
+            <span
+              className={`text-base sm:text-lg font-extrabold font-mono mt-0.5 block tabular-financial ${
+                filteredMetrics.net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
+              }`}
+            >
+              {filteredMetrics.net >= 0 ? '+' : ''}{formatINR(filteredMetrics.net)}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-fintech">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              Records Count
+            </span>
+            <span className="text-base sm:text-lg font-extrabold font-mono text-slate-800 dark:text-slate-200 mt-0.5 block">
+              {total} total ({transactions.length} shown)
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Transactions Ledger Card */}
       <Card className="p-0 overflow-hidden shadow-fintech">
@@ -587,105 +809,119 @@ export const TransactionsPage: React.FC = () => {
               />
             </div>
 
-            {/* Mobile Stacked Card View (transformed for mobile, no horizontal scrolling!) */}
-            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80">
-              {transactions.map((tx) => {
-                const isExpense = tx.type === 'expense';
-                const isSelected = selectedIds.includes(tx._id);
+            {/* Mobile Stacked Card View grouped by date */}
+            <div className="md:hidden">
+              {groupedTransactions.map((group) => (
+                <div key={group.dateKey} className="border-b border-slate-100 dark:border-slate-800/80 last:border-b-0">
+                  <div className="px-4 py-2 bg-slate-100/70 dark:bg-slate-850/80 border-b border-slate-200/50 dark:border-white/5 flex items-center justify-between text-xs sticky top-16 z-10 backdrop-blur-md">
+                    <span className="font-extrabold text-slate-800 dark:text-slate-200 tracking-tight">
+                      {group.displayDate}
+                    </span>
+                    <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400">
+                      {group.items.length} {group.items.length === 1 ? 'txn' : 'txns'} · {group.dayTotal >= 0 ? '+' : ''}{formatINR(group.dayTotal)}
+                    </span>
+                  </div>
 
-                return (
-                  <div
-                    key={tx._id}
-                    onClick={(e) => {
-                      const target = e.target as HTMLElement | null;
-                      if (target?.closest('input, button, a')) return;
-                      setSelectedTx(tx);
-                    }}
-                    className={`p-4 flex items-center justify-between gap-3 active:bg-slate-50 dark:active:bg-slate-800/60 transition-colors ${
-                      isSelected ? 'bg-brand-500/10 dark:bg-brand-950/20' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          dispatch(toggleSelectId(tx._id));
-                        }}
-                        className="pr-1 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                          }}
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {group.items.map((tx) => {
+                      const isSelected = selectedIds.includes(tx._id);
+
+                      return (
+                        <div
+                          key={tx._id}
                           onClick={(e) => {
-                            e.stopPropagation();
-                            dispatch(toggleSelectId(tx._id));
+                            const target = e.target as HTMLElement | null;
+                            if (target?.closest('input, button, a')) return;
+                            setSelectedTx(tx);
                           }}
-                          className="rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
-                        />
-                      </div>
-
-                      <CategoryIconBox category={tx.categoryId} categories={categories} size="lg" />
-
-                      <div className="min-w-0">
-                        <p className="font-bold text-slate-900 dark:text-white truncate text-xs sm:text-sm tracking-tight">
-                          {tx.merchant}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-400 flex-wrap">
-                          <span>{formatDate(tx.transactionDate, 'dd MMM')}</span>
-                          <span>•</span>
-                          <CategoryBadge category={tx.categoryId} categories={categories} size="xs" />
-                          {(tx.refNo || tx.externalTransactionId) && (
-                            <>
-                              <span>•</span>
-                              <span className="font-mono text-[10px] text-brand-600 dark:text-brand-400 truncate max-w-[110px]" title={tx.refNo || tx.externalTransactionId}>
-                                #{tx.refNo || tx.externalTransactionId}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        {tx.notes && (
-                          <span className="text-[11px] text-slate-400 truncate block mt-0.5 font-normal">
-                            {tx.notes}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2.5 flex-shrink-0">
-                      <div className="text-right">
-                        <span
-                          className={`text-sm font-extrabold font-mono tabular-financial block ${
-                            isExpense
-                              ? 'text-slate-900 dark:text-white'
-                              : 'text-emerald-600 dark:text-emerald-400'
+                          className={`p-3.5 flex items-center justify-between gap-3 active:bg-slate-50 dark:active:bg-slate-800/60 transition-colors ${
+                            isSelected ? 'bg-brand-500/10 dark:bg-brand-950/20' : ''
                           }`}
                         >
-                          {isExpense ? '-' : '+'}
-                          {formatINR(tx.amount)}
-                        </span>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 mt-0.5 block">
-                          {tx.paymentMethod}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingTx(tx);
-                        }}
-                        className="p-2 rounded-xl text-slate-400 hover:text-brand-600 hover:bg-brand-500/10 dark:hover:text-brand-400 dark:hover:bg-brand-500/20 transition-colors border border-slate-200/60 dark:border-slate-800"
-                        title="Edit Transaction"
-                        aria-label={`Edit ${tx.merchant}`}
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                    </div>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                dispatch(toggleSelectId(tx._id));
+                              }}
+                              className="pr-1 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  dispatch(toggleSelectId(tx._id));
+                                }}
+                                className="rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                              />
+                            </div>
+
+                            <CategoryIconBox category={tx.categoryId} categories={categories} size="lg" />
+
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-900 dark:text-white truncate text-xs sm:text-sm tracking-tight">
+                                {tx.merchant}
+                              </p>
+                              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-400 flex-wrap">
+                                <CategoryBadge category={tx.categoryId} categories={categories} size="xs" />
+                                {(tx.refNo || tx.externalTransactionId) && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="font-mono text-[10px] text-brand-600 dark:text-brand-400 truncate max-w-[110px]" title={tx.refNo || tx.externalTransactionId}>
+                                      #{tx.refNo || tx.externalTransactionId}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                              {tx.notes && (
+                                <span className="text-[11px] text-slate-400 truncate block mt-0.5 font-normal">
+                                  {tx.notes}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2.5 flex-shrink-0">
+                            <div className="text-right">
+                              <span
+                                className={`text-sm font-extrabold font-mono tabular-financial block ${
+                                  tx.type === 'income'
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : tx.type === 'transfer'
+                                    ? 'text-sky-600 dark:text-sky-400'
+                                    : 'text-slate-900 dark:text-white'
+                                }`}
+                              >
+                                {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '↔ ' : '-'}
+                                {formatINR(tx.amount)}
+                              </span>
+                              <span className="text-[10px] uppercase font-bold text-slate-400 mt-0.5 block">
+                                {tx.paymentMethod}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTx(tx);
+                              }}
+                              className="p-2 rounded-xl text-slate-400 hover:text-brand-600 hover:bg-brand-500/10 dark:hover:text-brand-400 dark:hover:bg-brand-500/20 transition-colors border border-slate-200/60 dark:border-slate-800"
+                              title="Edit Transaction"
+                              aria-label={`Edit ${tx.merchant}`}
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </>
         )}
@@ -791,6 +1027,27 @@ export const TransactionsPage: React.FC = () => {
           }}
         />
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirmState.isOpen}
+        title={deleteConfirmState.type === 'bulk' ? 'Delete Selected Transactions' : 'Delete Transaction'}
+        message={
+          deleteConfirmState.type === 'bulk'
+            ? `Are you sure you want to delete ${deleteConfirmState.count || selectedIds.length} transactions? This will permanently remove them from your records.`
+            : 'Are you sure you want to delete this transaction? This action cannot be undone.'
+        }
+        confirmText="Delete"
+        onConfirm={() => {
+          if (deleteConfirmState.type === 'bulk') {
+            dispatch(bulkDeleteThunk(selectedIds));
+          } else if (deleteConfirmState.targetId) {
+            dispatch(deleteTransactionThunk(deleteConfirmState.targetId));
+            setSelectedTx(null);
+          }
+          setDeleteConfirmState({ isOpen: false, type: 'single' });
+        }}
+        onCancel={() => setDeleteConfirmState({ isOpen: false, type: 'single' })}
+      />
     </div>
   );
 };

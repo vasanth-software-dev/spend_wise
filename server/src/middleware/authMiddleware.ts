@@ -12,12 +12,19 @@ export interface AuthenticatedRequest extends Request {
 
 export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  let token: string | undefined;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (typeof req.query.token === 'string' && req.query.token.trim()) {
+    token = req.query.token.trim();
+  }
+
+  if (!token) {
     sendError(res, 'Authentication required. No access token provided.', 401, 'UNAUTHORIZED');
     return;
   }
 
-  const token = authHeader.split(' ')[1];
   try {
     const payload = verifyAccessToken(token);
     req.user = payload;
