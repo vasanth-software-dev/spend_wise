@@ -168,8 +168,15 @@ export class EmailAccountController {
   async handleInboundWebhook(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (env.INBOUND_WEBHOOK_SECRET) {
-        const headerSecret = req.headers['x-webhook-secret'] || req.query.secret;
-        if (headerSecret !== env.INBOUND_WEBHOOK_SECRET) {
+        const authHeader = req.headers.authorization;
+        const bearerSecret = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : undefined;
+        const incomingSecret =
+          req.headers['x-webhook-secret'] ||
+          req.headers['x-api-key'] ||
+          req.query.secret ||
+          bearerSecret;
+
+        if (incomingSecret !== env.INBOUND_WEBHOOK_SECRET) {
           sendError(res, 'Unauthorized inbound webhook signature', 401, 'INVALID_WEBHOOK_SECRET');
           return;
         }

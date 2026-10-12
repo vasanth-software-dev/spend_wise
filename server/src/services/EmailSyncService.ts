@@ -105,12 +105,25 @@ export class EmailSyncService {
    */
   async setupForwardingAccount(userId: string): Promise<IEmailAccount> {
     const existing = await emailAccountRepository.findForwardingByUserId(userId);
+    const domain = env.INBOUND_FORWARDING_DOMAIN || 'myspendwise.dpdns.org';
+
     if (existing) {
+      // Synchronize forwarding domain if configuration changed
+      if (
+        existing.forwardingToken &&
+        (!existing.forwardingAddress || !existing.forwardingAddress.endsWith(`@${domain}`))
+      ) {
+        const newAddress = `sync-${existing.forwardingToken}@${domain}`;
+        const updated = await emailAccountRepository.update(String(existing._id), userId, {
+          email: newAddress,
+          forwardingAddress: newAddress,
+        });
+        if (updated) return updated;
+      }
       return existing;
     }
 
     const token = randomBytes(4).toString('hex').toLowerCase();
-    const domain = env.INBOUND_FORWARDING_DOMAIN || 'sync.spendwise.local';
     const forwardingAddress = `sync-${token}@${domain}`;
 
     const account = await emailAccountRepository.create({
@@ -412,13 +425,52 @@ export class EmailSyncService {
     detected?: any;
     accountId?: string;
   }> {
-    const toField =
+    let toField =
       rawPayload.to ||
       rawPayload.recipient ||
       rawPayload.To ||
       rawPayload.OriginalRecipient ||
       '';
-    const fromField = rawPayload.from || rawPayload.sender || rawPayload.From || 'unknown@sender.com';
+
+    // Handle SendGrid envelope format: {"to":["sync-xxxx@myspendwise.dpdns.org"],...}
+    if (!toField && (rawPayload as any).envelope) {
+      try {
+        const envObj =
+          typeof (rawPayload as any).envelope === 'string'
+            ? JSON.parse((rawPayload as any).envelope)
+            : (rawPayload as any).envelope;
+        if (Array.isArray(envObj.to) && envObj.to.length > 0) {
+          toField = envObj.to[0];
+        } else if (typeof envObj.to === 'string') {
+          toField = envObj.to;
+        }
+      } catch {
+        // ignore envelope JSON parse error
+      }
+    }
+
+    // Handle Mailgun or raw message-headers format
+    if (!toField && (rawPayload as any)['message-headers']) {
+      try {
+        const headers =
+          typeof (rawPayload as any)['message-headers'] === 'string'
+            ? JSON.parse((rawPayload as any)['message-headers'])
+            : (rawPayload as any)['message-headers'];
+        if (Array.isArray(headers)) {
+          const toHeader = headers.find((h: any) => h[0]?.toLowerCase() === 'to');
+          if (toHeader && toHeader[1]) toField = toHeader[1];
+        }
+      } catch {
+        // ignore headers parse error
+      }
+    }
+
+    const fromField =
+      rawPayload.from ||
+      rawPayload.sender ||
+      rawPayload.From ||
+      (rawPayload as any)['sender-address'] ||
+      'unknown@sender.com';
     const subject = rawPayload.subject || rawPayload.Subject || '(No Subject)';
     const textBody =
       rawPayload.text ||
@@ -731,7 +783,27 @@ https://isolated.mail.google.com/mail/vf-8291048102`,
   }
 
   async getAccounts(userId: string): Promise<IEmailAccount[]> {
-    return emailAccountRepository.findByUserId(userId);
+    const accounts = await emailAccountRepository.findByUserId(userId);
+    const domain = env.INBOUND_FORWARDING_DOMAIN || 'myspendwise.dpdns.org';
+
+    for (const acc of accounts) {
+      if (
+        acc.provider === 'forwarding' &&
+        acc.forwardingToken &&
+        acc.forwardingAddress &&
+        !acc.forwardingAddress.endsWith(`@${domain}`)
+      ) {
+        const newAddress = `sync-${acc.forwardingToken}@${domain}`;
+        acc.forwardingAddress = newAddress;
+        acc.email = newAddress;
+        await emailAccountRepository.update(String(acc._id), userId, {
+          email: newAddress,
+          forwardingAddress: newAddress,
+        });
+      }
+    }
+
+    return accounts;
   }
 
   async pauseAccount(userId: string, accountId: string): Promise<IEmailAccount | null> {
