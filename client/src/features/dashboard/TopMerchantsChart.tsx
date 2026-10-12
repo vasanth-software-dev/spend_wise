@@ -9,12 +9,14 @@ import {
 } from 'recharts';
 import { TopMerchantItem } from '../../types/index.js';
 import { formatINR } from '../../utils/format.js';
+import { useNavigate } from 'react-router-dom';
 
 interface TopMerchantsChartProps {
   data: TopMerchantItem[];
 }
 
 export const TopMerchantsChart: React.FC<TopMerchantsChartProps> = ({ data }) => {
+  const navigate = useNavigate();
   if (!data || data.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center text-xs text-slate-400 font-medium">
@@ -90,7 +92,7 @@ export const TopMerchantsChart: React.FC<TopMerchantsChartProps> = ({ data }) =>
             <div
               key={m.merchant}
               onClick={() => {
-                window.location.href = `/transactions?search=${encodeURIComponent(m.merchant)}`;
+                navigate(`/transactions?search=${encodeURIComponent(m.merchant)}`);
               }}
               className="py-2.5 px-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-xl cursor-pointer transition-colors group"
               title={`View all transactions with ${m.merchant}`}

@@ -96,6 +96,32 @@ describe('Financial Calculations Engine', () => {
       expect(savingsRate).toBe(63); // 42850 / 68000 = 63%
     });
 
+    it('strictly excludes transfers between accounts from income, expenses, and savings', () => {
+      const txWithTransfers: Transaction[] = [
+        ...mockTx,
+        {
+          _id: '4',
+          userId: 'u1',
+          type: 'transfer',
+          amount: 20000,
+          currency: 'INR',
+          merchant: 'Self Transfer: HDFC to Cash',
+          paymentMethod: 'bank',
+          source: 'manual',
+          transactionDate: '2026-10-10T12:00:00Z',
+          status: 'confirmed',
+          isRecurring: false,
+          createdAt: '2026-10-10',
+        },
+      ];
+
+      const income = calculateMonthlyIncome(txWithTransfers, fixedNow);
+      const expenses = calculateMonthlyExpenses(txWithTransfers, fixedNow);
+      expect(income).toBe(68000);
+      expect(expenses).toBe(25150);
+      expect(calculateSavings(income, expenses)).toBe(42850);
+    });
+
     it('handles zero income safely without NaN or infinity', () => {
       expect(calculateSavingsRate(0, 1000)).toBe(0);
       expect(calculateSavings(0, 1000)).toBe(-1000);

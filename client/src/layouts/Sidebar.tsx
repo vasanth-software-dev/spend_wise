@@ -231,11 +231,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                 aria-expanded={!isCollapsed}
               >
                 <div className="flex items-center gap-1.5">
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ backgroundColor: section.accentColor }}
-                  />
-                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
                     {section.title}
                   </span>
                 </div>
@@ -243,13 +240,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                 <div className="flex items-center gap-1.5">
                   {/* Collapsed Pill Badge Indicator */}
                   {isCollapsed && sectionBadgeCount > 0 && (
-                    <span className="bg-brand-500/20 text-brand-700 dark:text-brand-300 border border-brand-500/30 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full">
+                    <span className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
                       {sectionBadgeCount}
                     </span>
                   )}
                   {/* Collapsed Active Indicator Dot */}
                   {isCollapsed && hasActiveChild && !sectionBadgeCount && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-brand-500 dark:bg-brand-400" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
                   )}
                   <span className="text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
                     {isCollapsed ? (
@@ -274,38 +271,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                         className={({ isActive }) =>
                           `group flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-[background-color,border-color,color] duration-150 ease-out-expo relative border ${
                             isActive
-                              ? 'shadow-2xs font-bold'
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-bold shadow-2xs'
                               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-100 border-transparent'
                           }`
-                        }
-                        style={({ isActive }) =>
-                          isActive
-                            ? {
-                                backgroundColor: `${item.color}15`,
-                                borderColor: `${item.color}35`,
-                                color: item.color,
-                              }
-                            : undefined
                         }
                       >
                         {({ isActive }) => (
                           <>
                             {isActive && (
                               <span
-                                className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full"
-                                style={{ backgroundColor: item.color }}
+                                className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-emerald-500"
                               />
                             )}
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div
-                                className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105 border"
-                                style={{
-                                  backgroundColor: isActive ? `${item.color}22` : `${item.color}10`,
-                                  borderColor: isActive ? `${item.color}45` : `${item.color}20`,
-                                  color: item.color,
-                                }}
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105 border ${
+                                  isActive
+                                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                                    : 'bg-slate-100 dark:bg-slate-800/80 border-slate-200/60 dark:border-slate-700/60 text-slate-500 dark:text-slate-400'
+                                }`}
                               >
-                                <Icon className="w-3.5 h-3.5" color={item.color} />
+                                <Icon className="w-3.5 h-3.5" />
                               </div>
                               <span className="truncate">{item.label}</span>
                             </div>
@@ -317,7 +303,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                                     <span
                                       key={c._id || i}
                                       className="w-2 h-2 rounded-full border border-white dark:border-[#0b101d]"
-                                      style={{ backgroundColor: c.color || '#f97316' }}
+                                      style={{ backgroundColor: c.color || '#10b981' }}
                                       title={c.name}
                                     />
                                   ))}
@@ -326,9 +312,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
 
                               {item.badge !== undefined && (
                                 <span
-                                  className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                                     item.badgeVariant === 'brand' || !item.badgeVariant
-                                      ? 'bg-brand-500/20 text-brand-700 dark:text-brand-300 border border-brand-500/30'
+                                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25'
                                       : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300/50 dark:border-white/5'
                                   }`}
                                 >

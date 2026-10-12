@@ -21,6 +21,7 @@ import {
   downloadTransactionsCSV,
   ExportReportSections,
 } from '../utils/reportExport.js';
+import { toLocalISODate } from '../utils/format.js';
 
 interface ExportPageProps {
   initialFormat?: 'pdf' | 'excel' | 'csv';
@@ -49,9 +50,9 @@ export const ExportPage: React.FC<ExportPageProps> = ({ initialFormat = 'pdf' })
   const [customStartDate, setCustomStartDate] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
-    return d.toISOString().split('T')[0];
+    return toLocalISODate(d);
   });
-  const [customEndDate, setCustomEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [customEndDate, setCustomEndDate] = useState(() => toLocalISODate(new Date()));
 
   // Account / Payment Method Filter
   const [accountFilter, setAccountFilter] = useState<string>('all');
@@ -122,8 +123,8 @@ export const ExportPage: React.FC<ExportPageProps> = ({ initialFormat = 'pdf' })
     }
 
     return {
-      startDate: start.toISOString().split('T')[0],
-      endDate: end.toISOString().split('T')[0],
+      startDate: toLocalISODate(start),
+      endDate: toLocalISODate(end),
       periodLabel: label,
     };
   }, [periodPreset, customStartDate, customEndDate]);

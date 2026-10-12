@@ -78,13 +78,17 @@ export class DebtRepository {
       .sort({ createdAt: -1 })
       .lean();
 
+    if (debts.length === 0) return [];
+
+    const totals = await DebtPaymentModel.aggregate<{ _id: Types.ObjectId; totalPaid: number }>([
+      { $match: { debtId: { $in: debts.map((d) => d._id) } } },
+      { $group: { _id: '$debtId', totalPaid: { $sum: '$amount' } } },
+    ]);
+    const paidByDebt = new Map(totals.map((row) => [String(row._id), row.totalPaid]));
+
     const results: DebtWithBalance[] = [];
     for (const debt of debts) {
-      const paymentAgg = await DebtPaymentModel.aggregate([
-        { $match: { debtId: new Types.ObjectId(String(debt._id)) } },
-        { $group: { _id: null, totalPaid: { $sum: '$amount' } } },
-      ]);
-      const totalPaid = paymentAgg[0]?.totalPaid || 0;
+      const totalPaid = paidByDebt.get(String(debt._id)) || 0;
       const { remainingAmount, status, isOverdue } = this.calculateStatus(debt, totalPaid);
       if (remainingAmount <= 0) continue;
       results.push({ ...debt, totalPaid, remainingAmount, status, isOverdue });
@@ -183,26 +187,26 @@ export class DebtRepository {
 
   async getDebtsWithBalance(userId: string): Promise<DebtWithBalance[]> {
     const debts = await this.findByUserId(userId);
-    const results: DebtWithBalance[] = [];
+    if (debts.length === 0) return [];
 
-    for (const debt of debts) {
-      const paymentAgg = await DebtPaymentModel.aggregate([
-        { $match: { debtId: new Types.ObjectId(String(debt._id)) } },
-        { $group: { _id: null, totalPaid: { $sum: '$amount' } } },
-      ]);
-      const totalPaid = paymentAgg[0]?.totalPaid || 0;
+    const debtIds = debts.map((d) => d._id);
+    const totals = await DebtPaymentModel.aggregate<{ _id: Types.ObjectId; totalPaid: number }>([
+      { $match: { debtId: { $in: debtIds } } },
+      { $group: { _id: '$debtId', totalPaid: { $sum: '$amount' } } },
+    ]);
+    const paidByDebt = new Map(totals.map((row) => [String(row._id), row.totalPaid]));
+
+    return debts.map((debt) => {
+      const totalPaid = paidByDebt.get(String(debt._id)) || 0;
       const { remainingAmount, status, isOverdue } = this.calculateStatus(debt, totalPaid);
-
-      results.push({
+      return {
         ...debt,
         totalPaid,
         remainingAmount,
         status,
         isOverdue,
-      });
-    }
-
-    return results;
+      };
+    });
   }
 
   async getDebtWithPayments(id: string, userId: string): Promise<DebtWithPayments | null> {

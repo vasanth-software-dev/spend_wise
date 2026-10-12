@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { AccountModel } from '../models/Account.js';
-import { DebtModel } from '../models/Debt.js';
+import { debtRepository } from './DebtRepository.js';
 import { IAccount } from '../types/index.js';
 
 export interface NetWorthSummary {
@@ -57,11 +57,18 @@ export class AccountRepository {
     return res.deletedCount > 0;
   }
 
+  async adjustBalance(accountId: string | Types.ObjectId, delta: number): Promise<void> {
+    await AccountModel.updateOne(
+      { _id: new Types.ObjectId(String(accountId)) },
+      { $inc: { balance: delta } }
+    );
+  }
+
   async getNetWorthSummary(userId: string): Promise<NetWorthSummary> {
     const userObjId = new Types.ObjectId(userId);
 
     const accounts = await AccountModel.find({ userId: userObjId, isActive: true }).lean();
-    const debts = await DebtModel.find({ userId: userObjId }).lean();
+    const debts = await debtRepository.getDebtsWithBalance(userId);
 
     let bank = 0;
     let cash = 0;
@@ -102,7 +109,8 @@ export class AccountRepository {
     let receivables = 0;
 
     for (const d of debts) {
-      const amt = Number(d.originalAmount) || 0;
+      const amt = Number(d.remainingAmount) || 0;
+      if (amt <= 0) continue;
       if (d.direction === 'I_OWE') {
         debtsOwed += amt;
       } else if (d.direction === 'OWED_TO_ME') {

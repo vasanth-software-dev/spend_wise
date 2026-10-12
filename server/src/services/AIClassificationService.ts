@@ -343,14 +343,23 @@ interface CacheEntry {
 class AIClassificationService {
   private cache = new Map<string, CacheEntry>();
   private apiKey: string | undefined;
-  private model: string = 'gpt-4o-mini';
+  private model: string;
+  private apiUrl: string;
+  private timeoutMs: number;
   private enabled: boolean = true;
 
   constructor() {
     this.apiKey = env.OPENAI_API_KEY || env.AI_API_KEY;
+    this.apiUrl = env.AI_API_URL;
+    this.model = env.AI_MODEL;
+    this.timeoutMs = env.AI_TIMEOUT_MS;
     this.enabled = !!this.apiKey;
     
-    if (!this.enabled) {
+    if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+      this.enabled = false;
+    }
+
+    if (!this.enabled && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
       logger.warn('AI Classification Service: No API key found (OPENAI_API_KEY or AI_API_KEY). AI classification disabled, using fallback only.');
     }
   }
@@ -443,9 +452,9 @@ class AIClassificationService {
       const userPrompt = this.buildUserPrompt(input);
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
       
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

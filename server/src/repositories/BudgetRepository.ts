@@ -46,39 +46,59 @@ export class BudgetRepository {
   // Calculate actual spending against each budget
   async getBudgetsWithProgress(userId: string): Promise<BudgetWithSpending[]> {
     const budgets = await this.findByUserId(userId);
-    const results: BudgetWithSpending[] = [];
 
-    for (const budget of budgets) {
-      const matchQuery: Record<string, unknown> = {
-        userId: new Types.ObjectId(userId),
-        status: 'confirmed',
-        type: 'expense',
-        transactionDate: { $gte: budget.startDate, $lte: budget.endDate },
-      };
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const currentYearStart = new Date(now.getFullYear(), 0, 1);
+    const currentYearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
 
-      if (budget.categoryId) {
-        matchQuery.categoryId = (budget.categoryId as { _id?: Types.ObjectId })._id || budget.categoryId;
-      }
+    const results = await Promise.all(
+      budgets.map(async (budget) => {
+        let windowStart = budget.startDate;
+        let windowEnd = budget.endDate;
 
-      const spendingResult = await TransactionModel.aggregate([
-        { $match: matchQuery },
-        { $group: { _id: null, totalSpent: { $sum: '$amount' } } },
-      ]);
+        if (budget.period === 'monthly') {
+          windowStart = currentMonthStart;
+          windowEnd = currentMonthEnd;
+        } else if (budget.period === 'yearly') {
+          windowStart = currentYearStart;
+          windowEnd = currentYearEnd;
+        }
 
-      const spent = spendingResult[0]?.totalSpent || 0;
-      const remaining = Math.max(0, budget.amount - spent);
-      const percentageUsed = budget.amount > 0 ? Math.round((spent / budget.amount) * 100) : 0;
-      const threshold = budget.notificationThreshold || 80;
+        const matchQuery: Record<string, unknown> = {
+          userId: new Types.ObjectId(userId),
+          status: 'confirmed',
+          type: 'expense',
+          transactionDate: { $gte: windowStart, $lte: windowEnd },
+        };
 
-      results.push({
-        ...budget,
-        spent,
-        remaining,
-        percentageUsed,
-        isExceeded: spent > budget.amount,
-        isWarning: percentageUsed >= threshold && spent <= budget.amount,
-      });
-    }
+        if (budget.categoryId) {
+          matchQuery.categoryId = (budget.categoryId as { _id?: Types.ObjectId })._id || budget.categoryId;
+        }
+
+        const spendingResult = await TransactionModel.aggregate([
+          { $match: matchQuery },
+          { $group: { _id: null, totalSpent: { $sum: '$amount' } } },
+        ]);
+
+        const spent = spendingResult[0]?.totalSpent || 0;
+        const remaining = Math.max(0, budget.amount - spent);
+        const percentageUsed = budget.amount > 0 ? Math.round((spent / budget.amount) * 100) : 0;
+        const threshold = budget.notificationThreshold || 80;
+
+        return {
+          ...budget,
+          startDate: windowStart,
+          endDate: windowEnd,
+          spent,
+          remaining,
+          percentageUsed,
+          isExceeded: spent > budget.amount,
+          isWarning: percentageUsed >= threshold && spent <= budget.amount,
+        };
+      })
+    );
 
     return results;
   }

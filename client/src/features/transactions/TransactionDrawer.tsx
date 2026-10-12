@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { X, Calendar, Tag, CreditCard, Mail, Trash2, Edit3, ShieldCheck, UserRound, ExternalLink } from 'lucide-react';
+import { X, Calendar, Tag, CreditCard, Mail, Trash2, Edit3, ShieldCheck, UserRound, ExternalLink, ArrowRightLeft, Building } from 'lucide-react';
 import { Person, Transaction } from '../../types/index.js';
 import { formatINR, formatDate, getConfidenceBadge } from '../../utils/format.js';
 import { Badge } from '../../components/ui/Badge.js';
@@ -28,6 +28,7 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
   onEdit,
 }) => {
   const categories = useAppSelector((state) => state.categories.categories);
+  const accounts = useAppSelector((state) => state.accounts.accounts);
   const [localTx, setLocalTx] = useState<Transaction | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
@@ -203,6 +204,39 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
                 {transaction.paymentMethod}
               </span>
             </div>
+
+            {displayedTx.type === 'transfer' ? (
+              <div className="flex items-center justify-between text-xs sm:text-sm">
+                <div className="flex items-center gap-2 text-slate-500">
+                  <ArrowRightLeft className="w-4 h-4 text-brand-500" />
+                  <span>Transfer Route</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                  <span className="truncate max-w-[110px]">
+                    {accounts.find((a) => a._id === (typeof displayedTx.accountId === 'object' ? displayedTx.accountId?._id : displayedTx.accountId))?.name ||
+                      (typeof displayedTx.accountId === 'object' ? (displayedTx.accountId as any)?.name : 'Source')}
+                  </span>
+                  <span className="text-brand-500 font-bold">&rarr;</span>
+                  <span className="truncate max-w-[110px]">
+                    {accounts.find((a) => a._id === (typeof displayedTx.destinationAccountId === 'object' ? displayedTx.destinationAccountId?._id : displayedTx.destinationAccountId))?.name ||
+                      (typeof displayedTx.destinationAccountId === 'object' ? (displayedTx.destinationAccountId as any)?.name : 'Destination')}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              Boolean(displayedTx.accountId) && (
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <Building className="w-4 h-4 text-sky-500" />
+                    <span>Account</span>
+                  </div>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {accounts.find((a) => a._id === (typeof displayedTx.accountId === 'object' ? displayedTx.accountId?._id : displayedTx.accountId))?.name ||
+                      (typeof displayedTx.accountId === 'object' ? (displayedTx.accountId as any)?.name : 'Linked Account')}
+                  </span>
+                </div>
+              )
+            )}
 
             {Boolean(transaction.vpa) && (
               <div className="flex items-center justify-between text-xs sm:text-sm">

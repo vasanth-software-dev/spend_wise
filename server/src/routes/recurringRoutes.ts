@@ -10,8 +10,10 @@ router.use(requireAuth);
 
 router.get('/', (req, res, next) => recurringController.getAll(req, res, next));
 router.get('/upcoming', (req, res, next) => recurringController.getUpcoming(req, res, next));
+router.post('/sync-reminders', (req, res, next) => recurringController.syncReminders(req, res, next));
 router.post('/', validate(createRecurringSchema), (req, res, next) => recurringController.create(req, res, next));
 router.patch('/:id', (req, res, next) => recurringController.update(req, res, next));
+router.post('/:id/process', (req, res, next) => recurringController.process(req, res, next));
 router.delete('/:id', (req, res, next) => recurringController.delete(req, res, next));
 
 export default router;

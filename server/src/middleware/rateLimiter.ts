@@ -1,10 +1,13 @@
 import rateLimit from 'express-rate-limit';
 
+const isTest = process.env.NODE_ENV === 'test';
+
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 1000, // Limit each IP to 1000 requests per 15 mins for development/smooth experience
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isTest,
   message: {
     success: false,
     message: 'Too many requests, please try again later.',
@@ -17,6 +20,7 @@ export const authLimiter = rateLimit({
   max: 50, // 50 attempts per 15 mins for auth routes
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isTest,
   message: {
     success: false,
     message: 'Too many login or registration attempts. Please try again after 15 minutes.',
@@ -36,6 +40,7 @@ export const webauthnLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isTest,
   message: {
     success: false,
     message: 'Too many biometric sign-in attempts. Please try again after 15 minutes.',
@@ -49,9 +54,26 @@ export const webauthnAuthenticatedLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isTest,
   message: {
     success: false,
     message: 'Too many biometric security changes. Please try again later.',
     code: 'WEBAUTHN_RATE_LIMIT_EXCEEDED',
+  },
+});
+
+/**
+ * Heavy export rate limiter to prevent denial-of-service from concurrent large CSV generations.
+ */
+export const heavyExportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => isTest,
+  message: {
+    success: false,
+    message: 'Export limit reached. Please wait a few moments before requesting another export.',
+    code: 'EXPORT_RATE_LIMIT_EXCEEDED',
   },
 });

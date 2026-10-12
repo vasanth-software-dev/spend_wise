@@ -7,6 +7,7 @@ import {
   Plus,
   RefreshCw,
   ChevronRight,
+  AlertCircle,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import {
@@ -93,8 +94,14 @@ export const DashboardPage: React.FC = () => {
     );
   }, [selectedMonth, selectedYear]);
 
+  const budgetAlerts = useMemo(() => {
+    return budgets.filter((b) => {
+      const pct = b.amount > 0 ? (b.spent / b.amount) * 100 : 0;
+      return pct >= 80;
+    });
+  }, [budgets]);
+
   useEffect(() => {
-    dispatch(fetchDashboardThunk({ timeRange, month: selectedMonth, year: selectedYear }));
     dispatch(fetchPendingDetectedThunk());
     dispatch(fetchUpcomingThunk());
     dispatch(fetchCategoriesThunk());
@@ -103,6 +110,10 @@ export const DashboardPage: React.FC = () => {
     dispatch(fetchDebtsThunk());
     dispatch(fetchCalendarUpcomingThunk(30));
     dispatch(fetchNetWorthThunk());
+  }, [dispatch]);
+
+  useEffect(() => {
+    dispatch(fetchDashboardThunk({ timeRange, month: selectedMonth, year: selectedYear }));
   }, [dispatch, timeRange, selectedMonth, selectedYear]);
 
   const handleRangeChange = (range: DashboardTimeRange) => {
@@ -360,6 +371,29 @@ export const DashboardPage: React.FC = () => {
       {/* Detected Transactions Review Center (Top priority if any pending) */}
       <DetectedTransactionReviewCenter />
 
+      {/* Active Budget Alerts Notice */}
+      {budgetAlerts.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-800 dark:text-amber-300 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <span className="p-1.5 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex-shrink-0">
+              <AlertCircle className="w-4 h-4" />
+            </span>
+            <div>
+              <span className="font-bold">Budget Spending Alert: </span>
+              <span>
+                {budgetAlerts.length} budget{budgetAlerts.length > 1 ? 's have' : ' has'} reached or exceeded 80% of limit ({budgetAlerts.map(b => b.name || 'Category').join(', ')}).
+              </span>
+            </div>
+          </div>
+          <Link
+            to="/budgets"
+            className="self-start sm:self-auto font-bold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 underline transition-colors whitespace-nowrap"
+          >
+            Review Budgets &rarr;
+          </Link>
+        </div>
+      )}
+
       {/* 4 Stat Cards - Financial Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {loading && !summary ? (
@@ -567,11 +601,8 @@ export const DashboardPage: React.FC = () => {
                   </Button>
                 </div>
               ) : (
-                recentTransactions.map((tx) => {
-                  const isExpense = tx.type === 'expense';
-
-                  return (
-                    <div
+                recentTransactions.map((tx) => (
+                  <div
                       key={tx._id}
                       onClick={() => setSelectedTx(tx)}
                       className="py-3 px-2 flex items-center justify-between hover:bg-slate-50/90 dark:hover:bg-slate-800/40 rounded-xl cursor-pointer transition-[background-color] duration-150 ease-out-expo group"
@@ -600,12 +631,14 @@ export const DashboardPage: React.FC = () => {
                       <div className="text-right flex-shrink-0 pl-3">
                         <span
                           className={`text-xs sm:text-sm font-extrabold tabular-financial font-mono ${
-                            isExpense
-                              ? 'text-slate-900 dark:text-white'
-                              : 'text-emerald-600 dark:text-emerald-400'
+                            tx.type === 'income'
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : tx.type === 'transfer'
+                              ? 'text-sky-600 dark:text-sky-400'
+                              : 'text-slate-900 dark:text-white'
                           }`}
                         >
-                          {isExpense ? '-' : '+'}
+                          {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '↔ ' : '-'}
                           {formatINR(tx.amount)}
                         </span>
                         <span className="block text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 mt-0.5 tracking-wider">
@@ -613,9 +646,8 @@ export const DashboardPage: React.FC = () => {
                         </span>
                       </div>
                     </div>
-                  );
-                })
-              )}
+                  ))
+                )}
             </div>
           </div>
 

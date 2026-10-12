@@ -116,6 +116,7 @@ export class TransactionController {
         startDate,
         endDate,
         categoryId,
+        accountId,
         type,
         paymentMethod,
         source,
@@ -135,6 +136,7 @@ export class TransactionController {
         startDate: startDate ? new Date(startDate as string) : undefined,
         endDate: endDate ? new Date(endDate as string) : undefined,
         categoryId: categoryId as string,
+        accountId: accountId as string,
         type: type as 'expense' | 'income' | 'transfer',
         paymentMethod: paymentMethod as string,
         source: source as string,
@@ -310,7 +312,9 @@ export class TransactionController {
         startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
         endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
         categoryId: req.query.categoryId as string,
+        accountId: req.query.accountId as string,
         type: req.query.type as 'expense' | 'income' | 'transfer',
+        search: req.query.search as string,
       });
 
       res.setHeader('Content-Type', 'text/csv');

@@ -32,46 +32,6 @@ import { CategorySelect } from '../../components/ui/CategorySelect.js';
 import { toast } from '../../components/ui/Toast.js';
 import { DetectedTransaction } from '../../types/index.js';
 
-// Default mock items for when pendingTransactions is empty, matching reference UI
-const DEFAULT_DEMO_ITEMS: DetectedTransaction[] = [
-  {
-    _id: 'demo-flagged-1',
-    userId: 'demo-user',
-    emailAccountId: 'acc-demo-1',
-    emailMessageId: 'msg-amazon-1299',
-    amount: 1299,
-    currency: 'INR',
-    merchant: 'Amazon India',
-    transactionDate: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    transactionType: 'expense',
-    upiReference: '426899120847',
-    sender: 'payments-noreply@google.com',
-    subject: 'You paid ₹1,299 to Amazon India using Google Pay',
-    confidenceScore: 96,
-    status: 'detected',
-    suggestedCategory: 'Shopping',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    _id: 'demo-flagged-2',
-    userId: 'demo-user',
-    emailAccountId: 'acc-demo-1',
-    emailMessageId: 'msg-swiggy-450',
-    amount: 450,
-    currency: 'INR',
-    merchant: 'Swiggy',
-    transactionDate: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    transactionType: 'expense',
-    upiReference: '426899120848',
-    sender: 'noreply@phonepe.com',
-    subject: 'Transaction Successful! Paid ₹450 to Swiggy',
-    confidenceScore: 92,
-    status: 'detected',
-    suggestedCategory: 'Food & Dining',
-    createdAt: new Date().toISOString(),
-  },
-];
-
 export const DetectedTransactionReviewCenter: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -80,7 +40,6 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
   );
   const categories = useAppSelector((state) => state.categories.categories);
 
-  const [demoItems, setDemoItems] = useState<DetectedTransaction[]>(DEFAULT_DEMO_ITEMS);
   const [isExpanded, setIsExpanded] = useState(false);
 
   const [editingItem, setEditingItem] = useState<DetectedTransaction | null>(null);
@@ -92,20 +51,22 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
   const [editNotes, setEditNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Active items: prioritize backend items, fallback to demo items if empty
-  const isReal = pendingTransactions.length > 0;
-  const activeItems = isReal ? pendingTransactions : demoItems;
-  const flaggedCount = activeItems.length;
-
-  const autoMatchedCount = 10;
-  const totalScanned = autoMatchedCount + flaggedCount;
-
   // Ensure categories are loaded
   useEffect(() => {
     if (categories.length === 0) {
       dispatch(fetchCategoriesThunk());
     }
   }, [dispatch, categories.length]);
+
+  // Only display review center when there are actual detected transactions requiring review
+  if (pendingTransactions.length === 0) {
+    return null;
+  }
+
+  const activeItems = pendingTransactions;
+  const flaggedCount = activeItems.length;
+  const autoMatchedCount = 0;
+  const totalScanned = flaggedCount;
 
   const getSelectedCategoryId = (tx: DetectedTransaction): string => {
     if (tx.categoryId) return String(tx.categoryId);
@@ -135,27 +96,16 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
   };
 
   const handleInlineCategoryChange = async (tx: DetectedTransaction, catId: string) => {
-    if (isReal) {
-      const selected = categories.find((c) => c._id === catId);
-      await dispatch(
-        updateDetectedThunk({
-          id: tx._id,
-          updates: {
-            categoryId: catId || null,
-            suggestedCategory: selected ? selected.name : undefined,
-          },
-        })
-      );
-    } else {
-      const selected = categories.find((c) => c._id === catId);
-      setDemoItems((prev) =>
-        prev.map((item) =>
-          item._id === tx._id
-            ? { ...item, categoryId: catId || undefined, suggestedCategory: selected?.name }
-            : item
-        )
-      );
-    }
+    const selected = categories.find((c) => c._id === catId);
+    await dispatch(
+      updateDetectedThunk({
+        id: tx._id,
+        updates: {
+          categoryId: catId || null,
+          suggestedCategory: selected ? selected.name : undefined,
+        },
+      })
+    );
   };
 
   const handleSaveEditOnly = async () => {
@@ -163,33 +113,17 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
     setIsSaving(true);
     try {
       const selected = categories.find((c) => c._id === editCategory);
-      if (isReal) {
-        await dispatch(
-          updateDetectedThunk({
-            id: editingItem._id,
-            updates: {
-              merchant: editMerchant,
-              amount: parseFloat(editAmount) || editingItem.amount,
-              categoryId: editCategory || null,
-              suggestedCategory: selected ? selected.name : undefined,
-            },
-          })
-        ).unwrap();
-      } else {
-        setDemoItems((prev) =>
-          prev.map((item) =>
-            item._id === editingItem._id
-              ? {
-                  ...item,
-                  merchant: editMerchant,
-                  amount: parseFloat(editAmount) || editingItem.amount,
-                  categoryId: editCategory || undefined,
-                  suggestedCategory: selected?.name,
-                }
-              : item
-          )
-        );
-      }
+      await dispatch(
+        updateDetectedThunk({
+          id: editingItem._id,
+          updates: {
+            merchant: editMerchant,
+            amount: parseFloat(editAmount) || editingItem.amount,
+            categoryId: editCategory || null,
+            suggestedCategory: selected ? selected.name : undefined,
+          },
+        })
+      ).unwrap();
       setEditingItem(null);
     } catch (err) {
       console.error('Failed to update detected transaction:', err);
@@ -202,22 +136,17 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
     if (!editingItem) return;
     setIsSaving(true);
     try {
-      if (isReal) {
-        await dispatch(
-          confirmDetectedThunk({
-            id: editingItem._id,
-            overrides: {
-              merchant: editMerchant,
-              amount: parseFloat(editAmount) || editingItem.amount,
-              categoryId: editCategory || undefined,
-              notes: editNotes || undefined,
-            },
-          })
-        ).unwrap();
-      } else {
-        setDemoItems((prev) => prev.filter((item) => item._id !== editingItem._id));
-        toast.success(`Verified and recorded ₹${editAmount} (${editMerchant})`);
-      }
+      await dispatch(
+        confirmDetectedThunk({
+          id: editingItem._id,
+          overrides: {
+            merchant: editMerchant,
+            amount: parseFloat(editAmount) || editingItem.amount,
+            categoryId: editCategory || undefined,
+            notes: editNotes || undefined,
+          },
+        })
+      ).unwrap();
       setEditingItem(null);
     } catch (err) {
       console.error('Failed to confirm detected transaction:', err);
@@ -227,45 +156,26 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
   };
 
   const handleConfirmCard = (tx: DetectedTransaction) => {
-    if (isReal) {
-      const catId = getSelectedCategoryId(tx);
-      dispatch(
-        confirmDetectedThunk({
-          id: tx._id,
-          overrides: catId ? { categoryId: catId } : undefined,
-        })
-      );
-    } else {
-      setDemoItems((prev) => prev.filter((item) => item._id !== tx._id));
-      toast.success(`Verified and recorded ₹${tx.amount} (${tx.merchant})`);
-    }
+    const catId = getSelectedCategoryId(tx);
+    dispatch(
+      confirmDetectedThunk({
+        id: tx._id,
+        overrides: catId ? { categoryId: catId } : undefined,
+      })
+    );
   };
 
   const handleRejectCard = (tx: DetectedTransaction) => {
-    if (isReal) {
-      dispatch(rejectDetectedThunk(tx._id));
-    } else {
-      setDemoItems((prev) => prev.filter((item) => item._id !== tx._id));
-      toast.info(`Dismissed transaction from ${tx.merchant}`);
-    }
+    dispatch(rejectDetectedThunk(tx._id));
   };
 
   const handleDuplicateCard = (tx: DetectedTransaction) => {
-    if (isReal) {
-      dispatch(markDuplicateDetectedThunk(tx._id));
-    } else {
-      setDemoItems((prev) => prev.filter((item) => item._id !== tx._id));
-      toast.info(`Marked as duplicate`);
-    }
+    dispatch(markDuplicateDetectedThunk(tx._id));
   };
 
   const handleClearAll = async () => {
     try {
-      if (isReal) {
-        await dispatch(rejectAllDetectedThunk(undefined)).unwrap();
-      } else {
-        setDemoItems([]);
-      }
+      await dispatch(rejectAllDetectedThunk(undefined)).unwrap();
       toast.success('Cleared all detected transactions');
       setShowClearModal(false);
       setIsExpanded(false);
@@ -276,15 +186,11 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
 
   const handleAcceptAll = async () => {
     try {
-      if (isReal) {
-        const items = pendingTransactions.map((tx) => ({
-          id: tx._id,
-          categoryId: getSelectedCategoryId(tx) || undefined,
-        }));
-        await dispatch(confirmAllDetectedThunk(items)).unwrap();
-      } else {
-        setDemoItems([]);
-      }
+      const items = pendingTransactions.map((tx) => ({
+        id: tx._id,
+        categoryId: getSelectedCategoryId(tx) || undefined,
+      }));
+      await dispatch(confirmAllDetectedThunk(items)).unwrap();
       toast.success(`Accepted all ${flaggedCount} transactions`);
       setShowAcceptModal(false);
       setIsExpanded(false);

@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { ScanLine, Zap, Check } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store/index.js';
 import { createTransactionThunk, updateTransactionThunk } from '../../store/slices/transactionSlice.js';
+import { createRecurringThunk } from '../../store/slices/recurringSlice.js';
 import { fetchDashboardThunk } from '../../store/slices/dashboardSlice.js';
+import { fetchAccountsThunk } from '../../store/slices/accountSlice.js';
 import { Modal } from '../../components/ui/Modal.js';
 import { Button } from '../../components/ui/Button.js';
 import { Input } from '../../components/ui/Input.js';
@@ -32,6 +34,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 }) => {
   const dispatch = useAppDispatch();
   const categories = useAppSelector((state) => state.categories.categories);
+  const accounts = useAppSelector((state) => state.accounts.accounts);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const isEditing = !!transaction;
@@ -41,6 +44,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [amount, setAmount] = useState('');
   const [merchant, setMerchant] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [accountId, setAccountId] = useState('');
+  const [destinationAccountId, setDestinationAccountId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi');
   const [date, setDate] = useState(initialDate);
   const [refNo, setRefNo] = useState('');
@@ -54,6 +59,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      if (accounts.length === 0) {
+        dispatch(fetchAccountsThunk());
+      }
       if (transaction) {
         setType(transaction.type);
         setAmount(String(transaction.amount));
@@ -63,6 +71,16 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             ? transaction.categoryId._id
             : (transaction.categoryId as string) || '';
         setCategoryId(catId);
+        const accId =
+          typeof transaction.accountId === 'object' && transaction.accountId !== null
+            ? (transaction.accountId as any)._id
+            : (transaction.accountId as string) || '';
+        setAccountId(accId);
+        const destAccId =
+          typeof transaction.destinationAccountId === 'object' && transaction.destinationAccountId !== null
+            ? (transaction.destinationAccountId as any)._id
+            : (transaction.destinationAccountId as string) || '';
+        setDestinationAccountId(destAccId);
         setPaymentMethod(transaction.paymentMethod || 'upi');
         setRefNo(transaction.refNo || transaction.externalTransactionId || '');
         setDate(
@@ -84,9 +102,20 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         // Pick default category for type
         const defaultCat = categories.find((c) => c.type === defaultType || c.type === 'both');
         if (defaultCat) setCategoryId(defaultCat._id);
+
+        // Pre-select default account if available
+        const defaultAcc = accounts.find((a) => a.isDefault);
+        if (defaultAcc) {
+          setAccountId(defaultAcc._id);
+        } else if (accounts.length > 0) {
+          setAccountId(accounts[0]._id);
+        } else {
+          setAccountId('');
+        }
+        setDestinationAccountId('');
       }
     }
-  }, [isOpen, transaction, defaultType, categories, initialDate]);
+  }, [isOpen, transaction, defaultType, categories, accounts, initialDate, dispatch]);
 
   const handleParseQuick = () => {
     if (!quickInput.trim()) return;
@@ -127,6 +156,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               amount: numAmount,
               currency: 'INR',
               categoryId: categoryId || null,
+              accountId: accountId || null,
+              destinationAccountId: type === 'transfer' ? destinationAccountId || null : null,
               merchant: merchant.trim(),
               paymentMethod,
               refNo: trimmedRef,
@@ -148,6 +179,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             amount: numAmount,
             currency: 'INR',
             categoryId: categoryId || undefined,
+            accountId: accountId || undefined,
+            destinationAccountId: type === 'transfer' ? destinationAccountId || undefined : undefined,
             merchant: merchant.trim(),
             paymentMethod,
             refNo: trimmedRef,
@@ -158,6 +191,26 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             isRecurring,
           })
         ).unwrap();
+
+        if (isRecurring) {
+          try {
+            await dispatch(
+              createRecurringThunk({
+                name: merchant.trim(),
+                amount: numAmount,
+                currency: 'INR',
+                type,
+                categoryId: categoryId || null,
+                merchant: merchant.trim(),
+                paymentMethod,
+                frequency: recurringFrequency,
+                startDate: new Date(date),
+              })
+            ).unwrap();
+          } catch {
+            // Silently continue if recurring record creation encounters a warning
+          }
+        }
 
         toast.success('Transaction recorded successfully');
         dispatch(fetchDashboardThunk('30d'));
@@ -414,36 +467,77 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           </div>
         </div>
 
-        {/* Payment Method & Date */}
+        {/* Linked Account & Payment Method / Destination */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-              Payment Method
+              Account {type === 'transfer' ? '(From)' : ''}
             </label>
             <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
               className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors shadow-2xs font-medium"
             >
-              {paymentMethods.map((pm) => (
-                <option key={pm.id} value={pm.id}>
-                  {pm.label}
+              <option value="">No account linked</option>
+              {accounts.map((acc) => (
+                <option key={acc._id} value={acc._id}>
+                  {acc.name} ({acc.type.toUpperCase()})
                 </option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-              Date
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors shadow-2xs font-medium"
-            />
-          </div>
+          {type === 'transfer' ? (
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                Destination Account (To)
+              </label>
+              <select
+                value={destinationAccountId}
+                onChange={(e) => setDestinationAccountId(e.target.value)}
+                className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors shadow-2xs font-medium"
+              >
+                <option value="">Select destination</option>
+                {accounts
+                  .filter((a) => a._id !== accountId)
+                  .map((acc) => (
+                    <option key={acc._id} value={acc._id}>
+                      {acc.name} ({acc.type.toUpperCase()})
+                    </option>
+                  ))}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                Payment Method
+              </label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors shadow-2xs font-medium"
+              >
+                {paymentMethods.map((pm) => (
+                  <option key={pm.id} value={pm.id}>
+                    {pm.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Date Field */}
+        <div>
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+            Date
+          </label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full py-2 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors shadow-2xs font-medium"
+          />
         </div>
 
         {/* Ref.No / Reference ID */}

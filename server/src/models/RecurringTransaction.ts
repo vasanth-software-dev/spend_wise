@@ -25,6 +25,9 @@ const recurringTransactionSchema = new Schema<IRecurringTransaction>(
     nextDueDate: { type: Date, required: true, index: true },
     lastProcessedDate: { type: Date, default: null },
     isActive: { type: Boolean, default: true, index: true },
+    isSubscription: { type: Boolean, default: false, index: true },
+    reminderDaysBefore: { type: Number, default: 3, min: 0, max: 30 },
+    lastReminderSentForDate: { type: Date, default: null },
   },
   {
     timestamps: true,

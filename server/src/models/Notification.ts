@@ -12,6 +12,7 @@ const notificationSchema = new Schema<INotification>(
         'detected_transaction',
         'budget_warning',
         'budget_exceeded',
+        'bill_reminder',
         'sync_completed',
         'sync_failed',
         'system',

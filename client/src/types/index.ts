@@ -44,6 +44,8 @@ export interface Transaction {
   paymentMethod: PaymentMethod;
   source: TransactionSource;
   sourceAccountId?: { _id: string; email: string; provider: string } | string | null;
+  accountId?: Account | string | null;
+  destinationAccountId?: Account | string | null;
   externalTransactionId?: string;
   refNo?: string;
   transactionDate: string;
@@ -155,7 +157,11 @@ export interface RecurringTransaction {
   startDate: string;
   endDate?: string | null;
   nextDueDate: string;
+  lastProcessedDate?: string | null;
   isActive: boolean;
+  isSubscription?: boolean;
+  reminderDaysBefore?: number;
+  lastReminderSentForDate?: string | null;
 }
 
 export type GoalStatus = 'active' | 'completed';

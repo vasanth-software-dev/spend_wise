@@ -37,10 +37,15 @@ export const CalendarPage: React.FC = () => {
 
   useEffect(() => {
     dispatch(fetchCalendarMonthThunk({ year: viewYear, month: viewMonth }));
-    dispatch(fetchCalendarDayThunk(selectedKey));
     dispatch(fetchCalendarUpcomingThunk(45));
     dispatch(fetchCategoriesThunk());
-  }, [dispatch, viewYear, viewMonth, selectedKey]);
+  }, [dispatch, viewYear, viewMonth]);
+
+  useEffect(() => {
+    if (selectedKey) {
+      dispatch(fetchCalendarDayThunk(selectedKey));
+    }
+  }, [dispatch, selectedKey]);
 
   const cells = useMemo(() => {
     const summaryMap: Record<string, CalendarDaySummary> = {};

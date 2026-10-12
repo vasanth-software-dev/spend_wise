@@ -11,6 +11,9 @@ import { DetectedTransactionModel } from './models/DetectedTransaction.js';
 import { NotificationModel } from './models/Notification.js';
 import { PersonModel } from './models/Person.js';
 import { AccountModel } from './models/Account.js';
+import { DebtModel, DebtPaymentModel } from './models/Debt.js';
+import { DebtCandidateModel } from './models/DebtCandidate.js';
+import { SessionModel } from './models/Session.js';
 import { hashPassword } from './utils/hash.js';
 import { categoryRepository, DEFAULT_SYSTEM_CATEGORIES } from './repositories/CategoryRepository.js';
 import { normalizePersonName } from './services/PersonService.js';
@@ -34,6 +37,10 @@ async function seed() {
     GoalModel.deleteMany({}),
     GoalContributionModel.deleteMany({}),
     AccountModel.deleteMany({}),
+    DebtModel.deleteMany({}),
+    DebtPaymentModel.deleteMany({}),
+    DebtCandidateModel.deleteMany({}),
+    SessionModel.deleteMany({}),
   ]);
 
   try {

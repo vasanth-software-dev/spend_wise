@@ -377,7 +377,7 @@ export function calculateMonthlyComparison(
  */
 export function calculateBudgetPacing(
   budget: Budget,
-  transactions: Transaction[],
+  transactions?: Transaction[],
   now = new Date()
 ): BudgetPacing {
   const currentMonth = now.getMonth();
@@ -385,19 +385,23 @@ export function calculateBudgetPacing(
   const currentDay = now.getDate();
   const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
 
-  // Find confirmed expenses for this budget category this month
-  const targetCatId = typeof budget.categoryId === 'object' && budget.categoryId ? budget.categoryId._id : (budget.categoryId as string);
-
-  const spent = transactions
-    .filter((tx) => {
-      if (tx.type !== 'expense' || tx.status === 'ignored') return false;
-      const d = new Date(tx.transactionDate);
-      if (d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) return false;
-      if (!targetCatId) return true; // overall budget if no category
-      const txCatId = typeof tx.categoryId === 'object' && tx.categoryId ? tx.categoryId._id : (tx.categoryId as string);
-      return txCatId === targetCatId;
-    })
-    .reduce((sum, tx) => addMoney(sum, tx.amount), 0);
+  // If transactions are provided and non-empty, use them; otherwise use pre-aggregated budget.spent
+  let spent = 0;
+  if (transactions && transactions.length > 0) {
+    const targetCatId = typeof budget.categoryId === 'object' && budget.categoryId ? budget.categoryId._id : (budget.categoryId as string);
+    spent = transactions
+      .filter((tx) => {
+        if (tx.type !== 'expense' || tx.status === 'ignored') return false;
+        const d = new Date(tx.transactionDate);
+        if (d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) return false;
+        if (!targetCatId) return true; // overall budget if no category
+        const txCatId = typeof tx.categoryId === 'object' && tx.categoryId ? tx.categoryId._id : (tx.categoryId as string);
+        return txCatId === targetCatId;
+      })
+      .reduce((sum, tx) => addMoney(sum, tx.amount), 0);
+  } else if (budget.spent !== undefined && budget.spent !== null) {
+    spent = Number(budget.spent) || 0;
+  }
 
   const remaining = subtractMoney(budget.amount, spent);
   const percentageUsed = budget.amount > 0 ? Math.round((spent / budget.amount) * 1000) / 10 : 0;

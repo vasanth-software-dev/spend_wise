@@ -459,7 +459,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   );
 
   // Revoke every temporary URL and tear down the OCR worker when the modal
-  // unmounts, so nothing survives the session in memory.
+  // closes or unmounts, so nothing survives the session in memory.
   useEffect(() => {
     if (!isOpen) {
       releaseSession();
@@ -469,6 +469,13 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       setStep('capture');
       setMode('upload');
     }
+
+    return () => {
+      releaseSession();
+      disposeOCRProviders(providersRef.current || []).then(() => {
+        providersRef.current = null;
+      });
+    };
   }, [isOpen, releaseSession]);
 
   const unreadCount = Object.values(lowConfidence).filter(Boolean).length;

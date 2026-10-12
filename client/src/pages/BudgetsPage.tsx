@@ -12,6 +12,7 @@ import { fetchCategoriesThunk } from '../store/slices/categorySlice.js';
 import { Card } from '../components/ui/Card.js';
 import { Button } from '../components/ui/Button.js';
 import { Modal } from '../components/ui/Modal.js';
+import { ConfirmModal } from '../components/ui/ConfirmModal.js';
 import { Input } from '../components/ui/Input.js';
 import { Badge } from '../components/ui/Badge.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
@@ -26,7 +27,6 @@ export const BudgetsPage: React.FC = () => {
   const navigate = useNavigate();
   const budgets = useAppSelector((state) => state.budgets.budgets);
   const categories = useAppSelector((state) => state.categories.categories);
-  const transactions = useAppSelector((state) => state.transactions.transactions);
   const summary = useAppSelector((state) => state.dashboard.summary);
   const loading = useAppSelector((state) => state.budgets.loading);
 
@@ -36,6 +36,7 @@ export const BudgetsPage: React.FC = () => {
   const [categoryId, setCategoryId] = useState('');
   const [threshold, setThreshold] = useState('80');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [budgetToDelete, setBudgetToDelete] = useState<any | null>(null);
 
   useEffect(() => {
     dispatch(fetchBudgetsThunk());
@@ -110,11 +111,11 @@ export const BudgetsPage: React.FC = () => {
       {/* Aggregate Overview KPI Banner */}
       {budgets.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card className="p-4 bg-slate-900/40 border-slate-800">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <Card className="p-4 bg-white dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 shadow-fintech">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Total Balance
             </span>
-            <div className="text-2xl font-extrabold text-white font-mono tabular-financial mt-1">
+            <div className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono tabular-financial mt-1">
               {formatINR(aggregate.totalBalance)}
             </div>
             <span className="text-xs text-slate-500 mt-0.5 block">
@@ -122,11 +123,11 @@ export const BudgetsPage: React.FC = () => {
             </span>
           </Card>
 
-          <Card className="p-4 bg-slate-900/40 border-slate-800">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <Card className="p-4 bg-white dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 shadow-fintech">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Total Budget Pool
             </span>
-            <div className="text-2xl font-extrabold text-white font-mono tabular-financial mt-1">
+            <div className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono tabular-financial mt-1">
               {formatINR(aggregate.totalBudget)}
             </div>
             <span className="text-xs text-slate-500 mt-0.5 block">
@@ -134,25 +135,25 @@ export const BudgetsPage: React.FC = () => {
             </span>
           </Card>
 
-          <Card className="p-4 bg-slate-900/40 border-slate-800">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <Card className="p-4 bg-white dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 shadow-fintech">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Total Spent So Far
             </span>
-            <div className="text-2xl font-extrabold text-rose-400 font-mono tabular-financial mt-1">
+            <div className="text-2xl font-extrabold text-rose-500 font-mono tabular-financial mt-1">
               {formatINR(aggregate.totalSpent)}
             </div>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xs font-semibold text-slate-400">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                 {aggregate.overallPercentage}% allocated
               </span>
             </div>
           </Card>
 
-          <Card className="p-4 bg-slate-900/40 border-slate-800">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <Card className="p-4 bg-white dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 shadow-fintech">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Discretionary Remaining
             </span>
-            <div className="text-2xl font-extrabold text-emerald-400 font-mono tabular-financial mt-1">
+            <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono tabular-financial mt-1">
               {formatINR(aggregate.totalRemaining)}
             </div>
             <span className="text-xs text-slate-500 mt-0.5 block">
@@ -160,11 +161,11 @@ export const BudgetsPage: React.FC = () => {
             </span>
           </Card>
 
-          <Card className="p-4 bg-slate-900/40 border-slate-800">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <Card className="p-4 bg-white dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 shadow-fintech">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Unbudgeted Balance
             </span>
-            <div className="text-2xl font-extrabold text-amber-400 font-mono tabular-financial mt-1">
+            <div className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 font-mono tabular-financial mt-1">
               {formatINR(aggregate.unbudgetedBalance)}
             </div>
             <span className="text-xs text-slate-500 mt-0.5 block">
@@ -172,29 +173,29 @@ export const BudgetsPage: React.FC = () => {
             </span>
           </Card>
 
-          <Card className="p-4 bg-slate-900/40 border-slate-800">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <Card className="p-4 bg-white dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 shadow-fintech">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Health Status
             </span>
-            <div className="text-lg font-bold text-white mt-1.5 flex items-center gap-2">
+            <div className="text-lg font-bold text-slate-900 dark:text-white mt-1.5 flex items-center gap-2">
               {aggregate.overBudgetCount > 0 ? (
                 <>
                   <AlertTriangle className="w-5 h-5 text-rose-500 flex-shrink-0" />
-                  <span className="text-rose-400 text-sm font-semibold">
+                  <span className="text-rose-500 text-sm font-semibold">
                     {aggregate.overBudgetCount} exceeded
                   </span>
                 </>
               ) : aggregate.warningCount > 0 ? (
                 <>
                   <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                  <span className="text-amber-400 text-sm font-semibold">
+                  <span className="text-amber-600 dark:text-amber-400 text-sm font-semibold">
                     {aggregate.warningCount} near threshold
                   </span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                  <span className="text-emerald-400 text-sm font-semibold">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
+                  <span className="text-emerald-600 dark:text-emerald-400 text-sm font-semibold">
                     All budgets on track
                   </span>
                 </>
@@ -225,7 +226,7 @@ export const BudgetsPage: React.FC = () => {
                 : null;
 
             const percentage = Math.min(100, b.percentageUsed);
-            const pacing = calculateBudgetPacing(b, transactions);
+            const pacing = calculateBudgetPacing(b);
 
             return (
               <Card key={b._id} interactive className="p-5 sm:p-6 flex flex-col justify-between group">
@@ -308,16 +309,16 @@ export const BudgetsPage: React.FC = () => {
                   {/* Spending Pace & Projected Overrun Note */}
                   <div className={`mt-4 p-2.5 rounded-xl border text-xs flex items-start gap-2 ${
                     pacing.isPaceExceeding
-                      ? 'bg-rose-500/10 border-rose-500/20 text-rose-300'
-                      : 'bg-slate-850/60 border-white/5 text-slate-400'
+                      ? 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-300'
+                      : 'bg-slate-50 dark:bg-slate-850/60 border-slate-200/60 dark:border-white/5 text-slate-600 dark:text-slate-400'
                   }`}>
                     {pacing.isPaceExceeding ? (
-                      <TrendingUp className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+                      <TrendingUp className="w-4 h-4 text-rose-500 dark:text-rose-400 flex-shrink-0 mt-0.5" />
                     ) : (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
                     )}
                     <div className="leading-snug">
-                      <span className="font-semibold text-white">
+                      <span className="font-semibold text-slate-900 dark:text-white">
                         {pacing.isPaceExceeding ? 'Pacing Alert: ' : 'Pace: '}
                       </span>
                       {pacing.paceMessage}
@@ -343,11 +344,7 @@ export const BudgetsPage: React.FC = () => {
                   </div>
 
                   <button
-                    onClick={() => {
-                      if (confirm(`Delete budget "${b.name}"?`)) {
-                        dispatch(deleteBudgetThunk(b._id));
-                      }
-                    }}
+                    onClick={() => setBudgetToDelete(b)}
                     className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-500/10"
                     title="Delete budget"
                     aria-label="Delete budget"
@@ -441,6 +438,20 @@ export const BudgetsPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={!!budgetToDelete}
+        title="Delete Budget"
+        message={`Are you sure you want to delete "${budgetToDelete?.name}"? You will no longer receive threshold alerts for this category.`}
+        confirmText="Delete Budget"
+        onConfirm={() => {
+          if (budgetToDelete) {
+            dispatch(deleteBudgetThunk(budgetToDelete._id));
+            setBudgetToDelete(null);
+          }
+        }}
+        onCancel={() => setBudgetToDelete(null)}
+      />
     </div>
   );
 };

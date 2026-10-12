@@ -530,7 +530,9 @@ export const SettingsPage: React.FC = () => {
                 return (
                   <div
                     key={c._id}
-                    className="p-3.5 rounded-2xl border transition-all duration-200 flex items-center gap-3.5 group hover:scale-[1.02] shadow-2xs relative overflow-hidden"
+                    onClick={() => navigate(`/transactions?categoryId=${c._id}`)}
+                    className="p-3.5 rounded-2xl border transition-all duration-200 flex items-center gap-3.5 group hover:scale-[1.02] shadow-2xs relative overflow-hidden cursor-pointer"
+                    title={`View all transactions for ${c.name}`}
                     style={{
                       backgroundColor: `${meta.color}0a`,
                       borderColor: `${meta.color}25`,

@@ -10,6 +10,7 @@ import { CategoryBreakdownItem } from '../../types/index.js';
 import { formatINR } from '../../utils/format.js';
 import { useAppSelector } from '../../store/index.js';
 import { resolveCategoryMeta } from '../../constants/categories.js';
+import { useNavigate } from 'react-router-dom';
 
 interface CategoryBreakdownChartProps {
   data: CategoryBreakdownItem[];
@@ -20,6 +21,7 @@ const DEFAULT_COLORS = [
 ];
 
 export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ data }) => {
+  const navigate = useNavigate();
   const categories = useAppSelector((state) => state.categories?.categories);
 
   const getEntryColor = (entry: CategoryBreakdownItem, index: number) => {
@@ -103,9 +105,9 @@ export const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({ 
               key={item._id || index}
               onClick={() => {
                 if (item._id && item._id !== 'uncategorized') {
-                  window.location.href = `/transactions?categoryId=${item._id}`;
+                  navigate(`/transactions?categoryId=${item._id}`);
                 } else {
-                  window.location.href = '/transactions';
+                  navigate('/transactions');
                 }
               }}
               className="space-y-1 group cursor-pointer p-1.5 rounded-lg hover:bg-slate-100/60 dark:hover:bg-slate-800/40 transition-colors"

@@ -33,6 +33,7 @@ import { fetchCategoriesThunk } from '../store/slices/categorySlice.js';
 import { Card } from '../components/ui/Card.js';
 import { Button } from '../components/ui/Button.js';
 import { Modal } from '../components/ui/Modal.js';
+import { ConfirmModal } from '../components/ui/ConfirmModal.js';
 import { Input } from '../components/ui/Input.js';
 import { Badge } from '../components/ui/Badge.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
@@ -63,6 +64,7 @@ export const EmailSyncPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const [searchParams] = useSearchParams();
   const { accounts, isSyncing } = useAppSelector((state) => state.emailAccounts);
+  const [accountToRemove, setAccountToRemove] = useState<any | null>(null);
   const { user } = useAppSelector((state) => state.auth);
 
   const currentDate = new Date();
@@ -549,11 +551,7 @@ export const EmailSyncPage: React.FC = () => {
                       )}
 
                       <button
-                        onClick={() => {
-                          if (confirm(`Remove email account ${acc.email}?`)) {
-                            dispatch(removeAccountThunk(acc._id));
-                          }
-                        }}
+                        onClick={() => setAccountToRemove(acc)}
                         title="Remove account"
                         className="p-2 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
                       >
@@ -860,6 +858,20 @@ export const EmailSyncPage: React.FC = () => {
           )}
         </div>
       </Modal>
+
+      <ConfirmModal
+        isOpen={!!accountToRemove}
+        title="Remove Email Account"
+        message={`Are you sure you want to remove "${accountToRemove?.email}"? Inbound forwarding and automated email receipt syncing will be stopped for this account.`}
+        confirmText="Remove Account"
+        onConfirm={() => {
+          if (accountToRemove) {
+            dispatch(removeAccountThunk(accountToRemove._id));
+            setAccountToRemove(null);
+          }
+        }}
+        onCancel={() => setAccountToRemove(null)}
+      />
     </div>
   );
 };

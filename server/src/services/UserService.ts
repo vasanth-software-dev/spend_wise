@@ -9,6 +9,11 @@ import { NotificationModel } from '../models/Notification.js';
 import { SessionModel } from '../models/Session.js';
 import { AuditLogModel } from '../models/AuditLog.js';
 import { WebAuthnCredentialModel } from '../models/WebAuthnCredential.js';
+import { AccountModel } from '../models/Account.js';
+import { DebtModel, DebtPaymentModel } from '../models/Debt.js';
+import { DebtCandidateModel } from '../models/DebtCandidate.js';
+import { PersonModel } from '../models/Person.js';
+import { GoalModel, GoalContributionModel } from '../models/Goal.js';
 import { auditLogRepository } from '../repositories/AuditLogRepository.js';
 import { GmailProvider } from '../providers/gmail/GmailProvider.js';
 import { IUser } from '../types/index.js';
@@ -44,6 +49,13 @@ export class UserService {
       }
     }
 
+    // Find all debt IDs and goal IDs for this user to delete their child payments/contributions
+    const userDebts = await DebtModel.find({ userId: userObjId }).select('_id').lean();
+    const debtIds = userDebts.map((d) => d._id);
+
+    const userGoals = await GoalModel.find({ userId: userObjId }).select('_id').lean();
+    const goalIds = userGoals.map((g) => g._id);
+
     // 2. Cascade delete all user records
     await Promise.all([
       TransactionModel.deleteMany({ userId: userObjId }),
@@ -56,6 +68,13 @@ export class UserService {
       SessionModel.deleteMany({ userId: userObjId }),
       // Passkeys are personal security material; they must not outlive the account.
       WebAuthnCredentialModel.deleteMany({ userId: userObjId }),
+      AccountModel.deleteMany({ userId: userObjId }),
+      DebtModel.deleteMany({ userId: userObjId }),
+      DebtPaymentModel.deleteMany({ debtId: { $in: debtIds } }),
+      DebtCandidateModel.deleteMany({ userId: userObjId }),
+      PersonModel.deleteMany({ userId: userObjId }),
+      GoalModel.deleteMany({ userId: userObjId }),
+      GoalContributionModel.deleteMany({ goalId: { $in: goalIds } }),
     ]);
 
     await auditLogRepository.log({

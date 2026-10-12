@@ -2,12 +2,14 @@ import { TransactionModel } from '../models/Transaction.js';
 import { ITransaction } from '../types/index.js';
 import { Types } from 'mongoose';
 import { buildRefNoQueryPattern } from '../utils/referenceNumber.js';
+import '../models/Account.js';
 
 export interface TransactionFilterParams {
   userId: string;
   startDate?: Date;
   endDate?: Date;
   categoryId?: string;
+  accountId?: string;
   type?: 'expense' | 'income' | 'transfer';
   paymentMethod?: string;
   source?: string;
@@ -148,6 +150,21 @@ export class TransactionRepository {
       query.$or = searchOr;
     }
 
+    if (params.accountId) {
+      const accId = new Types.ObjectId(params.accountId);
+      const accountMatch = [
+        { accountId: accId },
+        { destinationAccountId: accId },
+      ];
+      if (query.$or) {
+        const existingOr = query.$or;
+        delete query.$or;
+        query.$and = [{ $or: existingOr }, { $or: accountMatch }];
+      } else {
+        query.$or = accountMatch;
+      }
+    }
+
     const sortField = params.sortBy || 'transactionDate';
     const sortDirection = params.sortOrder === 'asc' ? 1 : -1;
 
@@ -159,6 +176,8 @@ export class TransactionRepository {
         .populate('categoryId')
         .populate('personId', 'name vpa email')
         .populate('sourceAccountId', 'email provider')
+        .populate('accountId', 'name type')
+        .populate('destinationAccountId', 'name type')
         .lean(),
       TransactionModel.countDocuments(query),
     ]);
@@ -439,13 +458,14 @@ export class TransactionRepository {
     });
   }
 
-  // Payment method distribution aggregation
-  async getPaymentMethodDistribution(userId: string, startDate: Date, endDate: Date) {
+  // Payment method distribution aggregation (defaults to expense outflows)
+  async getPaymentMethodDistribution(userId: string, startDate: Date, endDate: Date, type: 'expense' | 'income' = 'expense') {
     return TransactionModel.aggregate([
       {
         $match: {
           userId: new Types.ObjectId(userId),
           status: 'confirmed',
+          type,
           transactionDate: { $gte: startDate, $lte: endDate },
         },
       },
@@ -512,6 +532,8 @@ export class TransactionRepository {
       .sort({ transactionDate: 1, createdAt: 1 })
       .populate('categoryId', 'name icon color type')
       .populate('sourceAccountId', 'email provider')
+      .populate('accountId', 'name type')
+      .populate('destinationAccountId', 'name type')
       .lean();
   }
 

@@ -21,6 +21,8 @@ import { api } from '../../services/api.js';
 import { useAppDispatch, useAppSelector } from '../../store/index.js';
 import { fetchTransactionsThunk } from '../../store/slices/transactionSlice.js';
 import { fetchDashboardThunk } from '../../store/slices/dashboardSlice.js';
+import { fetchBudgetsThunk } from '../../store/slices/budgetSlice.js';
+import { fetchDebtsThunk, fetchDebtSummaryThunk } from '../../store/slices/debtSlice.js';
 import {
   parseStatementFile,
   ParsedTransaction,
@@ -159,7 +161,11 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
       ) {
         setFile(selectedFile);
         setNeedsPassword(true);
-        setError('This PDF bank statement is password-protected. Please enter your password below to unlock.');
+        if (password) {
+          setError('Incorrect PDF password. Please verify and re-enter your password (e.g. PAN number or DOB).');
+        } else {
+          setError('This PDF bank statement is password-protected. Please enter your password below to unlock.');
+        }
       } else {
         setError(`Failed to parse file: ${errMsg}`);
       }
@@ -319,6 +325,11 @@ export const StatementImportModal: React.FC<StatementImportModalProps> = ({
       setResult(res.data.data);
       dispatch(fetchTransactionsThunk(undefined));
       dispatch(fetchDashboardThunk('30d'));
+      dispatch(fetchBudgetsThunk());
+      if ((res.data?.data?.debtCandidateCount ?? 0) > 0) {
+        dispatch(fetchDebtsThunk());
+        dispatch(fetchDebtSummaryThunk());
+      }
       setIsImporting(false);
     } catch (err: any) {
       setError(

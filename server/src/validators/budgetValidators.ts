@@ -33,5 +33,7 @@ export const createRecurringSchema = z.object({
     frequency: z.enum(['daily', 'weekly', 'monthly', 'yearly']).default('monthly'),
     startDate: z.string().or(z.date()),
     endDate: z.string().or(z.date()).nullable().optional(),
+    isSubscription: z.boolean().optional(),
+    reminderDaysBefore: z.coerce.number().min(0).max(30).optional(),
   }),
 });

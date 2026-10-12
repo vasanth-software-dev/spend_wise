@@ -6,7 +6,7 @@ import {
   fetchGoalsThunk,
 } from '../store/slices/goalSlice.js';
 import { fetchCategoriesThunk } from '../store/slices/categorySlice.js';
-import { fetchAccountsThunk } from '../store/slices/emailAccountSlice.js';
+import { fetchAccountsThunk } from '../store/slices/accountSlice.js';
 import { Button } from '../components/ui/Button.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
 import { StatCardSkeleton } from '../components/ui/Skeleton.js';

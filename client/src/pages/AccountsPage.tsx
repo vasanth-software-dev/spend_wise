@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Landmark,
@@ -11,7 +12,9 @@ import {
   ShieldCheck,
   ArrowUpRight,
   ArrowDownRight,
+  ArrowRight,
   Building,
+  AlertCircle,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/index.js';
 import {
@@ -24,6 +27,7 @@ import {
 import { Card } from '../components/ui/Card.js';
 import { Button } from '../components/ui/Button.js';
 import { Modal } from '../components/ui/Modal.js';
+import { ConfirmModal } from '../components/ui/ConfirmModal.js';
 import { Input } from '../components/ui/Input.js';
 import { Badge } from '../components/ui/Badge.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
@@ -38,6 +42,7 @@ export const AccountsPage: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -45,6 +50,7 @@ export const AccountsPage: React.FC = () => {
   const [balance, setBalance] = useState('');
   const [institutionName, setInstitutionName] = useState('');
   const [accountNumberMasked, setAccountNumberMasked] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -59,6 +65,7 @@ export const AccountsPage: React.FC = () => {
     setBalance('0');
     setInstitutionName('');
     setAccountNumberMasked('');
+    setFormError(null);
     setIsModalOpen(true);
   };
 
@@ -66,19 +73,29 @@ export const AccountsPage: React.FC = () => {
     setEditingAccount(acc);
     setName(acc.name);
     setType(acc.type);
-    setBalance(String(acc.balance));
+    setBalance(String(acc.type === 'credit_card' ? Math.abs(acc.balance) : acc.balance));
     setInstitutionName(acc.institutionName || '');
     setAccountNumberMasked(acc.accountNumberMasked || '');
+    setFormError(null);
     setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     const numBalance = parseFloat(balance);
-    if (!name.trim() || isNaN(numBalance)) return;
+    if (!name.trim()) {
+      setFormError('Account name is required.');
+      return;
+    }
+    if (isNaN(numBalance)) {
+      setFormError('Please enter a valid numeric balance.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
+      const finalBalance = type === 'credit_card' ? Math.abs(numBalance) : numBalance;
       if (editingAccount) {
         await dispatch(
           updateAccountThunk({
@@ -86,7 +103,7 @@ export const AccountsPage: React.FC = () => {
             data: {
               name: name.trim(),
               type,
-              balance: numBalance,
+              balance: finalBalance,
               institutionName: institutionName.trim() || undefined,
               accountNumberMasked: accountNumberMasked.trim() || undefined,
             },
@@ -97,22 +114,26 @@ export const AccountsPage: React.FC = () => {
           createAccountThunk({
             name: name.trim(),
             type,
-            balance: numBalance,
+            balance: finalBalance,
             institutionName: institutionName.trim() || undefined,
             accountNumberMasked: accountNumberMasked.trim() || undefined,
           })
         ).unwrap();
       }
       setIsModalOpen(false);
+    } catch (err: any) {
+      setFormError(
+        typeof err === 'string'
+          ? err
+          : err?.message || 'Failed to save account. Please try again.'
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = (acc: Account) => {
-    if (confirm(`Delete account "${acc.name}"? This will not affect past transaction history.`)) {
-      dispatch(deleteAccountThunk(acc._id));
-    }
+    setAccountToDelete(acc);
   };
 
   const getAccountIcon = (accType: AccountType) => {
@@ -194,37 +215,37 @@ export const AccountsPage: React.FC = () => {
           </p>
         </Card>
 
-        <Card className="p-6 bg-slate-900/40 border-slate-800 flex flex-col justify-between">
+        <Card className="p-6 bg-white dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between shadow-fintech">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Total Assets
               </span>
-              <ArrowUpRight className="w-4 h-4 text-emerald-400" />
+              <ArrowUpRight className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono tabular-financial text-emerald-400 mt-3">
+            <div className="text-2xl sm:text-3xl font-extrabold font-mono tabular-financial text-emerald-600 dark:text-emerald-400 mt-3">
               {formatINR(totalAssets)}
             </div>
           </div>
-          <div className="text-xs text-slate-400 flex items-center justify-between pt-3 border-t border-slate-800">
+          <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
             <span>Bank: {formatINR(netWorthSummary?.assetsBreakdown.bank || 0)}</span>
             <span>Cash/Wallet: {formatINR((netWorthSummary?.assetsBreakdown.cash || 0) + (netWorthSummary?.assetsBreakdown.wallet || 0))}</span>
           </div>
         </Card>
 
-        <Card className="p-6 bg-slate-900/40 border-slate-800 flex flex-col justify-between">
+        <Card className="p-6 bg-white dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between shadow-fintech">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Total Liabilities
               </span>
-              <ArrowDownRight className="w-4 h-4 text-rose-400" />
+              <ArrowDownRight className="w-4 h-4 text-rose-500 dark:text-rose-400" />
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono tabular-financial text-rose-400 mt-3">
+            <div className="text-2xl sm:text-3xl font-extrabold font-mono tabular-financial text-rose-500 mt-3">
               {formatINR(totalLiabilities)}
             </div>
           </div>
-          <div className="text-xs text-slate-400 flex items-center justify-between pt-3 border-t border-slate-800">
+          <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
             <span>Cards: {formatINR(netWorthSummary?.liabilitiesBreakdown.creditCards || 0)}</span>
             <span>Debts Owed: {formatINR(netWorthSummary?.liabilitiesBreakdown.debtsOwed || 0)}</span>
           </div>
@@ -344,6 +365,13 @@ export const AccountsPage: React.FC = () => {
         description="Configure account name, type, and current balance for balance sheet reconciliation."
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {formError && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2 text-xs text-rose-500">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
+
           <Input
             label="Account Name"
             placeholder="e.g. HDFC Salary Account, SBI Credit Card, Cash in Hand"
@@ -371,15 +399,22 @@ export const AccountsPage: React.FC = () => {
               </select>
             </div>
 
-            <Input
-              label="Current Balance (INR)"
-              type="number"
-              step="any"
-              placeholder="e.g. 42850 (or negative for credit card outstanding)"
-              value={balance}
-              onChange={(e) => setBalance(e.target.value)}
-              required
-            />
+            <div>
+              <Input
+                label={type === 'credit_card' ? 'Current Outstanding (INR)' : 'Current Balance (INR)'}
+                type="number"
+                step="any"
+                placeholder={type === 'credit_card' ? 'e.g. 15000' : 'e.g. 42850'}
+                value={balance}
+                onChange={(e) => setBalance(e.target.value)}
+                required
+              />
+              {type === 'credit_card' && (
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Enter current outstanding due balance.
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -415,6 +450,20 @@ export const AccountsPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={!!accountToDelete}
+        title="Delete Account"
+        message={`Are you sure you want to delete "${accountToDelete?.name}"? This will remove the account from your dashboard, but will not affect past transaction history.`}
+        confirmText="Delete Account"
+        onConfirm={() => {
+          if (accountToDelete) {
+            dispatch(deleteAccountThunk(accountToDelete._id));
+            setAccountToDelete(null);
+          }
+        }}
+        onCancel={() => setAccountToDelete(null)}
+      />
     </div>
   );
 };
@@ -427,6 +476,7 @@ interface AccountCardProps {
 }
 
 const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete, icon }) => {
+  const navigate = useNavigate();
   const isCreditCard = account.type === 'credit_card';
   const isNegative = account.balance < 0;
 
@@ -435,14 +485,14 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete, ic
       <div>
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-800/70 border border-white/5 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800/70 border border-slate-200/60 dark:border-white/5 flex items-center justify-center flex-shrink-0">
               {icon}
             </div>
             <div>
               <h4 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
                 {account.name}
               </h4>
-              <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
+              <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                 {account.institutionName && <span>{account.institutionName}</span>}
                 {account.accountNumberMasked && (
                   <>
@@ -460,36 +510,48 @@ const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete, ic
         </div>
 
         <div className="mt-5">
-          <span className="text-xs text-slate-400 uppercase font-semibold">
+          <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">
             {isCreditCard ? 'Outstanding Balance' : 'Available Balance'}
           </span>
           <div
             className={`text-2xl font-extrabold font-mono tabular-financial mt-0.5 ${
-              isCreditCard || isNegative ? 'text-rose-400' : 'text-emerald-400'
+              isCreditCard || isNegative ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'
             }`}
           >
-            {formatINR(account.balance)}
+            {formatINR(isCreditCard ? Math.abs(account.balance) : account.balance)}
           </div>
         </div>
       </div>
 
-      <div className="mt-5 pt-3 border-t border-slate-800/60 flex items-center justify-end gap-1">
+      <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between gap-1">
         <button
           type="button"
-          onClick={onEdit}
-          className="p-1.5 text-slate-400 hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-800"
-          title="Edit account"
+          onClick={() => navigate(`/transactions?accountId=${account._id}`)}
+          className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 flex items-center gap-1 transition-colors px-1 py-1 rounded-md"
+          title={`View ledger for ${account.name}`}
         >
-          <Edit2 className="w-3.5 h-3.5" />
+          <span>View Ledger</span>
+          <ArrowRight className="w-3.5 h-3.5" />
         </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors rounded-lg hover:bg-rose-500/10"
-          title="Delete account"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+            title="Edit account"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors rounded-lg hover:bg-rose-500/10"
+            title="Delete account"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
     </Card>
   );

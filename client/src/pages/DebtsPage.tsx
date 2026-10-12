@@ -8,6 +8,7 @@ import {
   recordPaymentThunk,
 } from '../store/slices/debtSlice.js';
 import { Button } from '../components/ui/Button.js';
+import { Modal } from '../components/ui/Modal.js';
 import { toast } from '../components/ui/Toast.js';
 import { api } from '../services/api.js';
 import type { Debt } from '../types/index.js';
@@ -48,6 +49,8 @@ export const DebtsPage: React.FC = () => {
   const [payOpen, setPayOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [settleConfirmOpen, setSettleConfirmOpen] = useState(false);
+  const [settling, setSettling] = useState(false);
 
   useEffect(() => {
     dispatch(fetchDebtsThunk());
@@ -129,10 +132,7 @@ export const DebtsPage: React.FC = () => {
     if (!shown) return;
     const remaining = getDebtRemaining(shown);
     if (remaining <= 0) return;
-    const ok = confirm(
-      `Mark debt with ${shown.personName} as settled (${remaining.toLocaleString('en-IN')} remaining)? This records a final payment.`
-    );
-    if (!ok) return;
+    setSettling(true);
     try {
       await dispatch(
         recordPaymentThunk({
@@ -144,11 +144,14 @@ export const DebtsPage: React.FC = () => {
           },
         })
       ).unwrap();
-      toast.success('Debt settled');
+      toast.success('Debt settled successfully');
+      setSettleConfirmOpen(false);
       const res = await api.get(`/debts/${shown._id}`);
       setDetail(res.data.data.debt);
     } catch (e: unknown) {
       toast.error(typeof e === 'string' ? e : 'Failed to settle debt');
+    } finally {
+      setSettling(false);
     }
   };
   const handleAdd = () => {
@@ -234,7 +237,7 @@ export const DebtsPage: React.FC = () => {
           setFormOpen(true);
         }}
         onDelete={() => setDeleteOpen(true)}
-        onSettle={() => void doSettle()}
+        onSettle={() => setSettleConfirmOpen(true)}
       />
 
       <DeleteDebtDialog
@@ -245,6 +248,26 @@ export const DebtsPage: React.FC = () => {
         onCancel={() => setDeleteOpen(false)}
         onConfirm={() => void doDelete()}
       />
+
+      <Modal
+        isOpen={settleConfirmOpen}
+        onClose={() => setSettleConfirmOpen(false)}
+        title="Confirm Settlement"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Mark debt with <strong className="text-slate-900 dark:text-white">{shown?.personName}</strong> as fully settled (₹{shown ? getDebtRemaining(shown).toLocaleString('en-IN') : 0} remaining)? This will record a final payment for the remaining balance.
+          </p>
+          <div className="flex justify-end gap-2.5 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setSettleConfirmOpen(false)} disabled={settling}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => void doSettle()} isLoading={settling}>
+              Confirm Settlement
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

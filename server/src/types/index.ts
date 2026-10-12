@@ -25,6 +25,7 @@ export type NotificationType =
   | 'detected_transaction' 
   | 'budget_warning' 
   | 'budget_exceeded' 
+  | 'bill_reminder'
   | 'sync_completed' 
   | 'sync_failed' 
   | 'system';
@@ -137,6 +138,8 @@ export interface ITransaction {
   paymentMethod: PaymentMethod;
   source: TransactionSource;
   sourceAccountId?: Types.ObjectId | string | null;
+  accountId?: Types.ObjectId | string | null;
+  destinationAccountId?: Types.ObjectId | string | null;
   externalTransactionId?: string;
   refNo?: string;
   transactionDate: Date;
@@ -241,6 +244,9 @@ export interface IRecurringTransaction {
   nextDueDate: Date;
   lastProcessedDate?: Date | null;
   isActive: boolean;
+  isSubscription?: boolean;
+  reminderDaysBefore?: number;
+  lastReminderSentForDate?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

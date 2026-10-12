@@ -16,7 +16,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
       <NavLink
         to="/dashboard"
         className={({ isActive }) =>
-          `flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight transition-[color,transform] duration-150 ease-out-expo ${
+          `flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight transition-[color,transform] duration-150 ease-out-expo outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-lg ${
             isActive
               ? 'text-brand-600 dark:text-brand-400 scale-105'
               : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -30,7 +30,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
       <NavLink
         to="/transactions"
         className={({ isActive }) =>
-          `flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight transition-[color,transform] duration-150 ease-out-expo ${
+          `flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight transition-[color,transform] duration-150 ease-out-expo outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-lg ${
             isActive
               ? 'text-brand-600 dark:text-brand-400 scale-105'
               : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -45,7 +45,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
       <div className="-mt-7">
         <button
           onClick={onOpenAddModal}
-          className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 text-white flex items-center justify-center shadow-glow-emerald active:scale-95 transition-transform border border-emerald-300/30"
+          className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-brand-600 to-emerald-400 text-white flex items-center justify-center shadow-glow-emerald active:scale-95 transition-transform border border-emerald-300/30 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500 dark:focus-visible:ring-offset-slate-900"
           aria-label="Add transaction"
         >
           <Plus className="w-6 h-6 stroke-[2.5]" />
@@ -55,7 +55,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
       <NavLink
         to="/budgets"
         className={({ isActive }) =>
-          `flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight transition-[color,transform] duration-150 ease-out-expo ${
+          `flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight transition-[color,transform] duration-150 ease-out-expo outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-lg ${
             isActive
               ? 'text-brand-600 dark:text-brand-400 scale-105'
               : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -69,7 +69,7 @@ export const MobileNavigation: React.FC<MobileNavigationProps> = ({
       <button
         onClick={onOpenMoreMenu}
         aria-label="Open more navigation"
-        className="flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+        className="flex flex-col items-center justify-center py-1 px-2 gap-1 text-[10px] font-bold tracking-tight text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-lg"
       >
         <Menu className="w-5 h-5" />
         <span>More</span>

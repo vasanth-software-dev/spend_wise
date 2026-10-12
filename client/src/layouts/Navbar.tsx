@@ -11,10 +11,13 @@ import {
   AlertTriangle,
   Mail,
   ChevronDown,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../store/index.js';
 import { logoutThunk } from '../store/slices/authSlice.js';
 import { markReadThunk, markAllReadThunk } from '../store/slices/notificationSlice.js';
+import { toggleTheme } from '../store/slices/themeSlice.js';
 import { Button } from '../components/ui/Button.js';
 import { setFilters } from '../store/slices/transactionSlice.js';
 
@@ -31,6 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const { notifications, unreadCount } = useAppSelector((state) => state.notifications);
+  const isDark = useAppSelector((state) => state.theme.isDark);
 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -108,6 +112,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="hidden sm:inline">Add Transaction</span>
           <span className="sm:hidden">Add</span>
         </Button>
+
+        {/* Theme Switcher Toggle */}
+        <button
+          onClick={() => dispatch(toggleTheme())}
+          aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+          title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+          className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 border border-transparent hover:border-slate-200 dark:hover:border-white/5 transition-[background-color,border-color] duration-150 ease-out-expo"
+        >
+          {isDark ? (
+            <Sun className="w-4.5 h-4.5 text-amber-400 hover:rotate-45 transition-transform duration-200" />
+          ) : (
+            <Moon className="w-4.5 h-4.5 text-slate-600 dark:text-slate-300" />
+          )}
+        </button>
 
         {/* Notification Center */}
         <div ref={notifRef} className="relative">

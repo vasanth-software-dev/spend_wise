@@ -1,8 +1,10 @@
 import { transactionRepository, TransactionFilterParams } from '../repositories/TransactionRepository.js';
 import { categoryRepository } from '../repositories/CategoryRepository.js';
+import { accountRepository } from '../repositories/AccountRepository.js';
 import { duplicateDetectionService } from './DuplicateDetectionService.js';
 import { personService, isIdentifiablePerson } from './PersonService.js';
 import { debtCandidateService } from './DebtCandidateService.js';
+import { budgetService } from './BudgetService.js';
 import { ITransaction, TransactionType, PaymentMethod, TransactionSource } from '../types/index.js';
 import { roundTo2Decimals } from '../utils/currency.js';
 import { Types } from 'mongoose';
@@ -17,6 +19,8 @@ export interface CreateTransactionDTO {
   paymentMethod: PaymentMethod;
   source?: TransactionSource;
   sourceAccountId?: string | null;
+  accountId?: string | null;
+  destinationAccountId?: string | null;
   externalTransactionId?: string;
   refNo?: string;
   transactionDate?: Date | string;
@@ -66,6 +70,8 @@ export class TransactionService {
       paymentMethod: data.paymentMethod,
       source: data.source || 'manual',
       sourceAccountId: data.sourceAccountId ? new Types.ObjectId(data.sourceAccountId) : null,
+      accountId: data.accountId ? new Types.ObjectId(data.accountId) : null,
+      destinationAccountId: data.destinationAccountId ? new Types.ObjectId(data.destinationAccountId) : null,
       externalTransactionId: refNo,
       refNo: refNo,
       transactionDate: txDate,
@@ -75,6 +81,26 @@ export class TransactionService {
       personId: data.personId ? new Types.ObjectId(data.personId) : null,
       vpa: data.vpa ? data.vpa.trim().toLowerCase() : null,
       metadata: data.metadata || {},
+    });
+
+    // Synchronize account balances if account is linked
+    if (transaction.status === 'confirmed') {
+      if (data.type === 'expense' && data.accountId) {
+        await accountRepository.adjustBalance(data.accountId, -amount);
+      } else if (data.type === 'income' && data.accountId) {
+        await accountRepository.adjustBalance(data.accountId, +amount);
+      } else if (data.type === 'transfer') {
+        if (data.accountId) {
+          await accountRepository.adjustBalance(data.accountId, -amount);
+        }
+        if (data.destinationAccountId) {
+          await accountRepository.adjustBalance(data.destinationAccountId, +amount);
+        }
+      }
+    }
+
+    budgetService.checkBudgetAlerts(userId).catch((err) => {
+      console.warn('Failed to check budget alerts:', err);
     });
 
     return transaction;
@@ -89,9 +115,18 @@ export class TransactionService {
   }
 
   async updateTransaction(id: string, userId: string, updateData: Partial<CreateTransactionDTO>): Promise<ITransaction | null> {
+    const existing = await transactionRepository.findById(id, userId);
+    if (!existing) return null;
+
     const payload: Partial<ITransaction> = {};
 
-    if (updateData.amount !== undefined) payload.amount = roundTo2Decimals(Number(updateData.amount));
+    if (updateData.amount !== undefined) {
+      const amt = roundTo2Decimals(Number(updateData.amount));
+      if (isNaN(amt) || amt <= 0) {
+        throw new Error('Amount must be a positive number');
+      }
+      payload.amount = amt;
+    }
     if (updateData.type) payload.type = updateData.type;
     if (updateData.currency) payload.currency = updateData.currency;
     if (updateData.merchant) payload.merchant = updateData.merchant.trim();
@@ -113,12 +148,70 @@ export class TransactionService {
     if (updateData.vpa !== undefined) {
       payload.vpa = updateData.vpa ? updateData.vpa.trim().toLowerCase() : null;
     }
+    if (updateData.accountId !== undefined) {
+      payload.accountId = updateData.accountId ? new Types.ObjectId(updateData.accountId) : null;
+    }
+    if (updateData.destinationAccountId !== undefined) {
+      payload.destinationAccountId = updateData.destinationAccountId ? new Types.ObjectId(updateData.destinationAccountId) : null;
+    }
 
-    return transactionRepository.update(id, userId, payload);
+    // Revert old transaction balance impact if it was confirmed
+    if (existing.status === 'confirmed') {
+      if (existing.type === 'expense' && existing.accountId) {
+        await accountRepository.adjustBalance(existing.accountId, +existing.amount);
+      } else if (existing.type === 'income' && existing.accountId) {
+        await accountRepository.adjustBalance(existing.accountId, -existing.amount);
+      } else if (existing.type === 'transfer') {
+        if (existing.accountId) {
+          await accountRepository.adjustBalance(existing.accountId, +existing.amount);
+        }
+        if (existing.destinationAccountId) {
+          await accountRepository.adjustBalance(existing.destinationAccountId, -existing.amount);
+        }
+      }
+    }
+
+    const updated = await transactionRepository.update(id, userId, payload);
+
+    // Apply new transaction balance impact
+    if (updated && updated.status === 'confirmed') {
+      if (updated.type === 'expense' && updated.accountId) {
+        await accountRepository.adjustBalance(updated.accountId, -updated.amount);
+      } else if (updated.type === 'income' && updated.accountId) {
+        await accountRepository.adjustBalance(updated.accountId, +updated.amount);
+      } else if (updated.type === 'transfer') {
+        if (updated.accountId) {
+          await accountRepository.adjustBalance(updated.accountId, -updated.amount);
+        }
+        if (updated.destinationAccountId) {
+          await accountRepository.adjustBalance(updated.destinationAccountId, +updated.amount);
+        }
+      }
+    }
+
+    return updated;
   }
 
   async deleteTransaction(id: string, userId: string): Promise<boolean> {
-    return transactionRepository.delete(id, userId);
+    const existing = await transactionRepository.findById(id, userId);
+    if (!existing) return false;
+
+    const res = await transactionRepository.delete(id, userId);
+    if (res && existing.status === 'confirmed') {
+      if (existing.type === 'expense' && existing.accountId) {
+        await accountRepository.adjustBalance(existing.accountId, +existing.amount);
+      } else if (existing.type === 'income' && existing.accountId) {
+        await accountRepository.adjustBalance(existing.accountId, -existing.amount);
+      } else if (existing.type === 'transfer') {
+        if (existing.accountId) {
+          await accountRepository.adjustBalance(existing.accountId, +existing.amount);
+        }
+        if (existing.destinationAccountId) {
+          await accountRepository.adjustBalance(existing.destinationAccountId, -existing.amount);
+        }
+      }
+    }
+    return res;
   }
 
   /**
@@ -179,6 +272,25 @@ export class TransactionService {
   }
 
   async bulkDelete(ids: string[], userId: string): Promise<number> {
+    const transactions = await Promise.all(
+      ids.map((id) => transactionRepository.findById(id, userId))
+    );
+    for (const tx of transactions) {
+      if (tx && tx.status === 'confirmed') {
+        if (tx.type === 'expense' && tx.accountId) {
+          await accountRepository.adjustBalance(tx.accountId, +tx.amount);
+        } else if (tx.type === 'income' && tx.accountId) {
+          await accountRepository.adjustBalance(tx.accountId, -tx.amount);
+        } else if (tx.type === 'transfer') {
+          if (tx.accountId) {
+            await accountRepository.adjustBalance(tx.accountId, +tx.amount);
+          }
+          if (tx.destinationAccountId) {
+            await accountRepository.adjustBalance(tx.destinationAccountId, -tx.amount);
+          }
+        }
+      }
+    }
     return transactionRepository.deleteMany(ids, userId);
   }
 

@@ -17,7 +17,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from '../components/ui/C
 import { Button } from '../components/ui/Button.js';
 import { Badge } from '../components/ui/Badge.js';
 import { toast } from '../components/ui/Toast.js';
-import { formatINR } from '../utils/format.js';
+import { formatINR, toLocalISODate } from '../utils/format.js';
 import {
   exportReportToPDF,
   exportReportToExcel,
@@ -31,9 +31,9 @@ export const ReportsPage: React.FC = () => {
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
-    return d.toISOString().split('T')[0];
+    return toLocalISODate(d);
   });
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(() => toLocalISODate(new Date()));
   const [activePreset, setActivePreset] = useState<string>('last_30_days');
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -71,8 +71,8 @@ export const ReportsPage: React.FC = () => {
       start = new Date(now.getFullYear(), 0, 1);
     }
 
-    setStartDate(start.toISOString().split('T')[0]);
-    setEndDate(end.toISOString().split('T')[0]);
+    setStartDate(toLocalISODate(start));
+    setEndDate(toLocalISODate(end));
     setActivePreset(preset);
   };
 

@@ -34,22 +34,18 @@ export const SafeToSpendCard: React.FC<SafeToSpendCardProps> = ({ safeToSpendDat
   } = safeToSpendData;
 
   return (
-    <Card className="relative overflow-hidden border border-emerald-500/20 dark:border-emerald-500/20 bg-gradient-to-br from-emerald-950/20 via-slate-900 to-slate-900/90 shadow-glow-emerald/20 p-5 sm:p-6 transition-all duration-200">
-      {/* Decorative background glow */}
-      <div className="absolute -top-16 -right-16 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
-
+    <Card className="relative overflow-hidden border border-emerald-500/25 dark:border-emerald-500/20 bg-gradient-to-r from-emerald-500/[0.04] via-white to-white dark:from-emerald-950/20 dark:via-slate-900 dark:to-slate-900 p-5 sm:p-6 transition-all duration-150">
       <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-3 flex-1">
           {/* Header Tag */}
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               Discretionary Budget
             </span>
             <button
               onClick={() => setShowExplanation(!showExplanation)}
-              className="text-slate-400 hover:text-slate-200 transition-colors p-1"
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1"
               title="How is this calculated?"
               aria-label="How is Safe to Spend calculated?"
             >
@@ -74,28 +70,28 @@ export const SafeToSpendCard: React.FC<SafeToSpendCardProps> = ({ safeToSpendDat
 
           {/* Collapsible Formula Breakdown */}
           {showExplanation && (
-            <div className="mt-3 p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 space-y-2 animate-in fade-in duration-150">
-              <p className="font-semibold text-white">How Safe to Spend is Calculated:</p>
+            <div className="mt-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 space-y-2 animate-in fade-in duration-150">
+              <p className="font-bold text-slate-900 dark:text-white">How Safe to Spend is Calculated:</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-[11px]">
-                <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
-                  <span className="text-slate-400 block text-[10px]">Total Balance</span>
-                  <span className="font-bold text-white">{formatINR(currentBalance)}</span>
+                <div className="bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-sans uppercase font-bold">Total Balance</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{formatINR(currentBalance)}</span>
                 </div>
-                <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
-                  <span className="text-slate-400 block text-[10px]">- Upcoming Dues</span>
-                  <span className="font-bold text-rose-400">{formatINR(upcomingObligations)}</span>
+                <div className="bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-sans uppercase font-bold">- Upcoming Dues</span>
+                  <span className="font-bold text-rose-600 dark:text-rose-400">{formatINR(upcomingObligations)}</span>
                 </div>
-                <div className="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
-                  <span className="text-slate-400 block text-[10px]">- Cash Buffer</span>
-                  <span className="font-bold text-amber-400">{formatINR(cashBuffer)}</span>
+                <div className="bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <span className="text-slate-400 dark:text-slate-500 block text-[10px] font-sans uppercase font-bold">- Cash Buffer</span>
+                  <span className="font-bold text-amber-600 dark:text-amber-400">{formatINR(cashBuffer)}</span>
                 </div>
-                <div className="bg-emerald-950/40 p-2 rounded-lg border border-emerald-800/40">
-                  <span className="text-emerald-400 block text-[10px]">= Discretionary</span>
-                  <span className="font-bold text-emerald-400">{formatINR(safeToSpend)}</span>
+                <div className="bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-200 dark:border-emerald-800/40">
+                  <span className="text-emerald-700 dark:text-emerald-400 block text-[10px] font-sans uppercase font-bold">= Discretionary</span>
+                  <span className="font-bold text-emerald-700 dark:text-emerald-400">{formatINR(safeToSpend)}</span>
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400 mt-1">
-                This is a dynamic budgeting guideline calculated strictly from your recorded balances, recurring commitments, and cash reserves. It is not financial advice.
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                Dynamic budgeting guideline calculated strictly from recorded balances, recurring commitments, and cash reserves.
               </p>
             </div>
           )}
@@ -104,8 +100,8 @@ export const SafeToSpendCard: React.FC<SafeToSpendCardProps> = ({ safeToSpendDat
         {/* Right side actionable metric badges */}
         <div className="flex flex-row md:flex-col gap-3 flex-shrink-0">
           {/* Daily Recommended */}
-          <div className="bg-white/80 dark:bg-slate-850/90 border border-slate-200/80 dark:border-white/10 rounded-xl p-3.5 shadow-2xs flex-1 md:flex-initial min-w-[140px]">
-            <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-semibold mb-1">
+          <div className="bg-white dark:bg-slate-850/90 border border-slate-200/90 dark:border-white/10 rounded-xl p-3.5 shadow-2xs flex-1 md:flex-initial min-w-[150px]">
+            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-[11px] font-semibold mb-1">
               <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
               Daily Recommended
             </div>
@@ -116,14 +112,14 @@ export const SafeToSpendCard: React.FC<SafeToSpendCardProps> = ({ safeToSpendDat
           </div>
 
           {/* Days Remaining & Bills Considered */}
-          <div className="bg-white/80 dark:bg-slate-850/90 border border-slate-200/80 dark:border-white/10 rounded-xl p-3.5 shadow-2xs flex-1 md:flex-initial min-w-[140px]">
+          <div className="bg-white dark:bg-slate-850/90 border border-slate-200/90 dark:border-white/10 rounded-xl p-3.5 shadow-2xs flex-1 md:flex-initial min-w-[150px]">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-semibold mb-0.5">
-                  <Calendar className="w-3.5 h-3.5 text-brand-500" />
+                <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-[11px] font-semibold mb-0.5">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-500" />
                   Remaining
                 </div>
-                <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                <div className="text-sm font-bold text-slate-900 dark:text-white">
                   {daysRemaining} days left
                 </div>
               </div>

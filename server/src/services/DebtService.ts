@@ -37,7 +37,17 @@ export class DebtService {
         userId: new Types.ObjectId(userId),
         isDeleted: { $ne: true },
       }).lean();
-      if (!person) throw new Error('PERSON_NOT_FOUND');
+      if (!person) {
+        // If the contact was soft-deleted, preserve the historical name rather than bricking debt updates
+        const deletedPerson = await PersonModel.findOne({
+          _id: rawId,
+          userId: new Types.ObjectId(userId),
+        }).lean();
+        if (deletedPerson) {
+          return { personId: null, personName: data.personName?.trim() || deletedPerson.name };
+        }
+        throw new Error('PERSON_NOT_FOUND');
+      }
       return { personId: new Types.ObjectId(person._id), personName: person.name };
     }
     const manualName = data.personName?.trim();
