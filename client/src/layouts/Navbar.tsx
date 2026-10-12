@@ -65,9 +65,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   };
 
-  const handleLogout = () => {
-    dispatch(logoutThunk());
-    navigate('/login');
+  const handleLogout = async () => {
+    await dispatch(logoutThunk());
+    navigate('/login', { replace: true });
   };
 
   return (

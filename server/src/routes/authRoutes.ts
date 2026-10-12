@@ -11,7 +11,7 @@ const router = Router();
 router.post('/register', authLimiter, validate(registerSchema), (req, res, next) => authController.register(req, res, next));
 router.post('/login', authLimiter, validate(loginSchema), (req, res, next) => authController.login(req, res, next));
 router.post('/refresh', (req, res, next) => authController.refresh(req, res, next));
-router.post('/logout', requireAuth, (req, res, next) => authController.logout(req, res, next));
+router.post('/logout', (req, res, next) => authController.logout(req, res, next));
 router.get('/me', requireAuth, (req, res, next) => authController.me(req, res, next));
 
 // Google Socialite OAuth Endpoints

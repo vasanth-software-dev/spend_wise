@@ -1,7 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService, ClientMetadata } from '../services/AuthService.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
-import { REFRESH_COOKIE_NAME, refreshCookieOptions, clearCookieOptions, getRefreshCookieOptions } from '../utils/jwt.js';
+import {
+  REFRESH_COOKIE_NAME,
+  refreshCookieOptions,
+  clearCookieOptions,
+  getRefreshCookieOptions,
+  getClearCookieOptions,
+  verifyAccessToken,
+  verifyRefreshToken,
+} from '../utils/jwt.js';
 import { AuthenticatedRequest } from '../middleware/authMiddleware.js';
 import { GoogleSocialiteProvider, resolveAuthRedirectUri } from '../providers/social/GoogleSocialiteProvider.js';
 import { env } from '../config/env.js';
@@ -73,19 +81,54 @@ export class AuthController {
 
       sendSuccess(res, { user, accessToken: tokens.accessToken, sessionId }, 'Token refreshed');
     } catch (err) {
-      res.clearCookie(REFRESH_COOKIE_NAME, clearCookieOptions);
+      res.clearCookie(REFRESH_COOKIE_NAME, getClearCookieOptions(req));
       next(err);
     }
   }
 
-  async logout(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const sessionId = req.user?.sessionId;
-      const userId = req.user?.userId;
-      const ipAddress = req.ip;
+      let sessionId = (req as AuthenticatedRequest).user?.sessionId;
+      let userId = (req as AuthenticatedRequest).user?.userId;
 
-      await authService.logout(sessionId, userId, ipAddress);
-      res.clearCookie(REFRESH_COOKIE_NAME, clearCookieOptions);
+      // If req.user is not populated, attempt to decode token from Authorization header
+      const authHeader = req.headers.authorization;
+      if (!sessionId && authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split(' ')[1];
+          const payload = verifyAccessToken(token);
+          if (payload?.sessionId) {
+            sessionId = payload.sessionId;
+            userId = payload.userId;
+          }
+        } catch {
+          // Token expired, ignore and continue
+        }
+      }
+
+      // If still no session, check refresh cookie
+      const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+      if (!sessionId && refreshToken) {
+        try {
+          const refreshPayload = verifyRefreshToken(refreshToken);
+          if (refreshPayload?.sessionId) {
+            sessionId = refreshPayload.sessionId;
+            userId = refreshPayload.userId;
+          }
+        } catch {
+          // Token expired, ignore and continue
+        }
+      }
+
+      if (sessionId) {
+        await authService.logout(sessionId, userId, req.ip);
+      }
+
+      const clearOptions = getClearCookieOptions(req);
+      // Clear cookie for all potential paths and options
+      res.clearCookie(REFRESH_COOKIE_NAME, clearOptions);
+      res.clearCookie(REFRESH_COOKIE_NAME, { ...clearOptions, path: '/' });
+      res.clearCookie(REFRESH_COOKIE_NAME, { ...clearOptions, path: '/api/v1/auth' });
 
       sendSuccess(res, null, 'Logged out successfully');
     } catch (err) {

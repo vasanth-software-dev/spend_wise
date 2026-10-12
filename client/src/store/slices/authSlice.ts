@@ -211,10 +211,21 @@ const authSlice = createSlice({
       state.biometricError = payload?.cancelled ? null : (payload?.message ?? 'Biometric sign-in failed');
     });
 
-    // Logout
+    // Logout: immediately clear user and isAuthenticated regardless of promise outcome
+    builder.addCase(logoutThunk.pending, (state) => {
+      state.user = null;
+      state.isAuthenticated = false;
+      state.loading = false;
+    });
     builder.addCase(logoutThunk.fulfilled, (state) => {
       state.user = null;
       state.isAuthenticated = false;
+      state.loading = false;
+    });
+    builder.addCase(logoutThunk.rejected, (state) => {
+      state.user = null;
+      state.isAuthenticated = false;
+      state.loading = false;
     });
   },
 });

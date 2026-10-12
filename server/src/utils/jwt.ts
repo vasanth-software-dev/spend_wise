@@ -58,3 +58,14 @@ export function getRefreshCookieOptions(req?: { headers?: Record<string, unknown
   }
   return refreshCookieOptions;
 }
+
+export function getClearCookieOptions(req?: { headers?: Record<string, unknown>; secure?: boolean }): CookieOptions {
+  const forwardedProto = String(req?.headers?.['x-forwarded-proto'] ?? '').toLowerCase();
+  const isHttps = forwardedProto.includes('https') || req?.secure === true;
+  const publicIsHttps = (env.PUBLIC_API_URL ?? '').startsWith('https://');
+  if (isHttps || publicIsHttps || env.NODE_ENV === 'production') {
+    return { ...clearCookieOptions, secure: true, sameSite: 'none' };
+  }
+  return clearCookieOptions;
+}
+
