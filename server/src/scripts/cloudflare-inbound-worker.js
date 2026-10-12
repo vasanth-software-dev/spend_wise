@@ -21,6 +21,7 @@ export default {
    */
   async fetch(request, env, ctx) {
     const webhookUrl = env.SPENDWISE_WEBHOOK_URL || 'https://myspendwise.dpdns.org/api/v1/email-accounts/forwarding/inbound';
+    const secret = env.SPENDWISE_WEBHOOK_SECRET || 'spendwise_inbound_sec_myspendwise2026';
     const secretConfigured = !!env.SPENDWISE_WEBHOOK_SECRET;
 
     // Health check / browser view
@@ -50,10 +51,10 @@ export default {
     if (request.method === 'POST') {
       try {
         const body = await request.text();
-        const headersToSend = { 'Content-Type': 'application/json' };
-        if (env.SPENDWISE_WEBHOOK_SECRET) {
-          headersToSend['x-webhook-secret'] = env.SPENDWISE_WEBHOOK_SECRET;
-        }
+        const headersToSend = {
+          'Content-Type': 'application/json',
+          'x-webhook-secret': secret,
+        };
 
         const res = await fetch(webhookUrl, {
           method: 'POST',
@@ -83,7 +84,7 @@ export default {
    */
   async email(message, env, ctx) {
     const webhookUrl = env.SPENDWISE_WEBHOOK_URL || 'https://myspendwise.dpdns.org/api/v1/email-accounts/forwarding/inbound';
-    const secret = env.SPENDWISE_WEBHOOK_SECRET || '';
+    const secret = env.SPENDWISE_WEBHOOK_SECRET || 'spendwise_inbound_sec_myspendwise2026';
 
     const to = message.to;
     const from = message.from;
