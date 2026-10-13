@@ -44,7 +44,7 @@ export class AuthController {
       const clientMeta = extractClientMeta(req);
       const { user, tokens, sessionId } = await authService.register(req.body, clientMeta);
 
-      res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, refreshCookieOptions);
+      res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, getRefreshCookieOptions(req));
 
       sendSuccess(res, { user, accessToken: tokens.accessToken, sessionId }, 'Registration successful', 201);
     } catch (err) {
@@ -58,7 +58,7 @@ export class AuthController {
       const clientMeta = extractClientMeta(req);
       const { user, tokens, sessionId } = await authService.login(email, password, clientMeta);
 
-      res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, refreshCookieOptions);
+      res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, getRefreshCookieOptions(req));
 
       sendSuccess(res, { user, accessToken: tokens.accessToken, sessionId }, 'Login successful');
     } catch (err) {
@@ -68,20 +68,42 @@ export class AuthController {
 
   async refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const refreshToken = req.cookies[REFRESH_COOKIE_NAME];
-      if (!refreshToken) {
+      const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+      const clientMeta = extractClientMeta(req);
+
+      let result;
+      if (refreshToken) {
+        result = await authService.refreshTokens(refreshToken, clientMeta);
+      } else {
+        // Fallback: if browser blocked cross-site Set-Cookie during OAuth redirect,
+        // accept a valid Bearer accessToken (e.g. from /auth/callback?token=...) and issue a first-party refresh cookie
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          try {
+            const accessToken = authHeader.split(' ')[1];
+            const payload = verifyAccessToken(accessToken);
+            if (payload?.sessionId) {
+              result = await authService.refreshSessionById(payload.sessionId, clientMeta);
+            }
+          } catch {
+            // Invalid or expired access token, fall through to 401
+          }
+        }
+      }
+
+      if (!result) {
         sendError(res, 'No refresh token provided in cookie', 401, 'NO_REFRESH_TOKEN');
         return;
       }
 
-      const clientMeta = extractClientMeta(req);
-      const { tokens, sessionId, user } = await authService.refreshTokens(refreshToken, clientMeta);
-
-      res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, refreshCookieOptions);
+      const { tokens, sessionId, user } = result;
+      res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, getRefreshCookieOptions(req));
 
       sendSuccess(res, { user, accessToken: tokens.accessToken, sessionId }, 'Token refreshed');
     } catch (err) {
-      res.clearCookie(REFRESH_COOKIE_NAME, getClearCookieOptions(req));
+      const clearOptions = getClearCookieOptions(req);
+      res.clearCookie(REFRESH_COOKIE_NAME, clearOptions);
+      res.clearCookie(REFRESH_COOKIE_NAME, clearCookieOptions);
       next(err);
     }
   }
@@ -129,6 +151,7 @@ export class AuthController {
       res.clearCookie(REFRESH_COOKIE_NAME, clearOptions);
       res.clearCookie(REFRESH_COOKIE_NAME, { ...clearOptions, path: '/' });
       res.clearCookie(REFRESH_COOKIE_NAME, { ...clearOptions, path: '/api/v1/auth' });
+      res.clearCookie(REFRESH_COOKIE_NAME, clearCookieOptions);
 
       sendSuccess(res, null, 'Logged out successfully');
     } catch (err) {
@@ -273,7 +296,7 @@ export class AuthController {
       const clientMeta = extractClientMeta(req);
       const { user, tokens, sessionId } = await authService.handleGoogleDevLogin(req.body, clientMeta);
 
-      res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, refreshCookieOptions);
+      res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, getRefreshCookieOptions(req));
 
       sendSuccess(
         res,

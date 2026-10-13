@@ -8,6 +8,7 @@ import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '.
 import { IUser, ISession, AuthTokens } from '../types/index.js';
 import { GoogleProfile } from '../providers/social/GoogleSocialiteProvider.js';
 import { emailSyncService } from './EmailSyncService.js';
+import { ApiError } from '../utils/apiError.js';
 
 export interface RegisterDTO {
   name: string;
@@ -27,15 +28,16 @@ export interface ClientMetadata {
 
 export class AuthService {
   async register(data: RegisterDTO, clientMeta: ClientMetadata): Promise<{ user: Partial<IUser>; tokens: AuthTokens; sessionId: string }> {
-    const existing = await userRepository.findByEmail(data.email);
+    const normalizedEmail = data.email.toLowerCase().trim();
+    const existing = await userRepository.findByEmail(normalizedEmail);
     if (existing) {
-      throw new Error('An account with this email already exists');
+      throw ApiError.conflict('EMAIL_ALREADY_EXISTS', 'An account with this email already exists');
     }
 
     const passwordHash = await hashPassword(data.password);
     const user = await userRepository.create({
       name: data.name,
-      email: data.email.toLowerCase(),
+      email: normalizedEmail,
       passwordHash,
       currency: data.currency || 'INR',
       timezone: data.timezone || 'Asia/Kolkata',
@@ -68,18 +70,37 @@ export class AuthService {
     password: string,
     clientMeta: ClientMetadata
   ): Promise<{ user: Partial<IUser>; tokens: AuthTokens; sessionId: string }> {
-    const user = await userRepository.findByEmail(email);
+    const normalizedEmail = email.toLowerCase().trim();
+    let user = await userRepository.findByEmail(normalizedEmail);
+
+    // Ensure built-in demo user from LoginPage ("Fill Form") works even if DB was not seeded
+    if (!user && normalizedEmail === 'vasanth@spendwise.dev' && password === 'SpendWise@123') {
+      const passwordHash = await hashPassword('SpendWise@123');
+      user = await userRepository.create({
+        name: 'Vasanth Kumar',
+        email: normalizedEmail,
+        passwordHash,
+        currency: 'INR',
+        timezone: 'Asia/Kolkata',
+        isEmailVerified: true,
+      });
+      await categoryRepository.ensureDefaultCategories();
+    }
+
     if (!user) {
-      throw new Error('Invalid email or password');
+      throw ApiError.unauthorized('INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
     if (!user.passwordHash) {
-      throw new Error('This account was created with Google Sign-In. Please sign in using Google.');
+      throw ApiError.unauthorized(
+        'GOOGLE_ACCOUNT_ONLY',
+        'This account was created with Google Sign-In. Please sign in using Google.'
+      );
     }
 
     const isValid = await comparePassword(password, user.passwordHash);
     if (!isValid) {
-      throw new Error('Invalid email or password');
+      throw ApiError.unauthorized('INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
     const { tokens, session } = await this.createSession(user, clientMeta);
@@ -106,26 +127,41 @@ export class AuthService {
     try {
       payload = verifyRefreshToken(oldRefreshToken);
     } catch {
-      throw new Error('Invalid or expired refresh token');
+      throw ApiError.unauthorized('INVALID_REFRESH_TOKEN', 'Invalid or expired refresh token');
     }
 
-    const session = await sessionRepository.findById(payload.sessionId);
+    return this.refreshSessionById(payload.sessionId, clientMeta);
+  }
+
+  async refreshSessionById(
+    sessionId: string,
+    clientMeta: ClientMetadata
+  ): Promise<{ tokens: AuthTokens; sessionId: string; user: Partial<IUser> }> {
+    const session = await sessionRepository.findById(sessionId);
     if (!session || !session.isValid) {
-      throw new Error('Session is no longer valid');
+      throw ApiError.unauthorized('SESSION_INVALID', 'Session is no longer valid');
     }
 
-    const user = await userRepository.findById(payload.userId);
+    const user = await userRepository.findById(String(session.userId));
     if (!user) {
-      throw new Error('User not found');
+      throw ApiError.unauthorized('USER_NOT_FOUND', 'User not found');
     }
 
-    // Refresh token rotation: Invalidate old session and create a new session
-    await sessionRepository.invalidate(String(session._id));
-    const { tokens, session: newSession } = await this.createSession(user, clientMeta);
+    const payload = {
+      userId: String(user._id),
+      email: user.email,
+      sessionId: String(session._id),
+    };
+
+    const accessToken = generateAccessToken(payload);
+    const refreshToken = generateRefreshToken(payload);
+    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+    await sessionRepository.updateRefreshToken(String(session._id), tokenHash, clientMeta);
 
     return {
-      tokens,
-      sessionId: String(newSession._id),
+      tokens: { accessToken, refreshToken },
+      sessionId: String(session._id),
       user: this.sanitizeUser(user),
     };
   }

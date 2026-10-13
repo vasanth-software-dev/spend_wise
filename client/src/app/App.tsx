@@ -28,6 +28,10 @@ export const App: React.FC = () => {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
+    // Skip on /auth/callback since AuthCallbackPage handles token exchange & auth check directly
+    if (window.location.pathname.replace(/^\/+/, '/').startsWith('/auth/callback')) {
+      return;
+    }
     // Attempt automatic authentication on initial load via HttpOnly refresh cookie
     dispatch(checkAuthThunk());
   }, [dispatch]);

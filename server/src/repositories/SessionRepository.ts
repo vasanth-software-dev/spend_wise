@@ -19,6 +19,24 @@ export class SessionRepository {
     await SessionModel.findByIdAndUpdate(id, { $set: { lastActive: new Date() } });
   }
 
+  async updateRefreshToken(
+    id: string,
+    refreshTokenHash: string,
+    meta?: { userAgent?: string; ipAddress?: string; device?: string; browser?: string; os?: string }
+  ): Promise<void> {
+    await SessionModel.findByIdAndUpdate(id, {
+      $set: {
+        refreshTokenHash,
+        lastActive: new Date(),
+        ...(meta?.userAgent ? { userAgent: meta.userAgent } : {}),
+        ...(meta?.ipAddress ? { ipAddress: meta.ipAddress } : {}),
+        ...(meta?.device ? { device: meta.device } : {}),
+        ...(meta?.browser ? { browser: meta.browser } : {}),
+        ...(meta?.os ? { os: meta.os } : {}),
+      },
+    });
+  }
+
   async invalidate(id: string): Promise<boolean> {
     const res = await SessionModel.findByIdAndUpdate(id, { $set: { isValid: false } });
     return !!res;

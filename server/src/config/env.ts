@@ -9,7 +9,10 @@ dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(8080),
-  CLIENT_URL: z.string().default('http://localhost:5173'),
+  CLIENT_URL: z
+    .string()
+    .default('http://localhost:5173')
+    .transform((s) => s.trim().replace(/\/+$/, '')),
   // Comma-separated extra frontend origins (e.g. ngrok client URL) allowed for CORS.
   // Example: CLIENT_URLS=https://abc123.ngrok-free.app,https://def456.ngrok-free.app
   CLIENT_URLS: z.string().optional(),
