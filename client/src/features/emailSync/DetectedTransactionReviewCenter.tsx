@@ -68,6 +68,29 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
   const [isSimulating, setIsSimulating] = useState(false);
   const [isManualSyncing, setIsManualSyncing] = useState(false);
 
+  // Dynamic sync calculation
+  const latestSyncDate = useMemo(() => {
+    const dates = accounts
+      .map((a) => a.lastSyncAt)
+      .filter(Boolean)
+      .map((d) => new Date(d!).getTime());
+    return dates.length > 0 ? new Date(Math.max(...dates)) : null;
+  }, [accounts]);
+
+  const isAnySyncing = useMemo(() => {
+    return isManualSyncing || Object.values(isSyncing).some(Boolean);
+  }, [isManualSyncing, isSyncing]);
+
+  const syncTimeBadgeText = useMemo(() => {
+    if (isAnySyncing) return 'Syncing...';
+    if (!latestSyncDate) return 'Live Sync Active';
+    const diffSec = Math.floor((Date.now() - latestSyncDate.getTime()) / 1000);
+    if (diffSec < 60) return 'Synced just now';
+    if (diffSec < 3600) return `Synced ${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `Synced ${Math.floor(diffSec / 3600)}h ago`;
+    return `Synced ${Math.floor(diffSec / 86400)}d ago`;
+  }, [isAnySyncing, latestSyncDate]);
+
   // Ensure categories and accounts are loaded
   useEffect(() => {
     if (categories.length === 0) {
@@ -75,11 +98,6 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
     }
     dispatch(fetchAccountsThunk());
   }, [dispatch, categories.length]);
-
-  // Only display review center when there are actual detected transactions requiring review
-  if (pendingTransactions.length === 0) {
-    return null;
-  }
 
   const activeItems = pendingTransactions;
   const flaggedCount = activeItems.length;
@@ -218,29 +236,6 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
     }
   };
 
-  // Dynamic sync calculation
-  const latestSyncDate = useMemo(() => {
-    const dates = accounts
-      .map((a) => a.lastSyncAt)
-      .filter(Boolean)
-      .map((d) => new Date(d!).getTime());
-    return dates.length > 0 ? new Date(Math.max(...dates)) : null;
-  }, [accounts]);
-
-  const isAnySyncing = useMemo(() => {
-    return isManualSyncing || Object.values(isSyncing).some(Boolean);
-  }, [isManualSyncing, isSyncing]);
-
-  const syncTimeBadgeText = useMemo(() => {
-    if (isAnySyncing) return 'Syncing...';
-    if (!latestSyncDate) return 'Live Sync Active';
-    const diffSec = Math.floor((Date.now() - latestSyncDate.getTime()) / 1000);
-    if (diffSec < 60) return 'Synced just now';
-    if (diffSec < 3600) return `Synced ${Math.floor(diffSec / 60)}m ago`;
-    if (diffSec < 86400) return `Synced ${Math.floor(diffSec / 3600)}h ago`;
-    return `Synced ${Math.floor(diffSec / 86400)}d ago`;
-  }, [isAnySyncing, latestSyncDate]);
-
   const handleTriggerSync = async () => {
     if (accounts.length === 0) {
       toast.info('No email or sync accounts connected yet.');
@@ -281,6 +276,11 @@ export const DetectedTransactionReviewCenter: React.FC = () => {
       setIsSimulating(false);
     }
   };
+
+  // Only display review center when there are actual detected transactions requiring review
+  if (pendingTransactions.length === 0) {
+    return null;
+  }
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-2xs overflow-hidden transition-all duration-200">
