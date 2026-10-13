@@ -30,6 +30,9 @@ import {
   extractForwardingToken,
   extractGmailVerificationCode,
   unwrapForwardedEmail,
+  parseRawMimeEmail,
+  decodeRfc2047,
+  decodeQuotedPrintable,
 } from '../utils/inboundEmailUnwrapper.js';
 import { isDateInMonthYear, toValidDate } from '../utils/dateRange.js';
 
@@ -465,25 +468,41 @@ export class EmailSyncService {
       }
     }
 
-    const fromField =
-      rawPayload.from ||
-      rawPayload.sender ||
-      rawPayload.From ||
-      (rawPayload as any)['sender-address'] ||
-      'unknown@sender.com';
-    const subject = rawPayload.subject || rawPayload.Subject || '(No Subject)';
-    const textBody =
+    const rawInputText =
       rawPayload.text ||
       rawPayload.bodyText ||
       rawPayload['body-plain'] ||
       rawPayload.TextBody ||
+      (rawPayload as any).raw ||
       '';
-    const htmlBody =
+    const rawInputHtml =
       rawPayload.html ||
       rawPayload.bodyHtml ||
       rawPayload['body-html'] ||
       rawPayload.HtmlBody ||
       '';
+
+    // Automatically detect and unwrap RFC 5322 MIME stream (from Cloudflare Email Routing message.raw or SendGrid)
+    const mimeParsed = parseRawMimeEmail(rawInputText);
+    const textBody = mimeParsed.text || rawInputText;
+    const htmlBody = rawInputHtml || mimeParsed.html || '';
+
+    if (!toField && mimeParsed.to) {
+      toField = mimeParsed.to;
+    }
+
+    const rawFromField =
+      rawPayload.from ||
+      rawPayload.sender ||
+      rawPayload.From ||
+      (rawPayload as any)['sender-address'] ||
+      mimeParsed.from ||
+      'unknown@sender.com';
+    const fromField = decodeRfc2047(rawFromField);
+
+    const rawSubject = rawPayload.subject || rawPayload.Subject || mimeParsed.subject || '(No Subject)';
+    const subject = decodeRfc2047(rawSubject);
+
     const messageId =
       rawPayload.messageId ||
       rawPayload.MessageID ||

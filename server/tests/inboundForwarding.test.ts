@@ -94,4 +94,78 @@ Available Balance: INR 1,24,500.00.`,
     expect(parsed?.upiReference).toBe('426899120943');
     expect(parsed?.confidenceScore).toBeGreaterThanOrEqual(90);
   });
+
+  it('correctly decodes quoted-printable and RFC 2047 Indian Rupee symbols and headers', async () => {
+    const { decodeQuotedPrintable, decodeRfc2047 } = await import('../src/utils/inboundEmailUnwrapper.js');
+
+    const qpEncoded = 'You paid =E2=82=B91,250.00 to Swiggy=\r\n on Google Pay';
+    const decoded = decodeQuotedPrintable(qpEncoded);
+    expect(decoded).toBe('You paid ₹1,250.00 to Swiggy on Google Pay');
+
+    const rfc2047Header = '=?UTF-8?Q?You_paid_=E2=82=B9489.00_to_Swiggy?=';
+    expect(decodeRfc2047(rfc2047Header)).toBe('You paid ₹489.00 to Swiggy');
+
+    const base64Header = '=?UTF-8?B?U3dpZ2d5IE9yZGVyIFJlY2VpcHQ=?=';
+    expect(decodeRfc2047(base64Header)).toBe('Swiggy Order Receipt');
+  });
+
+  it('parses raw multipart RFC 5322 MIME messages as delivered by Cloudflare Email Routing', async () => {
+    const { parseRawMimeEmail } = await import('../src/utils/inboundEmailUnwrapper.js');
+
+    const rawCloudflareMime = `Received: by mail-ed1-f67.google.com with SMTP id 12345
+From: "Google Pay" <payments-noreply@google.com>
+To: <sync-e7a2647e@myspendwise.dpdns.org>
+Subject: =?UTF-8?Q?You_paid_=E2=82=B9750.00_to_Zomato?=
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="===============7381928491=="
+
+--===============7381928491==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+---------- Forwarded message ---------
+From: Google Pay <payments-noreply@google.com>
+Date: Fri, 26 Sep 2026 at 12:00
+Subject: You paid =E2=82=B9750.00 to Zomato using Google Pay
+To: <user@gmail.com>
+
+Dear User,
+You paid =E2=82=B9750.00 to Zomato.
+UPI transaction ID: 987654321098
+Google transaction ID: CICAgKDL999
+Payment method: HDFC Bank A/C XX4321
+
+--===============7381928491==
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div>You paid ₹750.00 to Zomato</div>
+
+--===============7381928491==--
+`;
+
+    const parsedMime = parseRawMimeEmail(rawCloudflareMime);
+    expect(parsedMime.to).toBe('<sync-e7a2647e@myspendwise.dpdns.org>');
+    expect(parsedMime.subject).toBe('You paid ₹750.00 to Zomato');
+    expect(parsedMime.text).toContain('---------- Forwarded message ---------');
+    expect(parsedMime.text).toContain('You paid ₹750.00 to Zomato');
+    expect(parsedMime.text).toContain('UPI transaction ID: 987654321098');
+
+    // Feed through unwrapForwardedEmail
+    const { unwrapped } = unwrapForwardedEmail({
+      id: 'cf-test-1',
+      sender: 'user@gmail.com',
+      recipient: parsedMime.to!,
+      subject: parsedMime.subject!,
+      date: new Date(),
+      bodyText: parsedMime.text,
+      bodyHtml: parsedMime.html,
+    });
+
+    const parsedTransaction = await emailParserRegistry.parse(unwrapped);
+    expect(parsedTransaction).not.toBeNull();
+    expect(parsedTransaction?.amount).toBe(750);
+    expect(parsedTransaction?.merchant).toBe('Zomato');
+    expect(parsedTransaction?.upiReference).toBe('987654321098');
+  });
 });

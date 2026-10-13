@@ -95,12 +95,12 @@ export default {
     // Read raw email body text
     const rawEmail = await new Response(message.raw).text();
 
-    // Extract plain text / basic body from raw email
     const payload = {
       to,
       from,
       subject,
       text: rawEmail,
+      raw: rawEmail,
       messageId,
       envelope: JSON.stringify({ to: [to], from }),
     };
@@ -113,8 +113,15 @@ export default {
       headersToSend['x-webhook-secret'] = secret;
     }
 
+    // Include secret in query parameter as fallback in case proxies strip custom headers
+    let targetUrl = webhookUrl;
+    if (secret && !targetUrl.includes('secret=')) {
+      const sep = targetUrl.includes('?') ? '&' : '?';
+      targetUrl = `${targetUrl}${sep}secret=${encodeURIComponent(secret)}`;
+    }
+
     try {
-      const response = await fetch(webhookUrl, {
+      const response = await fetch(targetUrl, {
         method: 'POST',
         headers: headersToSend,
         body: JSON.stringify(payload),
